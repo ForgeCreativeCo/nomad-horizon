@@ -75,6 +75,17 @@ canvas#scene{position:absolute;inset:0;width:100%;height:100%;display:block;}
 #shipTag .lbl{font-family:var(--font-mono);font-size:.62rem;letter-spacing:.12em;color:var(--cyan);text-shadow:0 1px 4px rgba(0,0,0,.9);white-space:nowrap;}
 #shipTag .lbl b{color:var(--ink);font-weight:400;}
 #shipTag.edge .dia{background:var(--cyan);}
+.navtag{position:absolute;left:0;top:0;display:flex;flex-direction:column;align-items:center;gap:.25rem;margin:-.55rem 0 0 -5rem;width:10rem;pointer-events:none;}
+.navtag .dia{width:.75rem;height:.75rem;border:2px solid #e8d2a8;transform:rotate(45deg);box-shadow:0 0 8px rgba(232,210,168,.6);}
+.navtag .lbl{display:flex;flex-direction:column;align-items:center;font-family:var(--font-mono);font-size:.6rem;letter-spacing:.12em;color:#e8d2a8;
+  text-shadow:0 1px 4px rgba(0,0,0,.95);white-space:nowrap;line-height:1.35;}
+.navtag .lbl b{color:var(--ink);font-weight:400;}
+.navtag.drop .dia{border-color:var(--amber);box-shadow:0 0 12px var(--amber);animation:droppulse 1.6s ease-in-out infinite;}
+.navtag.drop .lbl{color:var(--amber);}
+.navtag.edge .dia{background:currentColor;}
+.navtag.drop.edge .dia{background:var(--amber);}
+@keyframes droppulse{50%{transform:rotate(45deg) scale(1.35);}}
+@media (prefers-reduced-motion:reduce){.navtag.drop .dia{animation:none;}}
 #veil{position:absolute;inset:0;z-index:4;opacity:0;pointer-events:none;}
 #heat{position:absolute;inset:0;z-index:5;opacity:0;pointer-events:none;mix-blend-mode:screen;
   background:radial-gradient(ellipse at 50% 55%,transparent 38%,rgba(255,110,30,.45) 70%,rgba(255,220,160,.85) 100%);}
@@ -216,6 +227,10 @@ button:focus-visible{outline:2px solid var(--cyan);outline-offset:3px;}
 .wp-star{width:.85rem;height:.85rem;border-radius:50%;box-shadow:0 0 12px currentColor;grid-row:span 2;}
 .wp-name{font-family:var(--font-display);font-weight:700;font-size:.95rem;letter-spacing:.08em;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .wp-dist{font-family:var(--font-mono);font-size:.66rem;color:var(--ink-dim);font-variant-numeric:tabular-nums;}
+.wp-row.drop{border-color:rgba(255,178,77,.75);background:rgba(255,178,77,.08);}
+.wp-drop{grid-column:2 / 4;font-family:var(--font-mono);font-size:.6rem;letter-spacing:.1em;color:var(--amber);}
+#btnWarp.has-drop::after{content:"";position:absolute;top:.5rem;right:.55rem;width:.6rem;height:.6rem;border-radius:50%;background:var(--amber);box-shadow:0 0 10px var(--amber);}
+.st-row .nm small.fx .xs{color:var(--amber);}
 .wp-meta{grid-column:2 / 4;font-family:var(--font-mono);font-size:.6rem;letter-spacing:.06em;color:var(--ink-dim);}
 #wpClose{align-self:center;margin-top:.2rem;font-family:var(--font-mono);font-size:.68rem;letter-spacing:.16em;color:var(--ink-dim);
   background:none;border:1px solid var(--line);border-radius:99px;padding:.55rem 1.4rem;cursor:pointer;}
@@ -241,6 +256,7 @@ button:focus-visible{outline:2px solid var(--cyan);outline-offset:3px;}
     <button id="gfxBtn" class="panel" type="button">GFX <b id="gfxName">HIGH</b></button>
     <div id="radarWrap"><canvas id="radar" width="200" height="200"></canvas><div id="radarCap"></div></div>
     <div id="fps"></div>
+    <div id="navTags"></div>
     <div id="shipTag" hidden><span class="dia"></span><span class="lbl">SHIP <b id="shipTagDist">0m</b></span></div>
     <div id="reticle"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="2.2"/><path d="M12 3v4M12 17v4M3 12h4M17 12h4"/></svg></div>
     <div id="scanring"></div>
@@ -1554,6 +1570,7 @@ function renderInv(){
     c.textContent='\u25b8 '+g.n+' \u2192 '+g.d.name+(SYS && g.d.sys!==SYS.seed?' ('+g.d.sysName+')':'')+(g.tl?' \u00b7 '+g.tl:'');
     row.appendChild(c); });
   $('holdVal').textContent=holdUsed()+'/'+holdCap();
+  $('btnWarp').classList.toggle('has-drop', remoteDests().length>0);
   $('credVal').textContent=state.credits.toLocaleString();
 }
 $('gfxName').textContent=Q.name;
@@ -1782,22 +1799,37 @@ var CARGO_NAMES={
 var KIND_MULT={standard:1, fragile:1.35, perishable:1.5, hazardous:1.85};
 var KIND_TAG={standard:'', fragile:'FRAGILE', perishable:'PERISHABLE', hazardous:'HAZARDOUS'};
 
+var sysCache={};
+function sysInfo(seed){ if(!sysCache[seed]) sysCache[seed]=genSystem(seed); return sysCache[seed]; }
+function remoteLoc(seed, r){
+  var sy=sysInfo(seed), opts=[{key:seed+':S', kind:'station', name:sy.station.name, planet:-1, sys:seed, sysName:sy.name}];
+  sy.biomes.forEach(function(b,i){ if(b.town) opts.push({key:seed+':T'+i, kind:'town', name:b.town.name, planet:i, pname:b.name, sys:seed, sysName:sy.name}); });
+  return opts[Math.floor(r()*opts.length)];
+}
 function boardOffers(loc){
   var g=state.boardGen[loc.key]||0, r=rng(ihash(ihash(SYS.seed+11,loc.planet+20),g*31+7));
-  var others=locations().filter(function(l){ return l.key!==loc.key; }), out=[];
+  var others=locations().filter(function(l){ return l.key!==loc.key; }), out=[], nbs=neighbourSeeds(SYS.seed,3);
   if(!others.length) return out;
   for(var k=0;k<4;k++){
-    var dest=others[Math.floor(r()*others.length)], w=r();
-    var kind=w<.42?'standard':w<.64?'fragile':w<.84?'perishable':'hazardous';
+    var remote=r()<.3, dest, dist, ly=0;
+    if(remote){ var ns=nbs[Math.floor(r()*nbs.length)]; dest=remoteLoc(ns,r); ly=lightYears(SYS.seed,ns); }
+    else { dest=others[Math.floor(r()*others.length)]; dist=locPos(loc).distanceTo(locPos(dest)); }
+    var w=r(), kind=w<.42?'standard':w<.64?'fragile':w<.84?'perishable':'hazardous';
     var names=CARGO_NAMES[kind], crates=r()<.35?2:1;
-    var dist=locPos(loc).distanceTo(locPos(dest));
-    var reward=Math.round((210+dist*1.4)*KIND_MULT[kind]*(crates===2?1.75:1)/10)*10;
+    var base=remote?(520+ly*55):(210+dist*1.4);
+    var reward=Math.round(base*KIND_MULT[kind]*(crates===2?1.75:1)/10)*10;
     var id=loc.key+':'+g+':'+k;
     if(state.taken[id]) continue;
-    out.push({id:id, kind:kind, name:names[Math.floor(r()*names.length)], crates:crates, reward:reward,
-      from:loc.name, dest:dest, limit:kind==='perishable'?Math.round((dist/35+4)*60):0});
+    out.push({id:id, kind:kind, name:names[Math.floor(r()*names.length)], crates:crates, reward:reward, from:loc.name, dest:dest, ly:ly,
+      limit:kind==='perishable'?(remote?Math.round((ly*12+420)):Math.round((dist/35+4)*60)):0});
   }
   return out;
+}
+/* systems (other than this one) you are carrying freight for */
+function remoteDests(){
+  var m={};
+  state.cargo.forEach(function(c){ if(!SYS || c.dest.sys===SYS.seed) return; var k=c.dest.sys; if(!m[k]) m[k]={sys:k, sysName:c.dest.sysName, crates:0, stops:{}}; m[k].crates+=c.crates; m[k].stops[c.dest.name]=1; });
+  return Object.keys(m).map(function(k){ return m[k]; });
 }
 function acceptOffer(o, loc){
   if(holdUsed()+o.crates>holdCap()) return false;
@@ -1996,7 +2028,7 @@ function closeTerminal(){
   if(state.mode==='surface'){ showFlightControls(true); state.terminalCool=2; }
 }
 function tagHTML(kind){ return KIND_TAG[kind]?'<span class="tag k-'+kind+'">'+KIND_TAG[kind]+'</span>':''; }
-function destLabel(d){ return d.kind==='station'?d.name+' (station)':d.name+' ('+d.pname+')'; }
+function destLabel(d){ var here=!SYS||d.sys===SYS.seed; return (d.kind==='station'?d.name+' (station)':d.name+' ('+d.pname+')')+(here?'':' · '+d.sysName+' system'); }
 function renderTerminal(tab){
   var loc=termLoc; if(!loc) return;
   stTab=tab||stTab;
@@ -2020,7 +2052,7 @@ function renderTerminal(tab){
     if(other.length){
       h+='<div class="st-sub">IN YOUR HOLD</div>';
       other.forEach(function(c){ var tl=timeLeft(c);
-        h+='<div class="st-row job"><span class="nm">'+c.name+tagHTML(c.kind)+'<small>To '+destLabel(c.dest)+(c.dest.sys!==SYS.seed?' in '+c.dest.sysName:'')+'</small>'+
+        h+='<div class="st-row job"><span class="nm">'+c.name+tagHTML(c.kind)+'<small>To '+destLabel(c.dest)+'</small>'+
           '<small class="fx">'+fmt(cargoPay(c).pay)+' units'+(tl?' · '+tl+' left':'')+(c.kind==='fragile'?' · condition '+Math.round(c.cond*100)+'%':'')+'</small></span></div>'; });
     }
     var offers=boardOffers(loc);
@@ -2029,7 +2061,7 @@ function renderTerminal(tab){
     offers.forEach(function(o){
       var fits=used+o.crates<=cap;
       h+='<div class="st-row job"><span class="nm">'+o.name+tagHTML(o.kind)+'<small>'+o.crates+' crate'+(o.crates>1?'s':'')+' to '+destLabel(o.dest)+'</small>'+
-        '<small class="fx">Pays '+fmt(o.reward)+' units'+(o.limit?' · '+Math.round(o.limit/60)+' min limit':'')+(o.kind==='fragile'?' · pay drops if you crash':'')+'</small></span>'+
+        '<small class="fx">'+(o.ly?'<span class="xs">WARP '+o.ly+' LY</span> ':'')+'Pays '+fmt(o.reward)+' units'+(o.limit?' · '+Math.round(o.limit/60)+' min limit':'')+(o.kind==='fragile'?' · pay drops if you crash':'')+'</small></span>'+
         '<span class="acts"><button class="pri" data-act="accept" data-id="'+o.id+'"'+(fits?'':' disabled')+'>'+(fits?'LOAD':'HOLD FULL')+'</button></span></div>';
     });
   } else if(stTab==='trade'){
@@ -2116,7 +2148,7 @@ function updateSpace(dt){
   if(station) ri.push({x:station.center.x, z:station.center.z, color:'#eef6ff', kind:'station'});
   drawRadar(ship.position, state.yaw, 420, ri, sd<170?SYS.station.name:(best?best.biome.name:''));
   setSun(SPACE_SUN.clone(),1);
-  shipTag(null);
+  shipTag(null); navTags(spaceNav());
   setClock('SYSTEM', SYS.name);
 }
 
@@ -2128,11 +2160,14 @@ function openWarp(){
   if(state.mode!=='space'||state.warp) return;
   var list=$('wpList'); list.innerHTML='';
   var seeds=neighbourSeeds(SYS.seed,3+lvl('warp')); if(SYS.seed!==0) seeds.push(0);
+  var rem={}; remoteDests().forEach(function(r){ rem[r.sys]=r; if(seeds.indexOf(r.sys)<0) seeds.push(r.sys); });
+  seeds=seeds.filter(function(sd){ return sd!==SYS.seed; }).sort(function(a,b){ return (rem[b]?1:0)-(rem[a]?1:0); });
   seeds.forEach(function(sd){
-    var sy=genSystem(sd), types=sy.biomes.map(function(b){ return TYPE_SHORT[b.type]; }).join(' · ');
-    var row=document.createElement('button'); row.type='button'; row.className='wp-row';
+    var sy=sysInfo(sd), types=sy.biomes.map(function(b){ return TYPE_SHORT[b.type]; }).join(' · '), d=rem[sd];
+    var row=document.createElement('button'); row.type='button'; row.className='wp-row'+(d?' drop':'');
     row.innerHTML='<span class="wp-star" style="color:'+sy.star.col+';background:'+sy.star.col+'"></span>'+
       '<span class="wp-name">'+(sd===0?'ORIGIN · HOME':sy.name)+'</span><span class="wp-dist">'+lightYears(SYS.seed,sd)+' LY</span>'+
+      (d?'<span class="wp-drop">▸ DROP · '+d.crates+' CRATE'+(d.crates>1?'S':'')+' FOR '+Object.keys(d.stops).join(', ')+'</span>':'')+
       '<span class="wp-meta">CLASS '+sy.star.cls+' · '+sy.biomes.length+' PLANETS · '+types+'</span>';
     row.addEventListener('click',function(){ startWarp(sd); });
     list.appendChild(row);
@@ -2171,7 +2206,9 @@ function updateWarp(dt){
   drawCompass([]); drawRadar(ship.position,state.yaw,420,[], 'WARP');
   setClock('SYSTEM', W.swapped?SYS.name:'IN TRANSIT');
   if(t>3.7){ state.warp=null; state.vel.copy(fwd).multiplyScalar(20);
-    showBanner('ARRIVED IN SYSTEM', SYS.name, 'CLASS '+SYS.star.cls+' '+SYS.star.name+' STAR · '+planets.length+' PLANETS'); }
+    showBanner('ARRIVED IN SYSTEM', SYS.name, 'CLASS '+SYS.star.cls+' '+SYS.star.name+' STAR · '+planets.length+' PLANETS');
+    var ad=activeDests(); if(ad.length) setTimeout(function(){ toast('DELIVERIES HERE · '+ad.map(function(d){ return d.loc.name; }).join(', '),'life'); },1800);
+    renderInv(); }
 }
 
 /* =========================================================================
@@ -2272,7 +2309,7 @@ function updateAtmo(dt){
   }
   drawCompass(destMarkersSurface(sh.position).concat(S.resources.filter(function(r){ return r.scanned && !r.collected; }).map(function(r){ return {bearing:bearingTo(r.x-sh.position.x,r.z-sh.position.z), color:S.biome.crystal, label:''}; })));
   drawRadar(sh.position, state.yaw, 260, surfaceRadarItems(false, sh.position), 'ALT '+Math.round(alt)+'m');
-  shipTag(null);
+  shipTag(null); navTags(surfaceNav(sh.position));
 }
 function land(onPad){
   if(state.landing) return;
@@ -2377,6 +2414,7 @@ function updateSurface(dt){
   crys.sort(function(a,b){ return a.d-b.d; }); crys.forEach(function(m,i){ if(i<2) m.label=Math.round(m.d)+'u'; });
   drawCompass(crys.reverse().concat(markers));
   drawRadar(p, state.yaw, 160, surfaceRadarItems(true, p), Math.round(dShip)+'m TO SHIP');
+  navTags(surfaceNav(p));
   shipTag(dShip>9 && !termLoc ? {pos:V3.copy(sp).add(new THREE.Vector3(0,3.2,0)), dist:dShip} : null);
 
   if(termLoc) setPrompt(null);
@@ -2429,18 +2467,49 @@ function drawRadar(center, yaw, range, items, caption){
   var cap=$('radarCap'); if(cap.textContent!==(caption||'')) cap.textContent=caption||'';
 }
 var tagEl=$('shipTag'), tagDist=$('shipTagDist'), TV=new THREE.Vector3();
-function shipTag(info){
-  if(!info){ if(!tagEl.hidden) tagEl.hidden=true; return; }
-  tagEl.hidden=false;
-  TV.copy(info.pos).project(camera);
+function projectTag(el, pos){
+  TV.copy(pos).project(camera);
   var behind=TV.z>1, x=TV.x, y=TV.y;
   if(behind){ x=-x; y=-y; }
   var W=window.innerWidth, H=window.innerHeight, m=0.86;
   var off=behind||Math.abs(x)>m||Math.abs(y)>m;
-  if(behind){ x=(x>=0?1:-1)*m; y=clamp(y,-.35,.45); }
-  else if(off){ var k=m/Math.max(Math.abs(x),Math.abs(y),1e-4); x=clamp(x*k,-.8,.8); y=clamp(y*k,-.35,.45); }
-  tagEl.style.transform='translate('+((x*.5+.5)*W).toFixed(1)+'px,'+((-y*.5+.5)*H).toFixed(1)+'px)';
-  tagEl.classList.toggle('edge',off);
+  if(behind){ x=(x>=0?1:-1)*.8; y=clamp(y,-.22,.22); }
+  else if(off){ x=(Math.abs(x)>.15?(x>0?1:-1):(x>=0?1:-1))*.8; y=clamp(y,-.22,.22); }
+  el.style.transform='translate('+((x*.5+.5)*W).toFixed(1)+'px,'+((-y*.5+.5)*H).toFixed(1)+'px)';
+  el.classList.toggle('edge',off);
+}
+var navWrap=$('navTags'), navPool=[], navSet=false;
+function navTags(list){
+  navSet=true;
+  while(navPool.length<list.length){ var d=document.createElement('div'); d.className='navtag'; d.hidden=true;
+    d.innerHTML='<span class="dia"></span><span class="lbl"><span class="nm"></span><b></b></span>'; navWrap.appendChild(d); navPool.push(d); }
+  navPool.forEach(function(el,i){
+    var it=list[i]; if(!it){ if(!el.hidden) el.hidden=true; return; }
+    el.hidden=false; el.classList.toggle('drop',!!it.drop);
+    var nm=el.querySelector('.nm'), sb=el.querySelector('b');
+    if(nm.textContent!==it.name) nm.textContent=it.name; if(sb.textContent!==it.sub) sb.textContent=it.sub;
+    projectTag(el,it.pos);
+  });
+}
+function spaceNav(){
+  if(!station) return [];
+  return activeDests().map(function(d){
+    var pos, dist;
+    if(d.loc.kind==='station'){ pos=station.center.clone().add(new THREE.Vector3(0,64,0)); dist=ship.position.distanceTo(station.center); }
+    else { var p=planets[d.loc.planet]; pos=p.mesh.position.clone().add(new THREE.Vector3(0,p.radius*1.3,0)); dist=Math.max(0,ship.position.distanceTo(p.mesh.position)-p.radius); }
+    return {pos:pos, name:'▸ '+d.loc.name, sub:d.crates+' CRATE'+(d.crates>1?'S':'')+' · '+Math.round(dist)+' KM', drop:true};
+  });
+}
+function surfaceNav(from){
+  if(!S || !S.town || termLoc) return [];
+  var d=Math.hypot(from.x,from.z); if(d<28) return [];
+  var dest=activeDests().filter(function(x){ return x.loc.kind==='town' && x.loc.planet===S.idx; })[0];
+  return [{pos:new THREE.Vector3(0,S.town.pad.y+14,0), name:(dest?'▸ ':'')+S.town.name, sub:(dest?dest.crates+' CRATE'+(dest.crates>1?'S':'')+' · ':'')+Math.round(d)+' M', drop:!!dest}];
+}
+function shipTag(info){
+  if(!info){ if(!tagEl.hidden) tagEl.hidden=true; return; }
+  tagEl.hidden=false;
+  projectTag(tagEl,info.pos);
   tagDist.textContent=Math.round(info.dist)+'m';
 }
 
@@ -2471,12 +2540,14 @@ var clock=new THREE.Clock(), fpsAcc=0, fpsN=0, fpsT=0, lastResChange=0;
 function frame(){
   requestAnimationFrame(frame);
   var dt=Math.min(.05,clock.getDelta()); state.t+=dt;
+  navSet=false;
   if(state.mode==='title') updateTitle(dt);
   else if(state.mode==='space') updateSpace(dt);
   else if(state.mode==='atmo' && S) updateAtmo(dt);
   else if(state.mode==='surface' && S) updateSurface(dt);
   state.exposure=lerp(state.exposure,state.exposureTarget,1-Math.pow(.25,dt));
   var u=finalPass.uniforms; u.exposure.value=state.exposure; u.time.value=state.t;
+  if(!navSet){ navTags([]); navSet=false; }
   composer.render(dt);
   $('enFill').style.width=state.energy.toFixed(1)+'%'; $('scFill').style.width=(state.scan*100).toFixed(1)+'%';
   fpsAcc+=dt; fpsN++; fpsT+=dt;
