@@ -61,6 +61,9 @@ canvas#scene{position:absolute;inset:0;width:100%;height:100%;display:block;}
 #compassWrap{position:absolute;left:50%;transform:translateX(-50%);top:calc(.75rem + env(safe-area-inset-top,0px));
   width:min(46vw,26rem);height:2rem;overflow:hidden;}
 #compass{width:100%;height:100%;display:block;}
+#pitchBtn{position:absolute;right:6.4rem;top:calc(.75rem + env(safe-area-inset-top,0px));pointer-events:auto;
+  font-family:var(--font-mono);font-size:.64rem;letter-spacing:.08em;color:var(--ink);padding:.5rem .65rem;cursor:pointer;}
+#pitchBtn b{color:var(--cyan);font-weight:400;}
 #gfxBtn{position:absolute;right:.75rem;top:calc(.75rem + env(safe-area-inset-top,0px));pointer-events:auto;
   font-family:var(--font-mono);font-size:.64rem;letter-spacing:.08em;color:var(--ink);padding:.5rem .65rem;cursor:pointer;}
 #gfxBtn b{color:var(--cyan);font-weight:400;}
@@ -265,6 +268,7 @@ button:focus-visible{outline:2px solid var(--cyan);outline-offset:3px;}
     </div>
     <div id="invrow"></div>
     <div id="compassWrap" class="panel"><canvas id="compass" width="520" height="40"></canvas></div>
+    <button id="pitchBtn" class="panel" type="button" aria-pressed="true">PITCH <b id="pitchName">INV</b></button>
     <button id="gfxBtn" class="panel" type="button">GFX <b id="gfxName">HIGH</b></button>
     <div id="radarWrap"><canvas id="radar" width="200" height="200"></canvas><div id="radarCap"></div></div>
     <div id="fps"></div>
@@ -1909,7 +1913,7 @@ function flyShip(dt, obj, sc, cruiseSpd, boostSpd, openK){
   // throttle keys (desktop)
   if(keys.KeyW) setThrottle(state.throttle+dt*.7); if(keys.KeyS) setThrottle(state.throttle-dt*.7);
   // turn rates with inertia
-  var tYaw=-curve(inp.x)*HH.yaw, tPitch=-curve(inp.y)*HH.pitch, k=1-Math.exp(-HH.agi*dt);
+  var tYaw=-curve(inp.x)*HH.yaw, tPitch=(INVERT_PITCH?1:-1)*curve(inp.y)*HH.pitch, k=1-Math.exp(-HH.agi*dt);
   state.yawRate+=(tYaw-state.yawRate)*k; state.pitchRate+=(tPitch-state.pitchRate)*k;
   // soft pitch limit: resistance builds near vertical instead of a wall
   var lim=1.3, pr=state.pitchRate;
@@ -2814,6 +2818,15 @@ function frame(){
   }
 }
 
+var INVERT_PITCH=true;
+try{ var ip=localStorage.getItem('nh_invert'); if(ip!==null) INVERT_PITCH=ip==='1'; }catch(e){}
+function showPitchMode(){ $('pitchName').textContent=INVERT_PITCH?'INV':'STD'; $('pitchBtn').setAttribute('aria-pressed',INVERT_PITCH?'true':'false');
+  $('pitchBtn').title=INVERT_PITCH?'Push up to dive, pull down to climb':'Push up to climb, pull down to dive'; }
+showPitchMode();
+$('pitchBtn').addEventListener('click',function(){
+  INVERT_PITCH=!INVERT_PITCH; try{ localStorage.setItem('nh_invert',INVERT_PITCH?'1':'0'); }catch(e){}
+  showPitchMode(); toast(INVERT_PITCH?'PITCH INVERTED \u00b7 PUSH UP TO DIVE':'PITCH STANDARD \u00b7 PUSH UP TO CLIMB');
+});
 $('gfxBtn').addEventListener('click',function(){
   qKey=QORDER[(QORDER.indexOf(qKey)+1)%QORDER.length]; Q=QUALITY[qKey];
   try{ localStorage.setItem('nh_quality',qKey); }catch(e){}

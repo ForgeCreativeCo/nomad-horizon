@@ -21,7 +21,7 @@ The installed app opens full screen in landscape and works offline after the fir
 
 | Action | Touch | Keyboard / mouse |
 | --- | --- | --- |
-| Steer (turn rate) | Left thumbstick | Arrow keys, A / D |
+| Steer (turn rate) | Left thumbstick (pitch inverted by default; PITCH button toggles) | Arrow keys, A / D |
 | Set speed (stays set, includes reverse) | Throttle lever | W / S |
 | Boost | BOOST button | Space or Shift |
 | Look around the ship | Drag anywhere (eases back on release) | Drag with the mouse |
