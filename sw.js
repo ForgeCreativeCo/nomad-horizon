@@ -1,6 +1,6 @@
 /* Nomad Horizon service worker: offline play + fast reloads.
    Bump VERSION on every release so installed copies pick up the new game. */
-const VERSION = 'nh-2026-10-02-hulls';
+const VERSION = 'nh-2026-10-02-vast';
 const THREE_BASE = 'https://cdn.jsdelivr.net/npm/three@0.128.0/';
 const CORE = [
   './', './index.html', './manifest.webmanifest',

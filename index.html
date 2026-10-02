@@ -395,7 +395,8 @@ else if(!gl2 && renderer.extensions.has('OES_texture_half_float') && renderer.ex
 var HDR = hdrType===THREE.HalfFloatType;
 var maxAniso = renderer.capabilities.getMaxAnisotropy();
 
-var camera = new THREE.PerspectiveCamera(62, 1, 0.1, 5000);
+var SYS_SPREAD=2.6, SUN_FAR=2.6;
+var camera = new THREE.PerspectiveCamera(62, 1, 0.1, 13000);
 var resScale = 1;
 function basePR(){ return Math.min(window.devicePixelRatio||1, Q.pr); }
 
@@ -653,8 +654,8 @@ var STAR_CLASSES=[{cls:'M',col:'#ffb07e',name:'RED DWARF'},{cls:'K',col:'#ffd3a4
   {cls:'F',col:'#f4f6ff',name:'WHITE'},{cls:'A',col:'#d4e3ff',name:'BLUE-WHITE'}];
 function systemName(seed){ var r=rng(ihash(seed,991)); return genWord(r,2+(r()<.4?1:0)).toUpperCase()+'-'+(10+Math.floor(r()*890)); }
 function homeSystem(){
-  return finishStation({seed:0, name:'ORIGIN', star:{cls:'G',col:'#fff0dc',name:'YELLOW'}, sunPos:new THREE.Vector3(-260,240,-1300),
-    planets:[{pos:new THREE.Vector3(-90,-10,-190),radius:22},{pos:new THREE.Vector3(190,22,-70),radius:26},{pos:new THREE.Vector3(-40,-24,170),radius:24},{pos:new THREE.Vector3(230,-14,210),radius:19}],
+  return finishStation({seed:0, name:'ORIGIN', star:{cls:'G',col:'#fff0dc',name:'YELLOW'}, sunPos:new THREE.Vector3(-260,240,-1300).multiplyScalar(SUN_FAR),
+    planets:[{pos:new THREE.Vector3(-90,-10,-190).multiplyScalar(SYS_SPREAD),radius:22},{pos:new THREE.Vector3(190,22,-70).multiplyScalar(SYS_SPREAD),radius:26},{pos:new THREE.Vector3(-40,-24,170).multiplyScalar(SYS_SPREAD),radius:24},{pos:new THREE.Vector3(230,-14,210).multiplyScalar(SYS_SPREAD),radius:19}],
     biomes:HOME_BIOMES, neb:['#3a2a8a','#1a7a9a','#c87a5a'], belt:3, arrival:new THREE.Vector3(0,0,24)});
 }
 function genSystem(seed){
@@ -665,8 +666,8 @@ function genSystem(seed){
   var habN=Math.min(n,1+(r()<.45?1:0)), habIdx=[];
   while(habIdx.length<habN){ var hq=Math.floor(r()*n); if(habIdx.indexOf(hq)<0) habIdx.push(hq); }
   for(var i=0;i<n;i++){
-    var ang=base+i*(TAU/n)+(r()-.5)*.7, dist=150+r()*170;
-    planets.push({pos:new THREE.Vector3(Math.cos(ang)*dist,(r()-.5)*50,Math.sin(ang)*dist), radius:16+r()*12});
+    var ang=base+i*(TAU/n)+(r()-.5)*.7, dist=(150+r()*170)*SYS_SPREAD;
+    planets.push({pos:new THREE.Vector3(Math.cos(ang)*dist,(r()-.5)*50*SYS_SPREAD,Math.sin(ang)*dist), radius:16+r()*12});
     var pr=rng(ihash(seed,100+i)), suf=['',' PRIME',' MINOR',' IV',' VII',' B','',''];
     var isHab=habIdx.indexOf(i)>=0, ft=isHab?['lush','ocean','desert'][Math.floor(pr()*3)]:['frozen','scorched','toxic','exotic'][Math.floor(pr()*4)];
     var b=genBiome(ihash(seed,i+1), genWord(pr,2+(pr()<.5?1:0)).toUpperCase()+suf[Math.floor(pr()*suf.length)], star.col, ft);
@@ -674,11 +675,11 @@ function genSystem(seed){
     biomes.push(b);
   }
   biomes.forEach(function(b,i){ b.skyBody=(i+1)%n; });
-  return finishStation({seed:seed, name:systemName(seed), star:star, sunPos:sunDir.multiplyScalar(1300), planets:planets, biomes:biomes,
+  return finishStation({seed:seed, name:systemName(seed), star:star, sunPos:sunDir.multiplyScalar(1300*SUN_FAR), planets:planets, biomes:biomes,
     neb:[hsl(r(),.45,.2), hsl(r(),.5,.22), hsl(r(),.4,.42)], belt:r()<.6?Math.floor(r()*n):-1, arrival:new THREE.Vector3(0,0,0)});
 }
 function neighbourSeeds(seed,count){ var out=[]; for(var k=1;k<=(count||3);k++) out.push((ihash(seed+977,k)%899999)+1); return out; }
-function lightYears(a,b){ return 4+ihash(Math.min(a,b),Math.max(a,b))%38; }
+function lightYears(a,b){ return 40+ihash(Math.min(a,b),Math.max(a,b))%361; }
 
 var SYS=null, BIOMES=[], planetTex=[];
 
@@ -743,6 +744,7 @@ function buildShip(landed){
    Freighter hulls (tier follows the Freighter Hull / cargo upgrade)
    0 SKIFF · 1 MULE · 2 LONGHAUL · 3 ATLAS
    ========================================================================= */
+var DOCK_RANGE=82;
 var HULL_NAMES=['SKIFF','MULE','LONGHAUL','ATLAS'], HULL_CLASS=['LIGHT COURIER','SHORT-HAUL HAULER','TRACTOR-TRAILER','HEAVY LIFTER'];
 var HULL_SPACE=.62, HULL_GROUND=.8;
 var HULL_HANDLING=[{spd:1,grip:.03},{spd:.95,grip:.045},{spd:.9,grip:.07},{spd:.86,grip:.06}];
@@ -906,7 +908,7 @@ function disposeObject(root){
    SPACE SCENE
    ========================================================================= */
 var spaceScene=new THREE.Scene();
-var SPACE_SUN=new THREE.Vector3(-260,240,-1300);
+var SPACE_SUN=new THREE.Vector3(-260,240,-1300).multiplyScalar(SUN_FAR);
 var planets=[], ship, dust, asteroidGroup=null, spaceSky, spaceSunMesh, sysGroup=null, spaceEnvRT=null;
 var ATMO_VS='varying vec3 vN; varying vec3 vW; void main(){ vN=normalize(mat3(modelMatrix)*normal); vec4 w=modelMatrix*vec4(position,1.0); vW=w.xyz; gl_Position=projectionMatrix*viewMatrix*w; }';
 var ATMO_FS=['uniform vec3 color, sunPos; uniform float limb, intensity; varying vec3 vN; varying vec3 vW;',
@@ -936,7 +938,7 @@ function ringMesh(inner, outer, color){
 function buildSpaceStatic(){
   var N=2200, pos=new Float32Array(N*3), col=new Float32Array(N*3), r=rng(77);
   for(var i=0;i<N;i++){
-    var th=r()*TAU, ph=Math.acos(2*r()-1), R=2000;
+    var th=r()*TAU, ph=Math.acos(2*r()-1), R=5000;
     pos[i*3]=R*Math.sin(ph)*Math.cos(th); pos[i*3+1]=R*Math.cos(ph); pos[i*3+2]=R*Math.sin(ph)*Math.sin(th);
     var b=Math.pow(r(),6)*6+.25, tint=r();
     col[i*3]=b*(tint<.3?1.0:.75); col[i*3+1]=b*.85; col[i*3+2]=b*(tint>.7?1.0:.8);
@@ -972,15 +974,15 @@ function buildSystem(sys){
   BIOMES.forEach(function(b,i){ planetTex.push(bakePlanetTextures(b,i,Q.tex)); });
 
   var nebTex=bake(NEBULA_FS,{c1:{value:lin(sys.neb[0])}, c2:{value:lin(sys.neb[1])}, c3:{value:lin(sys.neb[2])}},2048,1024,true);
-  spaceSky=new THREE.Mesh(new THREE.SphereGeometry(2400,64,32), new THREE.MeshBasicMaterial({map:nebTex, side:THREE.BackSide, depthWrite:false}));
+  spaceSky=new THREE.Mesh(new THREE.SphereGeometry(6000,64,32), new THREE.MeshBasicMaterial({map:nebTex, side:THREE.BackSide, depthWrite:false}));
   sysGroup.add(spaceSky);
   var pm=new THREE.PMREMGenerator(renderer); spaceEnvRT=pm.fromEquirectangular(nebTex); spaceScene.environment=spaceEnvRT.texture; pm.dispose();
 
   var starCol=lin(sys.star.col);
-  spaceSunMesh=new THREE.Mesh(new THREE.SphereGeometry(26,32,16), new THREE.MeshBasicMaterial({color:starCol.clone().multiplyScalar(40)}));
+  spaceSunMesh=new THREE.Mesh(new THREE.SphereGeometry(26*SUN_FAR,32,16), new THREE.MeshBasicMaterial({color:starCol.clone().multiplyScalar(40)}));
   spaceSunMesh.position.copy(SPACE_SUN); sysGroup.add(spaceSunMesh);
   var corona=new THREE.Sprite(new THREE.SpriteMaterial({map:glowTex, color:starCol.clone().multiplyScalar(1.3), blending:THREE.AdditiveBlending, depthWrite:false}));
-  corona.scale.set(190,190,1); spaceSunMesh.add(corona);
+  corona.scale.set(190*SUN_FAR,190*SUN_FAR,1); spaceSunMesh.add(corona);
   var sunL=new THREE.DirectionalLight(starCol, 3.0); sunL.position.copy(SPACE_SUN); sysGroup.add(sunL);
   sysGroup.add(new THREE.AmbientLight(0x1a2240,.25));
 
@@ -1866,8 +1868,8 @@ function inputAxes(){
   var y=joy.y+((keys.KeyS||keys.ArrowDown)?1:0)-((keys.KeyW||keys.ArrowUp)?1:0);
   return {x:clamp(x,-1,1), y:clamp(y,-1,1), hold: holdA||keys.Space||keys.ShiftLeft};
 }
-function flyShip(dt, obj, sc, cruiseSpd, boostSpd){
-  var inp=inputAxes(), HH=HULL_HANDLING[obj.userData.tier||0]; sc=hullCam(obj); cruiseSpd*=HH.spd; boostSpd*=HH.spd;
+function flyShip(dt, obj, sc, cruiseSpd, boostSpd, openK){
+  var inp=inputAxes(), HH=HULL_HANDLING[obj.userData.tier||0]; sc=hullCam(obj); cruiseSpd*=HH.spd*(1+2*(openK||0)); boostSpd*=HH.spd*(1+2.8*(openK||0));
   state.yaw-=look.dx*.0026; state.pitch=clamp(state.pitch-look.dy*.002,-1.2,1.2); look.dx=look.dy=0;
   var fwd=new THREE.Vector3(Math.sin(state.yaw)*Math.cos(state.pitch),Math.sin(state.pitch),Math.cos(state.yaw)*Math.cos(state.pitch)).normalize();
   var right=new THREE.Vector3().crossVectors(fwd,UP).normalize();
@@ -1969,12 +1971,12 @@ function boardOffers(loc){
     else { dest=others[Math.floor(r()*others.length)]; dist=locPos(loc).distanceTo(locPos(dest)); }
     var w=r(), kind=w<.42?'standard':w<.64?'fragile':w<.84?'perishable':'hazardous';
     var names=CARGO_NAMES[kind], crates=r()<.35?2:1;
-    var base=remote?(520+ly*55):(210+dist*1.4);
+    var base=remote?(600+ly*5.5):(210+dist*.55);
     var reward=Math.round(base*KIND_MULT[kind]*(crates===2?1.75:1)/10)*10;
     var id=loc.key+':'+g+':'+k;
     if(state.taken[id]) continue;
     out.push({id:id, kind:kind, name:names[Math.floor(r()*names.length)], crates:crates, reward:reward, from:loc.name, dest:dest, ly:ly,
-      limit:kind==='perishable'?(remote?Math.round((ly*12+420)):Math.round((dist/35+4)*60)):0});
+      limit:kind==='perishable'?(remote?Math.round((ly*1.3+420)):Math.round((dist/90+4)*60)):0});
   }
   return out;
 }
@@ -2275,7 +2277,10 @@ $('undockBtn').addEventListener('click',function(){ if(termLoc && termLoc.kind==
 function updateSpace(dt){
   if(state.dock){ updateDock(dt); return; }
   if(state.warp){ updateWarp(dt); return; }
-  var f=flyShip(dt, ship, 1, 24*speedMul(), 70*speedMul());
+  var nearD=1e9; planets.forEach(function(p){ nearD=Math.min(nearD,ship.position.distanceTo(p.mesh.position)-p.radius*1.6); });
+  if(station) nearD=Math.min(nearD,ship.position.distanceTo(station.center)-60);
+  state.openK=lerp(state.openK||0,sstep(40,320,nearD),1-Math.pow(.3,dt));
+  var f=flyShip(dt, ship, 1, 24*speedMul(), 70*speedMul(), state.openK);
   camera.lookAt(f.aim);
   entryCooldown=Math.max(0,entryCooldown-dt);
   var best=null, bd=1e9;
@@ -2303,7 +2308,7 @@ function updateSpace(dt){
   var sd=station?ship.position.distanceTo(station.center):1e9;
   if(sd<56){ cargoImpact(state.vel.length()*.6); ship.position.sub(station.center).setLength(56).add(station.center); state.vel.multiplyScalar(.3); }
   state.dockCool=Math.max(0,(state.dockCool||0)-dt);
-  if(sd<170 && !state.dockCool && $('warpPanel').hidden) setPrompt('DOCK · '+SYS.station.name,'TRADE · UPGRADES · JOBS',startDock); else setPrompt(null);
+  if(sd<DOCK_RANGE && !state.dockCool && $('warpPanel').hidden) setPrompt('DOCK · '+SYS.station.name,'TRADE · UPGRADES · CONTRACTS',startDock); else setPrompt(null);
   spaceAmbient(dt);
   updateDust(-.05-(f.boosting?.05:0), clamp((state.vel.length()-8)/50,0,.7));
   var dests=activeDests();
@@ -2315,7 +2320,7 @@ function updateSpace(dt){
   drawCompass(cm);
   var ri=planets.map(function(p){ return {x:p.mesh.position.x, z:p.mesh.position.z, color:p.biome.crystal, kind:'planet', size:p.radius}; });
   if(station) ri.push({x:station.center.x, z:station.center.z, color:'#eef6ff', kind:'station'});
-  drawRadar(ship.position, state.yaw, 420, ri, sd<170?SYS.station.name:(best?best.biome.name:''));
+  drawRadar(ship.position, state.yaw, 1100, ri, sd<DOCK_RANGE?SYS.station.name:(best?best.biome.name:''));
   setSun(SPACE_SUN.clone(),1);
   shipTag(null); navTags(spaceNav());
   setClock('SYSTEM', SYS.name);
@@ -2348,11 +2353,13 @@ $('btnWarp').addEventListener('click',openWarp);
 $('wpClose').addEventListener('click',function(){ warpPanel.hidden=true; });
 function startWarp(seed){
   warpPanel.hidden=true;
-  state.warp={t:0, seed:seed, swapped:false};
+  var ly=lightYears(SYS.seed,seed); state.warp={t:0, seed:seed, swapped:false, ly:ly, cruise:clamp(ly/75,.6,5.4), prog:0};
   setPrompt(null); toast('WARP DRIVE ENGAGED');
 }
 function updateWarp(dt){
-  var W=state.warp; W.t+=dt; var t=W.t;
+  var W=state.warp; W.t+=dt;
+  var t=W.t<1.5 ? W.t : (W.t<1.5+W.cruise ? 1.5 : W.t-W.cruise), inCruise=W.t>=1.5 && W.t<1.5+W.cruise;
+  W.prog=clamp(W.t/(1.6+W.cruise),0,1);
   var fwd=V1.set(Math.sin(state.yaw)*Math.cos(state.pitch),Math.sin(state.pitch),Math.cos(state.yaw)*Math.cos(state.pitch)).normalize();
   var spd=t<1.6 ? lerp(20,900,sstep(.15,1.5,t)) : lerp(900,24,sstep(1.8,3.6,t));
   state.vel.copy(fwd).multiplyScalar(spd);
@@ -2361,18 +2368,18 @@ function updateWarp(dt){
   ship.userData.flames.forEach(function(f){ var u=f.material.uniforms; u.intensity.value=2.4; u.time.value=state.t; f.scale.y=1.8; });
   state.fovKick = t<1.6 ? 42*sstep(.15,1.5,t) : 42*(1-sstep(1.8,3.4,t));
   camera.fov=62+state.fovKick; camera.updateProjectionMatrix();
-  var shake=sstep(.3,1.5,t)*(1-sstep(1.7,2.6,t))*.25;
+  var shake=sstep(.3,1.5,t)*(1-sstep(1.7,2.6,t))*.25*(inCruise?.6:1);
   camera.position.copy(ship.position).addScaledVector(fwd,-10).addScaledVector(UP,2.6);
   camera.position.x+=(Math.random()-.5)*shake; camera.position.y+=(Math.random()-.5)*shake;
   camera.lookAt(V2.copy(ship.position).addScaledVector(fwd,18));
   finalPass.uniforms.boost.value=state.fovKick/12;
-  var white=sstep(1.0,1.55,t)*(1-sstep(1.75,2.7,t));
+  var white=W.t<1.5+W.cruise ? 0 : sstep(1.5,1.6,t)*(1-sstep(1.75,2.7,t));
   setVeil(white,'#e4f4ff',0);
   if(t>=1.6 && !W.swapped){ W.swapped=true; loadSystem(W.seed); state.exposure=2.5; }
   spaceAmbient(dt);
   updateDust(-.06,clamp(spd/200,0,1)*(1-sstep(2.8,3.6,t)));
   setSun(SPACE_SUN.clone(),1);
-  drawCompass([]); drawRadar(ship.position,state.yaw,420,[], 'WARP');
+  drawCompass([]); drawRadar(ship.position,state.yaw,1100,[], W.swapped?'WARP':'WARP \u00b7 '+Math.max(0,Math.ceil((W.ly*(1-W.prog)))) +' LY');
   setClock('SYSTEM', W.swapped?SYS.name:'IN TRANSIT');
   if(t>3.7){ state.warp=null; state.vel.copy(fwd).multiplyScalar(20);
     showBanner('ARRIVED IN SYSTEM', SYS.name, 'CLASS '+SYS.star.cls+' '+SYS.star.name+' STAR · '+planets.length+' PLANETS');
