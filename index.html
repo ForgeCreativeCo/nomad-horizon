@@ -6,6 +6,11 @@
 <meta name="theme-color" content="#03050a">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Nomad Horizon">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <meta name="description" content="Nomad Horizon: a mobile-first space trucker game with an Unreal-style HDR look.">
 <title>Nomad Horizon</title>
 <style>
@@ -147,6 +152,11 @@ button:focus-visible{outline:2px solid var(--cyan);outline-offset:3px;}
 #loader{font-family:var(--font-mono);font-size:.7rem;letter-spacing:.08em;color:var(--ink-dim);font-variant-numeric:tabular-nums;}
 #loader .lb{display:block;width:12rem;height:2px;margin-top:.4rem;background:rgba(255,255,255,.1);}
 #loader .lb i{display:block;height:100%;width:0;background:var(--cyan);transition:width .2s;}
+#title .install-row{display:flex;align-items:center;gap:.8rem;min-height:0;}
+#installBtn{font-family:var(--font-mono);font-size:.68rem;letter-spacing:.16em;color:var(--ink);background:rgba(127,232,255,.1);
+  border:1px solid rgba(127,232,255,.55);border-radius:.35rem;padding:.6rem 1rem;cursor:pointer;}
+#iosHint{font-family:var(--font-mono);font-size:.66rem;letter-spacing:.05em;color:var(--ink-dim);}
+#iosHint b{color:var(--ink);font-weight:400;}
 #title .hint{font-family:var(--font-mono);font-size:.64rem;letter-spacing:.06em;color:var(--ink-dim);opacity:.8;}
 .toast.life{border-left-color:#9dff6a;}
 .jobline{font-family:var(--font-mono);font-size:.6rem;letter-spacing:.06em;color:var(--amber);text-shadow:0 1px 4px rgba(0,0,0,.9);max-width:15rem;}
@@ -272,11 +282,32 @@ button:focus-visible{outline:2px solid var(--cyan);outline-offset:3px;}
         <button id="enterBtn" type="button" disabled>ENTER COCKPIT</button>
         <div id="loader">Generating universe&hellip;<span class="lb"><i id="loadFill"></i></span></div>
       </div>
+      <div class="install-row"><button id="installBtn" type="button" hidden>INSTALL APP</button><span id="iosHint" hidden>Install: tap <b>Share</b>, then <b>Add to Home Screen</b></span></div>
       <div class="hint">Left thumb moves &middot; drag anywhere to look &middot; best in landscape &middot; WASD + drag + Space/E/F on desktop</div>
     </div>
   </div>
 </div>
 
+<script>
+(function(){
+  var standalone = (window.matchMedia && (matchMedia('(display-mode: standalone)').matches || matchMedia('(display-mode: fullscreen)').matches)) || navigator.standalone;
+  if('serviceWorker' in navigator && location.protocol !== 'file:'){
+    window.addEventListener('load', function(){ navigator.serviceWorker.register('sw.js').catch(function(){}); });
+  }
+  var deferred = null;
+  window.addEventListener('beforeinstallprompt', function(e){
+    e.preventDefault(); deferred = e;
+    var b = document.getElementById('installBtn'); if(b && !standalone) b.hidden = false;
+  });
+  window.addEventListener('appinstalled', function(){ var b=document.getElementById('installBtn'); if(b) b.hidden = true; });
+  document.addEventListener('DOMContentLoaded', function(){
+    var b = document.getElementById('installBtn');
+    if(b) b.addEventListener('click', function(){ if(!deferred) return; deferred.prompt(); deferred.userChoice.finally(function(){ deferred = null; b.hidden = true; }); });
+    var ios = /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    if(ios && !standalone){ var h = document.getElementById('iosHint'); if(h) h.hidden = false; }
+  });
+})();
+</script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/CopyShader.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/LuminosityHighPassShader.js"></script>
