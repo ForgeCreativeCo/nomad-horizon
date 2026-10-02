@@ -2162,26 +2162,144 @@ function buildStation(st, parent){
   function beacon(x,y,z,col,phase){ var s=new THREE.Mesh(new THREE.SphereGeometry(.6,10,8),new THREE.MeshBasicMaterial({color:col})); s.position.set(x,y,z); g.add(s); blink.push({m:s, base:col.clone(), ph:phase}); }
   beacon(0,61,0,new THREE.Color(4,.3,.2),0); beacon(0,-57,0,new THREE.Color(4,.3,.2),.5);
   beacon(47,10,0,new THREE.Color(.3,3,.6),.2); beacon(-47,10,0,new THREE.Color(4,.3,.2),.7);
-  // hangar bay (opens toward +z, below the ring)
-  var by=-14;
-  var bayMat=new THREE.MeshStandardMaterial({color:0x6c727c, map:texRep(T.plate,4,4), metalness:.7, roughness:.5});
-  box(24,1,28,0,by-7,26,bayMat); box(24,1,28,0,by+7,26,bayMat); box(1,15,28,-12.5,by,26,bayMat); box(1,15,28,12.5,by,26,bayMat);
-  box(24,15,1,0,by,12.6,dark);
-  [-7,0,7].forEach(function(xx){ box(.35,.12,26,xx,by-6.4,26,cyan); });
-  box(25,.45,.45,0,by+7.6,40.2,cyan); box(25,.45,.45,0,by-7.6,40.2,cyan); box(.45,15.4,.45,-12.9,by,40.2,cyan); box(.45,15.4,.45,12.9,by,40.2,cyan);
-  [[-12.9,by+7.6],[12.9,by+7.6],[-12.9,by-7.6],[12.9,by-7.6]].forEach(function(q,i){ beacon(q[0],q[1],40.8,new THREE.Color(4,2.2,.4),i*.25); });
-  var bayLight=new THREE.PointLight(0xcfe9ff,1.3,60,1.6); bayLight.position.set(0,by+4,28); g.add(bayLight);
-  // traffic
-  var traffic=[];
-  for(var t=0;t<2;t++){ var sh=buildHull(ihash((st.pos.x|0)+7,t)%4,false); sh.scale.setScalar(.5); parent.add(sh); traffic.push({obj:sh, r:85+t*35, ph:t*2.4, sp:.13+t*.05, tilt:.25-t*.4}); }
+  // ---- orbital freight pier (replaces the old enclosed bay) ----
+  var PY=-34, BX=[-36,-12,12,36], PLAYER_BERTH=1;
+  var plate2=new THREE.MeshStandardMaterial({color:0x6c727c, map:texRep(T.plate,4,4), metalness:.7, roughness:.5});
+  var yellowM=new THREE.MeshStandardMaterial({color:lin('#a87e1c'), metalness:.5, roughness:.55});
+  var hazT=(function(){ var c=document.createElement('canvas'); c.width=256; c.height=32; var x=c.getContext('2d'); x.fillStyle='#1b1d21'; x.fillRect(0,0,256,32); x.fillStyle='#ffb000';
+    for(var i=-32;i<288;i+=32){ x.beginPath(); x.moveTo(i,0); x.lineTo(i+16,0); x.lineTo(i-16,32); x.lineTo(i-32,32); x.closePath(); x.fill(); }
+    var t=new THREE.CanvasTexture(c); t.wrapS=t.wrapT=THREE.RepeatWrapping; t.encoding=THREE.sRGBEncoding; t.anisotropy=maxAniso; return t; })();
+  var deckM=new THREE.MeshStandardMaterial({map:texRep(hazT,3.2,1), metalness:.2, roughness:.6});
+  var tubeM=new THREE.MeshStandardMaterial({color:lin('#c9ced6'), metalness:.55, roughness:.45, side:THREE.DoubleSide});
+  var glassM=new THREE.MeshStandardMaterial({color:lin('#9fd8ff'), transparent:true, opacity:.2, metalness:.9, roughness:.05, envMapIntensity:2, depthWrite:false, side:THREE.DoubleSide});
+  var warmM=new THREE.MeshBasicMaterial({color:new THREE.Color(.5,.42,.34)});
+  var lampW=new THREE.MeshBasicMaterial({color:new THREE.Color(4,3.6,3)});
+  // concourse along the front of the hub, glass facing the berths
+  box(104,1.2,10,0,-31.4,10,dark); box(104,1.4,10,0,-19.3,10,hull); box(104,13,.6,0,-25.5,5.2,dark);
+  var inner=new THREE.Mesh(new THREE.PlaneGeometry(102,10.6),warmM); inner.position.set(0,-25.5,5.6); g.add(inner);
+  var gl=new THREE.Mesh(new THREE.PlaneGeometry(104,11),glassM); gl.position.set(0,-25.5,15); g.add(gl);
+  for(var mx=-52;mx<=52;mx+=6.5) box(.35,11.6,.35,mx,-25.5,15,dark);
+  for(var lx=-48;lx<=48;lx+=8) box(3,.15,.5,lx,-20.2,10,lampW);
+  [-1,1].forEach(function(s){ box(1,13,10,s*52,-25.5,10,hull); });
+  var crew=[], crewCols=['#e0a828','#d8582a','#2f6db3','#d9dde3','#3b8a5c'];
+  for(var w=0;w<10;w++){ var cg=new THREE.Group(), cm=new THREE.MeshStandardMaterial({color:lin(crewCols[w%5]), roughness:.7});
+    var bd=new THREE.Mesh(new THREE.CylinderGeometry(.32,.38,1.5,8),cm); bd.position.y=.75; cg.add(bd); var hd=new THREE.Mesh(new THREE.SphereGeometry(.3,10,8),cm); hd.position.y=1.8; cg.add(hd);
+    cg.position.set(-46+w*10,-30.8,8+(w%3)*2); g.add(cg); crew.push({g:cg, x0:cg.position.x, ph:w*1.7}); }
+  var cLight=new THREE.PointLight(0xffd2a0,1.4,90,1.5); cLight.position.set(0,-22,18); g.add(cLight);
+  // sign + live departures board on the concourse roof
+  function signTex(text,sub){ var c=document.createElement('canvas'); c.width=1024; c.height=192; var x=c.getContext('2d');
+    x.fillStyle='#0b1018'; x.fillRect(0,0,1024,192); x.strokeStyle='#ffb24d'; x.lineWidth=10; x.strokeRect(8,8,1008,176);
+    x.fillStyle='#ffb24d'; x.font='bold 82px "Share Tech Mono", monospace'; x.textAlign='center'; x.textBaseline='middle'; x.fillText(text,512,78);
+    x.fillStyle='#93a8c4'; x.font='34px "Share Tech Mono", monospace'; x.fillText(sub,512,150);
+    var t=new THREE.CanvasTexture(c); t.encoding=THREE.sRGBEncoding; return t; }
+  var sgn=new THREE.Mesh(new THREE.PlaneGeometry(30,5.6),new THREE.MeshBasicMaterial({map:signTex('ORBITAL FREIGHT PIER',st.name+' · BERTHS 1–4'), color:new THREE.Color(1.4,1.4,1.4)}));
+  sgn.position.set(-26,-14.6,14.9); g.add(sgn);
+  var bc=document.createElement('canvas'); bc.width=1024; bc.height=512; var bTex=new THREE.CanvasTexture(bc); bTex.encoding=THREE.sRGBEncoding;
+  var brd=new THREE.Mesh(new THREE.PlaneGeometry(22,11),new THREE.MeshBasicMaterial({map:bTex, color:new THREE.Color(1.5,1.5,1.5)})); brd.position.set(18,-12.4,14.9); g.add(brd);
+  box(23,12,.6,18,-12.4,14.4,dark); box(.6,6,.6,10,-18,14.4,dark); box(.6,6,.6,26,-18,14.4,dark);
+  // spine deck + overhead container rail
+  box(104,1.6,6,0,PY-.6,17,dark);
+  var spine=new THREE.Mesh(new THREE.PlaneGeometry(104,5),new THREE.MeshStandardMaterial({map:texRep(hazT,13,1), metalness:.2, roughness:.6})); spine.rotation.x=-Math.PI/2; spine.position.set(0,PY+.22,17); g.add(spine);
+  box(104,.8,.8,0,-15,20.5,yellowM); for(var rx=-48;rx<=48;rx+=16){ box(.6,18,.6,rx,-24.5,20.5,dark); }
+  var rail=[], CRC=['#b8452c','#2f6db3','#d9a43a','#3b8a5c','#7a4fa0'];
+  for(var r=0;r<5;r++){ var rg=new THREE.Group(); g.add(rg);
+    var tro=new THREE.Mesh(new THREE.BoxGeometry(1.8,1.2,1.6),hull); tro.position.set(0,-16,20.5); rg.add(tro);
+    var crt=new THREE.Mesh(new THREE.BoxGeometry(4.6,2.2,2.2),new THREE.MeshStandardMaterial({color:lin(CRC[r]), map:hullTextures().rib, metalness:.45, roughness:.55})); crt.position.set(0,-18,20.5); rg.add(crt);
+    rail.push({g:rg, ph:r/5}); }
+  // four berths: cradles, clamps, beacons, lifts, boarding tubes
+  var clamps=[], berthBeacons=[], lifts=[];
+  BX.forEach(function(bx,i){
+    box(3,1.8,28,bx,PY-1.6,28,dark);
+    var dk=new THREE.Mesh(new THREE.PlaneGeometry(26,10),deckM); dk.rotation.x=-Math.PI/2; dk.rotation.z=Math.PI/2; dk.position.set(bx,PY+.25,28); g.add(dk);
+    [-1,1].forEach(function(s){ box(.6,.6,26,bx+s*5.2,PY+.5,28,yellowM); });
+    [20,28,36].forEach(function(z){ [-1,1].forEach(function(s){ var cgp=new THREE.Group(); cgp.position.set(bx+s*5.4,PY+.4,z); g.add(cgp);
+      var p1=new THREE.Mesh(new THREE.BoxGeometry(.8,4.6,1.4),yellowM); p1.position.y=2.1; cgp.add(p1);
+      var p2=new THREE.Mesh(new THREE.BoxGeometry(2,.8,1.4),yellowM); p2.position.set(-s*.8,4.2,0); cgp.add(p2);
+      clamps.push({g:cgp, s:s, b:i}); }); });
+    [-1,1].forEach(function(s){ var bl=new THREE.Mesh(new THREE.SphereGeometry(.45,10,8),new THREE.MeshBasicMaterial({color:new THREE.Color(.3,3.4,.9)})); bl.position.set(bx+s*5.2,PY+.9,41.5); g.add(bl); berthBeacons.push({m:bl, b:i, k:berthBeacons.length}); });
+    var nm=new THREE.Mesh(new THREE.PlaneGeometry(7,2.4),new THREE.MeshBasicMaterial({map:signTex('BERTH '+(i+1),i===PLAYER_BERTH?'ASSIGNED TO YOU':'FREIGHT'), color:new THREE.Color(1.3,1.3,1.3)}));
+    nm.rotation.x=-Math.PI/2; nm.position.set(bx,PY+.3,17); g.add(nm);
+    box(2.4,18,2.4,bx-7.5,PY+9,17,dark); var lf=new THREE.Group(); g.add(lf);
+    var lp=new THREE.Mesh(new THREE.BoxGeometry(2.2,.3,2.2),yellowM); lf.add(lp); var lcr=new THREE.Mesh(new THREE.BoxGeometry(1.8,1.6,1.8),new THREE.MeshStandardMaterial({color:lin(CRC[(i+2)%5]), map:hullTextures().rib, metalness:.45, roughness:.55})); lcr.position.y=.95; lf.add(lcr);
+    lifts.push({g:lf, x:bx-7.5, ph:i*.27});
+    var tb=new THREE.Mesh(new THREE.CylinderGeometry(1.2,1.2,8,18,1,true),tubeM); tb.rotation.x=Math.PI/2; tb.position.set(bx+7.2,-27.5,19); g.add(tb);
+    [15,19,23].forEach(function(z){ var tr=new THREE.Mesh(new THREE.TorusGeometry(1.25,.14,8,22),dark); tr.position.set(bx+7.2,-27.5,z); g.add(tr); });
+    box(2.6,2.6,1.4,bx+7.2,-27.5,23.4,dark);
+  });
+  // approach lane lights for your berth
+  var lane=[]; for(var li=0;li<12;li++){ var ll=new THREE.Mesh(new THREE.SphereGeometry(.4,8,6),new THREE.MeshBasicMaterial({color:new THREE.Color(.6,2.6,3.6)})); ll.position.set(BX[PLAYER_BERTH],PY+1,48+li*9); g.add(ll); lane.push(ll); }
+  // berthed traffic: two parked freighters, one cycling in and out of berth 4
+  var tr0=ihash((st.pos.x|0)+7,3), parked=[];
+  [0,2].forEach(function(bi,k){ if(Q.flora<1 && k>0) return; var h=buildHull((tr0+k)%4,false); h.scale.setScalar(HULL_SPACE); h.userData.flames.concat(h.userData.glows).forEach(function(f){ f.visible=false; });
+    h.position.set(BX[bi],PY+hullGear(h)*.75+.4,28); h.rotation.y=Math.PI; g.add(h); parked.push({h:h, b:bi}); });
+  var inbound=buildHull((tr0+2)%4,false); inbound.scale.setScalar(HULL_SPACE); inbound.rotation.y=Math.PI; g.add(inbound);
+  var traffic=[]; var orb=buildHull((tr0+3)%4,false); orb.scale.setScalar(.5); parent.add(orb); traffic.push({obj:orb, r:110, ph:1.2, sp:.1, tilt:.25});
   g.updateMatrixWorld(true);
-  var mouthW=g.localToWorld(new THREE.Vector3(0,by,40)), insideW=g.localToWorld(new THREE.Vector3(0,by-.5,24)), dirW=new THREE.Vector3(Math.sin(st.yaw),0,Math.cos(st.yaw));
-  station={st:st, group:g, ring:ringG, blink:blink, traffic:traffic, center:st.pos.clone(), mouthW:mouthW, insideW:insideW, dirW:dirW};
+  var mouthW=g.localToWorld(new THREE.Vector3(BX[PLAYER_BERTH],PY,42)), insideW=g.localToWorld(new THREE.Vector3(BX[PLAYER_BERTH],PY,28)), dirW=new THREE.Vector3(Math.sin(st.yaw),0,Math.cos(st.yaw));
+  station={st:st, group:g, ring:ringG, blink:blink, traffic:traffic, center:st.pos.clone(), mouthW:mouthW, insideW:insideW, dirW:dirW,
+    pier:{clamps:clamps, beacons:berthBeacons, lifts:lifts, rail:rail, crew:crew, lane:lane, inbound:inbound, parked:parked, board:{c:bc, t:bTex, last:-1}, PY:PY, BX:BX, player:PLAYER_BERTH}};
+  drawPierBoard(true);
   return station;
+}
+function drawPierBoard(force){
+  var P=station.pier, B=P.board, sec=Math.floor(state.t*2);
+  if(!force && sec===B.last) return; B.last=sec;
+  var x=B.c.getContext('2d'); x.fillStyle='#05080d'; x.fillRect(0,0,1024,512);
+  x.fillStyle='#ffb24d'; x.font='bold 46px "Share Tech Mono", monospace'; x.textAlign='left'; x.fillText('DEPARTURES · FREIGHT',36,66);
+  x.fillStyle='#7fe8ff'; x.fillRect(36,88,952,3);
+  var dests=state.cargo.map(function(c){ return c.dest.name; }), mine=dests.length?dests[0]:'—';
+  var r=rng(ihash(SYS.seed,77)), names=SYS.biomes.filter(function(b){ return b.town; }).map(function(b){ return b.town.name; }).concat(['KORVA DOCKS','VINDRA EXCHANGE']);
+  var dockedHere=state.dock && state.dock.phase!=='approach';
+  var rows=[
+    ['1',HULL_NAMES[P.parked[0]?P.parked[0].h.userData.tier:0],names[Math.floor(r()*names.length)],'LOADING'],
+    ['2','YOU · '+HULL_NAMES[hullTier()],mine,dockedHere?(state.cargo.length?'LOADED':'DOCKED'):'ASSIGNED'],
+    ['3',P.parked[1]?HULL_NAMES[P.parked[1].h.userData.tier]:'—',P.parked[1]?names[Math.floor(r()*names.length)]:'—',P.parked[1]?'BOARDING':'OPEN'],
+    ['4',HULL_NAMES[P.inbound.userData.tier],'INBOUND',P.inPhase||'ON FINAL']];
+  x.font='34px "Share Tech Mono", monospace';
+  rows.forEach(function(row,i){ var y=150+i*86; x.fillStyle=i===1?'#132033':(i%2?'#0b1220':'#08101a'); x.fillRect(36,y-50,952,74);
+    x.fillStyle=i===1?'#7fe8ff':'#eef4fb'; x.fillText('BERTH '+row[0],52,y); x.fillText(row[1].slice(0,16),250,y); x.fillText(row[2].slice(0,16),560,y);
+    var st2=row[3], blink=(st2==='BOARDING'||st2==='ON FINAL') && sec%2;
+    x.fillStyle=st2==='OPEN'?'#93a8c4':(st2==='ASSIGNED'||st2==='ON FINAL'?'#ffb24d':'#9dff6a'); if(!blink) x.fillText(st2,826,y); });
+  B.t.needsUpdate=true;
+}
+function updatePier(dt){
+  var P=station.pier, t=state.t, K=state.dock;
+  var mineClosed=K && (K.phase==='turn'||K.phase==='docked');
+  // berth 4 traffic cycle: arrive, sit, depart (34 s loop)
+  var cyc=(t*.0294)%1, ib=P.inbound, bx=P.BX[3], parkY=P.PY+hullGear(ib)*.75+.4, z, y, vis=true, ph;
+  if(cyc<.3){ var e=1-Math.pow(1-cyc/.3,3); z=lerp(170,28,e); y=lerp(parkY+26,parkY,e); ph='ON FINAL'; }
+  else if(cyc<.7){ z=28; y=parkY; ph='UNLOADING'; }
+  else if(cyc<.95){ var e2=Math.pow((cyc-.7)/.25,2); z=lerp(28,190,e2); y=lerp(parkY,parkY+30,e2); ph='DEPARTING'; }
+  else { vis=false; z=190; y=parkY; ph='OPEN'; }
+  ib.visible=vis; ib.position.set(bx,y,z); var fly=cyc<.3||(cyc>=.7&&cyc<.95);
+  ib.userData.flames.concat(ib.userData.glows).forEach(function(f){ f.visible=fly; if(f.material.uniforms){ f.material.uniforms.intensity.value=1.2; f.material.uniforms.time.value=t; } });
+  ib.rotation.y=cyc<.3?0:Math.PI; P.inPhase=ph;
+  P.clamps.forEach(function(c){ var closed = c.b===P.player ? mineClosed : (c.b===3 ? (cyc>=.33&&cyc<.68) : true);
+    c.g.rotation.z+=((closed?0:c.s*.7)-c.g.rotation.z)*Math.min(1,dt*3); });
+  P.beacons.forEach(function(L){ var on=((t*(L.b===P.player&&K?2.5:1)+L.k*.13)%1)<.22, free=(L.b===P.player&&!mineClosed)||(L.b===3&&ph==='OPEN');
+    L.m.material.color.setRGB(free?4:.3,free?2.4:3.4,free?.6:.9).multiplyScalar(on?1:.12); });
+  P.lifts.forEach(function(l){ var u=((t*.14+l.ph)%1); l.g.position.set(l.x,P.PY+.4+Math.sin(u*Math.PI)*16,17); });
+  P.rail.forEach(function(r){ var f=((t*.025+r.ph)%1); r.g.position.x=-48+f*96; });
+  P.crew.forEach(function(c){ c.g.position.x=c.x0+Math.sin(t*.22+c.ph)*4; c.g.rotation.y=Math.cos(t*.22+c.ph)>0?Math.PI/2:-Math.PI/2; });
+  var laneOn=!mineClosed; P.lane.forEach(function(l,i){ var on=laneOn && ((t*1.4-i*.09)%1+1)%1<.16; l.material.color.setRGB(.6,2.6,3.6).multiplyScalar(on?1:.12); });
+  if(ship && ship.position.distanceTo(station.center)<400) drawPierBoard(false);
+}
+/* keep free-flying ships out of the pier structure */
+var PIER_V=new THREE.Vector3();
+function pierCollide(){
+  if(!station||!station.pier) return;
+  PIER_V.copy(ship.position); station.group.worldToLocal(PIER_V);
+  var mnx=-53, mxx=53, mny=station.pier.PY-4, mxy=-12, mnz=4, mxz=44;
+  if(PIER_V.x>mnx&&PIER_V.x<mxx&&PIER_V.y>mny&&PIER_V.y<mxy&&PIER_V.z>mnz&&PIER_V.z<mxz){
+    var d=[PIER_V.x-mnx,mxx-PIER_V.x,PIER_V.y-mny,mxy-PIER_V.y,mxz-PIER_V.z], m=Math.min.apply(null,d), k=d.indexOf(m);
+    if(k===0) PIER_V.x=mnx; else if(k===1) PIER_V.x=mxx; else if(k===2) PIER_V.y=mny; else if(k===3) PIER_V.y=mxy; else PIER_V.z=mxz;
+    station.group.localToWorld(PIER_V); ship.position.copy(PIER_V); cargoImpact(state.vel.length()*.6); state.vel.multiplyScalar(.3);
+  }
 }
 function updateStationAmbient(dt){
   if(!station) return;
   station.ring.rotation.y+=dt*.05;
+  if(station.pier) updatePier(dt);
   station.blink.forEach(function(b){ var on=((state.t*.8+b.ph)%1)<.18?1:.08; b.m.material.color.copy(b.base).multiplyScalar(on); });
   station.traffic.forEach(function(tr){
     tr.ph+=dt*tr.sp; var a=tr.ph, c=station.center;
@@ -2199,7 +2317,7 @@ function ease(t){ t=clamp(t,0,1); return t*t*t*(t*(t*6-15)+10); }
 function bez(a,c,b,t,out){ var u=1-t; return out.set(0,0,0).addScaledVector(a,u*u).addScaledVector(c,2*u*t).addScaledVector(b,t*t); }
 function faceShip(dir,k){ M4.lookAt(V3.copy(ship.position).sub(dir), ship.position, UP); QT.setFromRotationMatrix(M4); ship.quaternion.slerp(QT,k); }
 function showFlightControls(on){ $('joywrap').classList.toggle('on',on); $('actions').classList.toggle('on',on); thWrap.classList.toggle('on',on); }
-function dockPoint(){ var I=station.mouthW.clone().addScaledVector(station.dirW,-(hullLen(ship)/2+3)); I.y=station.insideW.y; return I; }
+function dockPoint(){ return station.insideW.clone().addScaledVector(UP,hullGear(ship)*.75+.4); }
 function startDock(){
   if(state.dock||!station) return;
   stopRates(); setThrottle(0);
@@ -2242,7 +2360,7 @@ function updateDock(dt){
   ship.userData.flames.forEach(function(f){ var un=f.material.uniforms; un.intensity.value=K.phase==='docked'?.05:(K.phase==='leave'?1.6:.7); un.time.value=state.t; f.scale.y=K.phase==='leave'?1.2:.6; });
   var side=new THREE.Vector3().crossVectors(K.D,UP).normalize();
   if(K.phase==='turn'||K.phase==='docked'){
-    camera.position.lerp(V2.copy(station.mouthW).addScaledVector(K.D,6+hullLen(ship)*.55).addScaledVector(UP,3+hullTop(ship)*.4).addScaledVector(side,-6-hullLen(ship)*.15),1-Math.pow(.02,dt));
+    camera.position.lerp(V2.copy(K.I).addScaledVector(K.D,hullLen(ship)*.6+11).addScaledVector(UP,8+hullTop(ship)*.8).addScaledVector(side,-3-hullLen(ship)*.2),1-Math.pow(.02,dt));
     camera.lookAt(V1.copy(K.I).addScaledVector(UP,.5));
     if(!$('stationPanel').hidden && window.innerWidth>620) camera.rotateY(-Math.atan(Math.tan(camera.fov*Math.PI/360)*camera.aspect*.42));
   } else {
@@ -2382,7 +2500,8 @@ function updateSpace(dt){
   veilHold=Math.max(0,veilHold-dt*.7);
   setVeil(Math.max(altVeil,veilHold), best?best.biome.horizon:null, heat);
   var sd=station?ship.position.distanceTo(station.center):1e9;
-  if(sd<56){ cargoImpact(state.vel.length()*.6); ship.position.sub(station.center).setLength(56).add(station.center); state.vel.multiplyScalar(.3); }
+  if(sd<56 && ship.position.y>station.center.y-14){ cargoImpact(state.vel.length()*.6); ship.position.sub(station.center).setLength(56).add(station.center); state.vel.multiplyScalar(.3); }
+  pierCollide();
   state.dockCool=Math.max(0,(state.dockCool||0)-dt);
   if(sd<DOCK_RANGE && !state.dockCool && $('warpPanel').hidden) setPrompt('DOCK · '+SYS.station.name,'TRADE · UPGRADES · CONTRACTS',startDock); else setPrompt(null);
   spaceAmbient(dt);
