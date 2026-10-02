@@ -17,13 +17,27 @@ Nomad Horizon is a Progressive Web App. Once it's hosted over HTTPS:
 
 The installed app opens full screen in landscape and works offline after the first launch. When releasing a new version, bump `VERSION` in `sw.js` so installed copies refresh their cache.
 
+**Flying**
+
 | Action | Touch | Keyboard / mouse |
 | --- | --- | --- |
-| Move / thrust | Left thumbstick | WASD or arrow keys |
-| Look / steer | Drag anywhere | Drag with the mouse |
-| Boost (space) / Jetpack (on foot) | BOOST / JET button | Space or Shift |
-| Interact (dock, land, board, terminal) | On-screen prompt | E |
+| Steer (turn rate) | Left thumbstick | Arrow keys, A / D |
+| Set speed (stays set, includes reverse) | Throttle lever | W / S |
+| Boost | BOOST button | Space or Shift |
+| Look around the ship | Drag anywhere (eases back on release) | Drag with the mouse |
+| Dock, land, board | On-screen prompt | E |
+
+**On foot**
+
+| Action | Touch | Keyboard / mouse |
+| --- | --- | --- |
+| Move | Left thumbstick | WASD |
+| Look | Drag anywhere | Drag with the mouse |
+| Jetpack | JET button | Space or Shift |
 | Scan | SCAN button | F |
+| Terminal, board ship | On-screen prompt | E |
+
+Each freighter hull has its own turn rate and weight: the Skiff snaps into turns, the Atlas swings wide and coasts out of them.
 
 ## Features
 
