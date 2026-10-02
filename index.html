@@ -1849,6 +1849,7 @@ function showBanner(eyebrow, name, meta){
 }
 
 function enterAtmosphere(p){
+  state.camYaw=null; state.camPitch=null;
   S=surfaces[p.index];
   if(S.ship.userData.tier!==hullTier()){
     var oldH=S.ship, nh=makePlayerHull(HULL_GROUND,false); S.scene.remove(oldH); disposeObject(oldH); S.scene.add(nh); S.ship=nh;
@@ -1877,7 +1878,7 @@ function enterAtmosphere(p){
 function exitAtmosphere(){
   var p=planets[S.idx], n=state.entryNormal||new THREE.Vector3(0,0,1);
   ship.position.copy(p.mesh.position).addScaledVector(n,p.radius*1.95);
-  state.yaw=Math.atan2(n.x,n.z); state.pitch=Math.asin(clamp(n.y,-1,1))*.6;
+  state.yaw=Math.atan2(n.x,n.z); state.pitch=Math.asin(clamp(n.y,-1,1))*.6; state.camYaw=null; state.camPitch=null;
   state.vel.copy(n).multiplyScalar(32);
   M4.lookAt(V3.copy(ship.position).sub(n), ship.position, UP); ship.quaternion.setFromRotationMatrix(M4);
   camera.position.copy(ship.position).addScaledVector(n,-14).addScaledVector(UP,3);
@@ -1932,22 +1933,25 @@ function flyShip(dt, obj, sc, cruiseSpd, boostSpd, openK){
   obj.userData.flames.forEach(function(f){ var u=f.material.uniforms; u.intensity.value=lerp(u.intensity.value,.25+thrust*.9,.15); u.time.value=state.t; f.scale.y=.4+thrust*.6; });
   state.fovKick=lerp(state.fovKick,boosting?14:0,1-Math.pow(.05,dt));
   camera.fov=62+state.fovKick; camera.updateProjectionMatrix();
+  // chase camera: locked to the ship's heading with a short, tight lag (no positional spring)
+  var kc=1-Math.exp(-9*dt);
+  if(state.camYaw==null){ state.camYaw=state.yaw; state.camPitch=state.pitch; }
+  state.camYaw+=wrapA(state.yaw-state.camYaw)*kc; state.camPitch+=(state.pitch-state.camPitch)*kc;
   // free-look: drag orbits the camera around the ship, easing back behind it on release
   state.lookYaw=(state.lookYaw||0)-look.dx*.006; state.lookPitch=clamp((state.lookPitch||0)-look.dy*.004,-.9,1.1); look.dx=look.dy=0;
-  if(!look.active){ var e=1-Math.exp(-2.2*dt); state.lookYaw*=1-e; state.lookPitch*=1-e; }
+  if(!look.active){ var e=1-Math.exp(-2.5*dt); state.lookYaw*=1-e; state.lookPitch*=1-e; }
   state.lookYaw=wrapA(state.lookYaw);
-  var dist=(10+state.fovKick*.15)*sc, cy=state.yaw+Math.PI+state.lookYaw, cp=state.pitch*.6+.28+state.lookPitch;
+  var dist=(10+state.fovKick*.15)*sc, cy=state.camYaw+Math.PI+state.lookYaw, cp=-state.camPitch+.24+state.lookPitch;
   CAMOFF.set(Math.sin(cy)*Math.cos(cp),Math.sin(cp),Math.cos(cy)*Math.cos(cp)).multiplyScalar(dist);
-  var camTarget=new THREE.Vector3().copy(obj.position).add(CAMOFF).addScaledVector(UP,1.2*sc);
-  if(boosting){ camTarget.x+=(Math.random()-.5)*.08; camTarget.y+=(Math.random()-.5)*.08; }
-  camera.position.lerp(camTarget,1-Math.pow(look.active?.00001:.0006,dt));
+  camera.position.copy(obj.position).add(CAMOFF).addScaledVector(UP,1.1*sc);
+  if(boosting){ camera.position.x+=(Math.random()-.5)*.08; camera.position.y+=(Math.random()-.5)*.08; }
   finalPass.uniforms.boost.value=state.fovKick/14;
-  var freeLook=Math.abs(state.lookYaw)>.08||Math.abs(state.lookPitch)>.08;
-  var aim=freeLook? new THREE.Vector3().copy(obj.position).addScaledVector(UP,1*sc) : new THREE.Vector3().copy(obj.position).addScaledVector(fwd,18*sc);
-  if(freeLook && state.aimBlend==null) state.aimBlend=0;
-  state.aimV=state.aimV||new THREE.Vector3().copy(aim); state.aimV.lerp(aim,1-Math.exp(-6*dt));
-  return {fwd:fwd, boosting:boosting, aim:state.aimV.clone()};
+  var la=state.lookYaw, lp=state.lookPitch, fl=Math.min(1,Math.max(Math.abs(la),Math.abs(lp))*3);
+  var ahead=new THREE.Vector3(Math.sin(state.camYaw)*Math.cos(state.camPitch),Math.sin(state.camPitch),Math.cos(state.camYaw)*Math.cos(state.camPitch));
+  var aim=new THREE.Vector3().copy(obj.position).addScaledVector(ahead,9*sc*(1-fl)).addScaledVector(UP,1.1*sc);
+  return {fwd:fwd, boosting:boosting, aim:aim, roll:state.bank*.35*(1-fl)};
 }
+
 function setThrottle(v){
   v=clamp(v,-.25,1); if(Math.abs(v)<.04) v=0;
   state.throttle=v; drawThrottle();
@@ -1960,7 +1964,7 @@ function drawThrottle(){
   var rh=Math.max(0,-state.throttle/1.25*100); thRev.style.height=rh.toFixed(1)+'%'; thRev.style.bottom=(20-rh).toFixed(1)+'%';
   var txt=state.throttle<0?'REV':Math.round(state.throttle*100)+'%'; if(thVal.textContent!==txt) thVal.textContent=txt;
 }
-function stopRates(){ state.yawRate=0; state.pitchRate=0; state.bank=0; state.lookYaw=0; state.lookPitch=0; state.aimV=null; }
+function stopRates(){ state.yawRate=0; state.pitchRate=0; state.bank=0; state.lookYaw=0; state.lookPitch=0; state.camYaw=null; state.camPitch=null; }
 function updateDust(stretchK, opacity){
   var arr=dust.geometry.attributes.position.array, base=dust.userData.base, B=90;
   var st=V3.copy(state.vel).multiplyScalar(stretchK);
@@ -2349,7 +2353,7 @@ function updateSpace(dt){
   if(station) nearD=Math.min(nearD,ship.position.distanceTo(station.center)-60);
   state.openK=lerp(state.openK||0,sstep(40,320,nearD),1-Math.pow(.3,dt));
   var f=flyShip(dt, ship, 1, 24*speedMul(), 70*speedMul(), state.openK);
-  camera.lookAt(f.aim);
+  camera.lookAt(f.aim); camera.rotateZ(f.roll);
   entryCooldown=Math.max(0,entryCooldown-dt);
   var best=null, bd=1e9;
   planets.forEach(function(p){ var d=ship.position.distanceTo(p.mesh.position)-p.radius; if(d<bd){ bd=d; best=p; } });
@@ -2532,7 +2536,7 @@ function updateAtmo(dt){
     if(sh.position.y<g){ var hitV=-state.vel.y; sh.position.y=g; if(state.vel.y<0) state.vel.y*=-.1; cargoImpact(hitV); }
     var hd=Math.hypot(sh.position.x,sh.position.z); if(hd>340){ sh.position.x*=340/hd; sh.position.z*=340/hd; }
     var cg=S.heightAt(camera.position.x,camera.position.z)+1.2; if(camera.position.y<cg) camera.position.y=cg;
-    camera.lookAt(f.aim);
+    camera.lookAt(f.aim); camera.rotateZ(f.roll);
   }
   updateWorld(dt, sh.position);
   var alt=sh.position.y-Math.max(S.heightAt(sh.position.x,sh.position.z),S.waterLevel);
@@ -2852,7 +2856,7 @@ async function boot(){
   frame();
 }
 window.__nh={enterPlanet:function(i){ enterAtmosphere(planets[i]); }, ready:function(i){ return !!surfaces[i]; }, land:land, board:board, exitAtmo:exitAtmosphere,
-  warp:startWarp, dock:startDock, station:function(){ return station; }, ship:function(){ return ship; }, state:state, getS:function(){ return S; }, sys:function(){ return SYS; }, enter:function(){ $('enterBtn').click(); }};
+  warp:startWarp, dock:startDock, cam:function(){ return camera; }, station:function(){ return station; }, ship:function(){ return ship; }, state:state, getS:function(){ return S; }, sys:function(){ return SYS; }, enter:function(){ $('enterBtn').click(); }};
 boot().catch(function(e){ console.error(e); $('loader').firstChild.nodeValue='Your device could not start the renderer: '+(e&&e.message||e); });
 })();
 </script>
