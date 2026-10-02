@@ -29,6 +29,7 @@ The installed app opens full screen in landscape and works offline after the fir
 
 - **Seamless flight:** fly from space through the atmosphere to the ground and back with no loading screens.
 - **Freight contracts:** take standard, fragile, perishable and hazardous loads between the station and towns in each system; your hold has limited crate slots.
+- **Freighter progression:** start in the Skiff light courier (4 crates) and trade up through the Mule (6), Longhaul tractor-trailer (9) and Atlas heavy lifter (12) at any station; each hull handles heavier than the last.
 - **Space stations:** dock by autopilot in a hangar bay; trade, upgrade your ship and pick up contracts.
 - **Settlements:** 1–2 habitable planets per system, each with a named town, landing pad, cargo terminal and residents.
 - **Procedural galaxy:** warp to seeded star systems with their own star, nebula and planet types (lush, ocean, desert, frozen, scorched, toxic, exotic).

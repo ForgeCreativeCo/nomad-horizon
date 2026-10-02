@@ -740,6 +740,150 @@ function buildShip(landed){
 }
 
 /* =========================================================================
+   Freighter hulls (tier follows the Freighter Hull / cargo upgrade)
+   0 SKIFF · 1 MULE · 2 LONGHAUL · 3 ATLAS
+   ========================================================================= */
+var HULL_NAMES=['SKIFF','MULE','LONGHAUL','ATLAS'], HULL_CLASS=['LIGHT COURIER','SHORT-HAUL HAULER','TRACTOR-TRAILER','HEAVY LIFTER'];
+var HULL_SPACE=.62, HULL_GROUND=.8;
+var HULL_HANDLING=[{spd:1,grip:.03},{spd:.95,grip:.045},{spd:.9,grip:.07},{spd:.86,grip:.06}];
+var hullTex=null;
+function hullTextures(){
+  if(hullTex) return hullTex;
+  function ct(w,h,draw){ var c=document.createElement('canvas'); c.width=w; c.height=h; draw(c.getContext('2d'),w,h); var t=new THREE.CanvasTexture(c); t.wrapS=t.wrapT=THREE.RepeatWrapping; t.encoding=THREE.sRGBEncoding; t.anisotropy=maxAniso; tud(t).shared=true; return t; }
+  var r=rng(42);
+  var plate=ct(256,256,function(x,w,h){ x.fillStyle='#cfd3d9'; x.fillRect(0,0,w,h);
+    for(var i=0;i<60;i++){ var g=196+Math.floor(r()*22); x.fillStyle='rgb('+g+','+g+','+(g+4)+')'; x.fillRect(Math.floor(r()*8)*32,Math.floor(r()*8)*32,32*(1+Math.floor(r()*2)),32); }
+    x.strokeStyle='rgba(30,34,40,.45)'; x.lineWidth=2; for(var k=0;k<=w;k+=64){ x.beginPath(); x.moveTo(k,0); x.lineTo(k,h); x.moveTo(0,k); x.lineTo(w,k); x.stroke(); }
+    x.fillStyle='rgba(30,34,40,.5)'; for(var q=0;q<40;q++) x.fillRect(r()*w,r()*h,3,3); });
+  plate.repeat.set(.35,.35);
+  var rib=ct(128,32,function(x,w,h){ for(var i=0;i<w;i+=8){ x.fillStyle=(i/8)%2?'#cfd3d8':'#9aa0a8'; x.fillRect(i,0,8,h); } x.fillStyle='rgba(0,0,0,.25)'; x.fillRect(0,0,w,3); x.fillRect(0,h-3,w,3); });
+  hullTex={plate:plate, rib:rib};
+  return hullTex;
+}
+var CRATE_HEX=['#b8452c','#2f6db3','#d9a43a','#3b8a5c','#d8dbe0','#7a4fa0'];
+function hullMats(){
+  var T=hullTextures();
+  return {
+    paint:new THREE.MeshStandardMaterial({color:lin('#e6e2da'), map:T.plate, metalness:.35, roughness:.42}),
+    trim:new THREE.MeshStandardMaterial({color:lin('#d8582a'), metalness:.3, roughness:.45}),
+    dark:new THREE.MeshStandardMaterial({color:lin('#2a2f37'), metalness:.85, roughness:.42}),
+    frame:new THREE.MeshStandardMaterial({color:lin('#41464f'), metalness:.8, roughness:.5}),
+    glass:new THREE.MeshStandardMaterial({color:lin('#0a1820'), metalness:1, roughness:.06, envMapIntensity:2}),
+    glow:new THREE.MeshBasicMaterial({color:new THREE.Color(.6,2.4,3.4)}),
+    lamp:new THREE.MeshBasicMaterial({color:new THREE.Color(3,2.4,1.6)}),
+    red:new THREE.MeshBasicMaterial({color:new THREE.Color(3.5,.3,.2)}),
+    green:new THREE.MeshBasicMaterial({color:new THREE.Color(.3,3.2,.8)}),
+    crates:CRATE_HEX.map(function(c){ return new THREE.MeshStandardMaterial({color:lin(c), map:T.rib, metalness:.45, roughness:.55}); })
+  };
+}
+function hullProfile(pts,width,bevel){
+  var s=new THREE.Shape(); s.moveTo(pts[0][0],pts[0][1]); for(var i=1;i<pts.length;i++) s.lineTo(pts[i][0],pts[i][1]); s.closePath();
+  var b=bevel==null?.1:bevel, g=new THREE.ExtrudeGeometry(s,{depth:width-b*2, bevelEnabled:b>0, bevelThickness:b, bevelSize:b, bevelSegments:2, curveSegments:2});
+  g.rotateY(-Math.PI/2); g.translate((width-b*2)/2,0,0); return g;
+}
+function buildHull(tier, landed){
+  var MT=hullMats(), g=new THREE.Group(), flames=[], glows=[], legs=[], tilts=[], cargo=[];
+  function M(geo,mat,x,y,z,par,shadow){ var m=new THREE.Mesh(geo,mat); m.position.set(x,y,z); if(shadow!==false){ m.castShadow=true; m.receiveShadow=true; } (par||g).add(m); return m; }
+  function box(w,h,d,mat,x,y,z,par,shadow){ return M(new THREE.BoxGeometry(w,h,d),mat,x,y,z,par,shadow); }
+  function prof(pts,w,bv,mat,par){ return M(hullProfile(pts,w,bv),mat,0,0,0,par); }
+  function nozzle(r,len,x,y,z,par){
+    par=par||g;
+    var n=M(new THREE.CylinderGeometry(r*.85,r,len,24,1,true),MT.dark,x,y,z,par); n.rotation.x=Math.PI/2;
+    M(new THREE.TorusGeometry(r*.92,r*.12,10,32),MT.trim,x,y,z+len/2,par,false);
+    M(new THREE.CircleGeometry(r*.8,24),MT.glow,x,y,z+len/2-.05,par,false);
+    var fm=new THREE.ShaderMaterial({uniforms:THREE.UniformsUtils.clone(FLAME_MAT_SRC.uniforms), vertexShader:FLAME_MAT_SRC.vertexShader, fragmentShader:FLAME_MAT_SRC.fragmentShader,
+      transparent:true, blending:THREE.AdditiveBlending, depthWrite:false, side:THREE.DoubleSide});
+    var fl=new THREE.Mesh(new THREE.ConeGeometry(r*.75,r*4.2,20,1,true),fm); fl.rotation.x=Math.PI/2; fl.position.set(x,y,z+len/2+r*2.1); par.add(fl); flames.push(fl);
+    var sp=new THREE.Sprite(new THREE.SpriteMaterial({map:glowTex, color:new THREE.Color(.8,1.8,2.4), transparent:true, blending:THREE.AdditiveBlending, depthWrite:false}));
+    sp.scale.setScalar(r*4.5); sp.position.set(x,y,z+len/2+.2); par.add(sp); glows.push(sp);
+  }
+  function leg(x,z,len,thick){
+    var t=thick||.14, lg=new THREE.Group(); lg.position.set(x,0,z); g.add(lg);
+    M(new THREE.CylinderGeometry(t,t*1.2,len,10),MT.dark,0,-len/2,0,lg);
+    M(new THREE.CylinderGeometry(t*3,t*3.4,.14,16),MT.dark,0,-len,0,lg);
+    legs.push(lg);
+  }
+  function crate(w,h,d,x,y,z,i){ cargo.push(box(w,h,d,MT.crates[i%MT.crates.length],x,y,z)); box(w+.06,.12,.12,MT.frame,x,y+h/2,z-d/2+.06,g,false); box(w+.06,.12,.12,MT.frame,x,y+h/2,z+d/2-.06,g,false); }
+  function nav(xs,y,z){ M(new THREE.SphereGeometry(.12,8,6),MT.red,-xs,y,z,g,false); M(new THREE.SphereGeometry(.12,8,6),MT.green,xs,y,z,g,false); }
+  var gear;
+  if(tier===0){
+    prof([[-4.4,.1],[-4.4,.75],[-3.3,1.55],[-1.3,1.8],[.6,1.72],[.9,.2],[-.4,-.35],[-3.6,-.25]],2.6,.12,MT.paint);
+    prof([[-4.05,.8],[-3.2,1.5],[-2.05,1.68],[-2.4,.98]],2.72,.03,MT.glass);
+    box(2.64,.07,2.4,MT.trim,0,1.78,-.5,g,false);
+    box(1.05,.85,5.6,MT.dark,0,.55,3.3);
+    crate(2.1,2.0,5.4,0,-.75,3.5,0);
+    [1.3,3.5,5.7].forEach(function(z){ box(2.4,.22,.32,MT.frame,0,.32,z,g,false); });
+    [-1,1].forEach(function(s){ box(1.7,.18,1.8,MT.trim,s*1.45,.62,4.4); var n=M(new THREE.CylinderGeometry(.58,.62,3.2,20),MT.paint,s*2.25,.62,4.7); n.rotation.x=Math.PI/2; nozzle(.5,.5,s*2.25,.62,6.45); });
+    nav(2.85,.62,3.4);
+    leg(0,-3.2,1.5); leg(-1.6,4.4,1.5); leg(1.6,4.4,1.5); gear=1.55;
+  } else if(tier===1){
+    prof([[-5.5,0],[-5.5,1.4],[-5.0,2.65],[-3.0,2.95],[-2.1,2.95],[-2.1,-.6],[-5.1,-.6]],3.3,.14,MT.paint);
+    prof([[-5.44,1.5],[-4.92,2.58],[-3.6,2.8],[-3.95,1.62]],3.42,.03,MT.glass);
+    box(3.1,.55,.35,MT.dark,0,.15,-5.55); [-1.05,1.05].forEach(function(x){ box(.6,.22,.08,MT.lamp,x,.62,-5.62,g,false); });
+    box(2.4,.16,.3,MT.lamp,0,3.05,-3.7,g,false); box(3.32,.1,3.4,MT.trim,0,1.2,-3.8,g,false);
+    box(1.3,1.3,9.4,MT.dark,0,.95,2.6);
+    [-1.25,1.25,3.75,6.25].forEach(function(z){ [-1,1].forEach(function(s){ box(.22,3.4,.22,MT.frame,s*2.25,.95,z); }); box(4.7,.22,.22,MT.frame,0,2.6,z); box(4.7,.22,.22,MT.frame,0,-.7,z); });
+    [-1,1].forEach(function(s){ box(.2,.2,7.7,MT.frame,s*2.25,2.6,2.5,g,false); box(.2,.2,7.7,MT.frame,s*2.25,-.7,2.5,g,false); });
+    var i1=0; [0,2.5,5].forEach(function(z){ [-1.1,1.1].forEach(function(x){ crate(1.95,3.0,2.25,x,.95,z,i1++); }); });
+    prof([[6.6,-.4],[6.6,2.2],[7.4,2.6],[8.9,2.4],[8.9,-.4]],3.6,.12,MT.paint);
+    box(3.62,.12,2.3,MT.trim,0,1.6,7.8,g,false);
+    [-.95,.95].forEach(function(x){ nozzle(.72,.9,x,.95,9.3); });
+    nav(1.82,2.3,8.2);
+    leg(-1.4,-4.2,1.6); leg(1.4,-4.2,1.6); leg(-1.6,7.6,1.6); leg(1.6,7.6,1.6); gear=2.25;
+  } else if(tier===2){
+    prof([[-10.4,.2],[-10.4,1.25],[-9.6,2.3],[-7.6,2.55],[-6.6,2.3],[-6.6,-.55],[-10,-.55]],3.0,.14,MT.paint);
+    prof([[-10.33,1.3],[-9.55,2.22],[-8.3,2.42],[-8.7,1.38]],3.12,.03,MT.glass);
+    box(3.02,.1,1.6,MT.trim,0,1.65,-8.4,g,false);
+    [-1,1].forEach(function(s){ var n=M(new THREE.CylinderGeometry(.5,.55,2.4,18),MT.paint,s*1.95,.6,-7.6); n.rotation.x=Math.PI/2; nozzle(.42,.4,s*1.95,.6,-6.2); });
+    var Z0=-6.6, Z1=10.8, L=Z1-Z0, zc=(Z0+Z1)/2;
+    [[-.55,0],[.55,0],[-.55,1.1],[.55,1.1]].forEach(function(q){ var rr=M(new THREE.CylinderGeometry(.12,.12,L,8),MT.frame,q[0],q[1]+.05,zc); rr.rotation.x=Math.PI/2; });
+    for(var z=Z0+1;z<Z1;z+=1.6){ box(1.25,.08,.08,MT.frame,0,.6,z,g,false).rotation.z=.8; box(.08,1.2,.08,MT.frame,-.55,.6,z+.8,g,false); box(.08,1.2,.08,MT.frame,.55,.6,z+.8,g,false); }
+    var i2=0; [-2.6,2.4,7.4].forEach(function(zz){
+      box(1.6,1.6,.5,MT.dark,0,.6,zz-2.2); box(1.6,1.6,.5,MT.dark,0,.6,zz+2.2);
+      crate(1.7,1.7,4.3,-1.75,.55,zz,i2++); crate(1.7,1.7,4.3,1.75,.55,zz,i2++); crate(1.7,1.7,4.3,0,2.3,zz,i2++);
+    });
+    prof([[10.6,-.9],[10.6,2.0],[11.4,2.6],[14,2.4],[14,-.9]],3.6,.14,MT.paint);
+    [-1,1].forEach(function(s){ M(hullProfile([[11.4,2.2],[12.4,4.0],[13.6,4.0],[14,2.2]],.16,0),MT.trim,s*1.5,0,0); });
+    [[-1,.25],[1,.25],[0,1.55]].forEach(function(q){ nozzle(.62,.8,q[0]*.95,q[1],14.4); });
+    nav(1.85,1.9,12.5);
+    leg(-1.2,-8.6,1.7); leg(1.2,-8.6,1.7); leg(-1.6,12.4,1.4); leg(1.6,12.4,1.4); gear=2.4;
+  } else {
+    prof([[-8.2,-.2],[-8.2,.7],[-7.6,1.0],[8.2,1.0],[8.6,.4],[8.2,-.6],[-7.4,-.6]],7.6,.16,MT.paint);
+    box(7.62,.12,15.2,MT.dark,0,1.02,.4,g,false);
+    [-1,1].forEach(function(s){ box(.3,.5,15.4,MT.trim,s*3.72,1.25,.4); });
+    prof([[-8.4,.9],[-8.4,2.2],[-7.7,3.5],[-5.6,3.75],[-4.9,3.6],[-4.9,.9]],3.8,.14,MT.paint);
+    prof([[-8.33,2.25],[-7.65,3.42],[-6.4,3.62],[-6.8,2.35]],3.92,.03,MT.glass);
+    box(3.82,.1,1.4,MT.trim,0,2.8,-6.2,g,false); box(2.6,.15,.3,MT.lamp,0,3.82,-5.9,g,false);
+    var i3=0; [-2.6,.4,3.4,6.4].forEach(function(zz){ [-2.35,0,2.35].forEach(function(x){ crate(2.05,1.9,2.7,x,2.03,zz,i3++); }); });
+    [-1,1].forEach(function(sx){ [-5.6,6.4].forEach(function(zz){
+      box(1.2,.5,1.2,MT.dark,sx*4.4,.3,zz);
+      var piv=new THREE.Group(); piv.position.set(sx*5.35,.35,zz); g.add(piv);
+      M(new THREE.CylinderGeometry(.9,.95,2.6,22),MT.paint,0,0,0,piv);
+      M(new THREE.TorusGeometry(.95,.14,10,28),MT.trim,0,1.2,0,piv,false).rotation.x=Math.PI/2;
+      var nz=new THREE.Group(); nz.rotation.x=Math.PI/2; nz.position.set(0,-1.3,0); piv.add(nz); nozzle(.72,.4,0,0,0,nz);
+      tilts.push(piv);
+    }); });
+    [-1.6,1.6].forEach(function(x){ nozzle(.75,.8,x,.2,8.9); });
+    nav(3.9,1.3,-7.8);
+    [[-2.8,-6],[2.8,-6],[-2.8,6.6],[2.8,6.6]].forEach(function(q){ leg(q[0],q[1],1.4,.22); }); gear=2.0;
+  }
+  var bb=new THREE.Box3().setFromObject(g), size=bb.getSize(new THREE.Vector3());
+  g.userData={flames:flames, glows:glows, legs:legs, tilts:tilts, cargo:cargo, tier:tier, gear:gear, len:size.z, beam:size.x, height:bb.max.y};
+  legs.forEach(function(l){ l.visible=!!landed; });
+  flames.concat(glows).forEach(function(f){ f.visible=!landed; });
+  tilts.forEach(function(p){ p.rotation.x=landed?0:-Math.PI/2; });
+  return g;
+}
+function hullTier(){ return Math.min(lvl('hold'),3); }
+/* size helpers: everything below is in world units for the object's current scale */
+function hullGear(obj){ return obj.userData.gear*obj.scale.y; }
+function hullLen(obj){ return obj.userData.len*obj.scale.z; }
+function hullBeam(obj){ return obj.userData.beam*obj.scale.x; }
+function hullTop(obj){ return obj.userData.height*obj.scale.y; }
+function hullCam(obj){ return Math.max(1,(hullLen(obj)+2)/7.5); }
+function makePlayerHull(scale, landed){ var h=buildHull(hullTier(), landed); h.scale.setScalar(scale); return h; }
+
+/* =========================================================================
    GPU memory housekeeping (warping rebuilds everything)
    ========================================================================= */
 function tud(t){ if(!t.userData) t.userData={}; return t.userData; }
@@ -801,7 +945,7 @@ function buildSpaceStatic(){
   var stars=new THREE.Points(sg,new THREE.PointsMaterial({size:1.6, sizeAttenuation:false, vertexColors:true, depthWrite:false}));
   stars.userData.follow=true; spaceScene.add(stars); spaceScene.userData.stars=stars;
 
-  ship=buildShip(false); spaceScene.add(ship);
+  ship=makePlayerHull(HULL_SPACE,false); spaceScene.add(ship);
   var DN=360, dpos=new Float32Array(DN*6), dr=rng(5);
   for(var j=0;j<DN;j++){ var x=(dr()-.5)*90, y=(dr()-.5)*90, z=(dr()-.5)*90; dpos.set([x,y,z,x,y,z],j*6); }
   var dg=new THREE.BufferGeometry(); dg.setAttribute('position',new THREE.BufferAttribute(dpos,3));
@@ -1115,7 +1259,7 @@ async function buildSurface(idx){
   motes.frustumCulled=false; motes.userData.base=mpos.slice(); scene.add(motes);
 
   // your ship + locator beacon
-  var parked=buildShip(true); parked.scale.setScalar(1.5); parked.position.set(0,300,0); scene.add(parked);
+  var parked=makePlayerHull(HULL_GROUND,true); parked.position.set(0,300,0); scene.add(parked);
   var beacon=new THREE.Mesh(new THREE.CylinderGeometry(1,1,1,20,1,true), new THREE.ShaderMaterial({
     uniforms:{color:{value:new THREE.Color(.5,2.2,3.2)}, time:{value:0}, fade:{value:1}},
     vertexShader:'varying vec2 vUv; void main(){ vUv=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }',
@@ -1570,6 +1714,7 @@ function renderInv(){
     c.textContent='\u25b8 '+g.n+' \u2192 '+g.d.name+(SYS && g.d.sys!==SYS.seed?' ('+g.d.sysName+')':'')+(g.tl?' \u00b7 '+g.tl:'');
     row.appendChild(c); });
   $('holdVal').textContent=holdUsed()+'/'+holdCap();
+  if(ship) updateHullCargo();
   $('btnWarp').classList.toggle('has-drop', remoteDests().length>0);
   $('credVal').textContent=state.credits.toLocaleString();
 }
@@ -1667,6 +1812,8 @@ function setModeUI(mode){
 function setShipFlying(obj, flying){
   obj.userData.legs.forEach(function(l){ l.visible=!flying; });
   obj.userData.flames.forEach(function(f){ f.visible=flying; });
+  (obj.userData.glows||[]).forEach(function(f){ f.visible=flying; });
+  (obj.userData.tilts||[]).forEach(function(p){ p.rotation.x=flying?-Math.PI/2:0; });
 }
 function showBanner(eyebrow, name, meta){
   $('locEye').textContent=eyebrow; $('locName').textContent=name; $('locMeta').textContent=meta;
@@ -1675,6 +1822,12 @@ function showBanner(eyebrow, name, meta){
 
 function enterAtmosphere(p){
   S=surfaces[p.index];
+  if(S.ship.userData.tier!==hullTier()){
+    var oldH=S.ship, nh=makePlayerHull(HULL_GROUND,false); S.scene.remove(oldH); disposeObject(oldH); S.scene.add(nh); S.ship=nh;
+    nh.traverse(function(o){ var m=o.material; if(m && m.isMeshStandardMaterial && S.envMats.indexOf(m)<0){ m.userData.envBase=m.envMapIntensity; S.envMats.push(m); } });
+    renderer.compile(S.scene,camera);
+  }
+  updateHullCargo();
   state.entryNormal=ship.position.clone().sub(p.mesh.position).normalize();
   setDayFromElevation(S, state.entryNormal.dot(V3.copy(SPACE_SUN).sub(p.mesh.position).normalize()));
   state.mode='atmo'; setScene(S.scene); setModeUI('atmo');
@@ -1714,7 +1867,7 @@ function inputAxes(){
   return {x:clamp(x,-1,1), y:clamp(y,-1,1), hold: holdA||keys.Space||keys.ShiftLeft};
 }
 function flyShip(dt, obj, sc, cruiseSpd, boostSpd){
-  var inp=inputAxes();
+  var inp=inputAxes(), HH=HULL_HANDLING[obj.userData.tier||0]; sc=hullCam(obj); cruiseSpd*=HH.spd; boostSpd*=HH.spd;
   state.yaw-=look.dx*.0026; state.pitch=clamp(state.pitch-look.dy*.002,-1.2,1.2); look.dx=look.dy=0;
   var fwd=new THREE.Vector3(Math.sin(state.yaw)*Math.cos(state.pitch),Math.sin(state.pitch),Math.cos(state.yaw)*Math.cos(state.pitch)).normalize();
   var right=new THREE.Vector3().crossVectors(fwd,UP).normalize();
@@ -1722,7 +1875,7 @@ function flyShip(dt, obj, sc, cruiseSpd, boostSpd){
   if(boosting){ state.energy=Math.max(0,state.energy-dt*16); cruise=Math.max(cruise,1); } else state.energy=Math.min(100,state.energy+dt*8);
   var speed=boosting?boostSpd:cruiseSpd;
   var target=new THREE.Vector3().copy(fwd).multiplyScalar(cruise*speed).addScaledVector(right,inp.x*speed*.55);
-  state.vel.lerp(target,1-Math.pow(.03,dt));
+  state.vel.lerp(target,1-Math.pow(HH.grip,dt));
   obj.position.addScaledVector(state.vel,dt);
   var bank=clamp(-inp.x*.6,-.7,.7);
   M4.lookAt(V3.copy(obj.position).addScaledVector(fwd,-1), obj.position, UP); QT.setFromRotationMatrix(M4);
@@ -1732,7 +1885,7 @@ function flyShip(dt, obj, sc, cruiseSpd, boostSpd){
   obj.userData.flames.forEach(function(f){ var u=f.material.uniforms; u.intensity.value=lerp(u.intensity.value,.25+thrust*.9,.15); u.time.value=state.t; f.scale.y=.4+thrust*.6; });
   state.fovKick=lerp(state.fovKick,boosting?14:0,1-Math.pow(.05,dt));
   camera.fov=62+state.fovKick; camera.updateProjectionMatrix();
-  var camTarget=new THREE.Vector3().copy(obj.position).addScaledVector(fwd,(-10-state.fovKick*.15)*sc).addScaledVector(UP,2.6*sc);
+  var camTarget=new THREE.Vector3().copy(obj.position).addScaledVector(fwd,(-10-state.fovKick*.15)*sc).addScaledVector(UP,3.6*sc);
   if(boosting){ camTarget.x+=(Math.random()-.5)*.08; camTarget.y+=(Math.random()-.5)*.08; }
   camera.position.lerp(camTarget,1-Math.pow(.0008,dt));
   finalPass.uniforms.boost.value=state.fovKick/14;
@@ -1764,7 +1917,7 @@ function spaceAmbient(dt){
 var BASE_PRICE=120;
 var HOLD_CAPS=[4,6,9,12];
 var UPGRADES=[
-  {id:'hold', name:'CARGO HOLD', desc:'More crate slots for freight contracts.', costs:[700,1800,4200], fx:function(l){ return HOLD_CAPS[l]+' crate slots'; }},
+  {id:'hold', name:'FREIGHTER HULL', desc:'Trade up to a bigger freighter: more crate slots, heavier handling.', costs:[700,1800,4200], fx:function(l){ return HULL_NAMES[l]+' \u00b7 '+HOLD_CAPS[l]+' crates'; }},
   {id:'pulse', name:'PULSE ENGINE', desc:'Faster cruise and boost, in space and in atmosphere.', costs:[600,1600,3800], fx:function(l){ return '+'+(l*25)+'% flight speed'; }},
   {id:'jet', name:'JETPACK', desc:'Uses less fuel and lifts harder.', costs:[400,1100,2600], fx:function(l){ return (l*25)+'% less fuel per second'; }},
   {id:'scan', name:'SCANNER', desc:'Wider scan radius and faster recharge.', costs:[500,1300,3000], fx:function(l){ return (120+l*45)+'u deposit range'; }},
@@ -1943,7 +2096,7 @@ function buildStation(st, parent){
   var bayLight=new THREE.PointLight(0xcfe9ff,1.3,60,1.6); bayLight.position.set(0,by+4,28); g.add(bayLight);
   // traffic
   var traffic=[];
-  for(var t=0;t<2;t++){ var sh=buildShip(false); sh.scale.setScalar(.75); parent.add(sh); traffic.push({obj:sh, r:85+t*35, ph:t*2.4, sp:.13+t*.05, tilt:.25-t*.4}); }
+  for(var t=0;t<2;t++){ var sh=buildHull(ihash((st.pos.x|0)+7,t)%4,false); sh.scale.setScalar(.5); parent.add(sh); traffic.push({obj:sh, r:85+t*35, ph:t*2.4, sp:.13+t*.05, tilt:.25-t*.4}); }
   g.updateMatrixWorld(true);
   var mouthW=g.localToWorld(new THREE.Vector3(0,by,40)), insideW=g.localToWorld(new THREE.Vector3(0,by-.5,24)), dirW=new THREE.Vector3(Math.sin(st.yaw),0,Math.cos(st.yaw));
   station={st:st, group:g, ring:ringG, blink:blink, traffic:traffic, center:st.pos.clone(), mouthW:mouthW, insideW:insideW, dirW:dirW};
@@ -1969,12 +2122,26 @@ function ease(t){ t=clamp(t,0,1); return t*t*t*(t*(t*6-15)+10); }
 function bez(a,c,b,t,out){ var u=1-t; return out.set(0,0,0).addScaledVector(a,u*u).addScaledVector(c,2*u*t).addScaledVector(b,t*t); }
 function faceShip(dir,k){ M4.lookAt(V3.copy(ship.position).sub(dir), ship.position, UP); QT.setFromRotationMatrix(M4); ship.quaternion.slerp(QT,k); }
 function showFlightControls(on){ $('joywrap').classList.toggle('on',on); $('actions').classList.toggle('on',on); }
+function dockPoint(){ var I=station.mouthW.clone().addScaledVector(station.dirW,-(hullLen(ship)/2+3)); I.y=station.insideW.y; return I; }
 function startDock(){
   if(state.dock||!station) return;
   var E=station.mouthW.clone().addScaledVector(station.dirW,30), P0=ship.position.clone(), d=P0.distanceTo(E);
-  state.dock={phase:'approach', t:0, p0:P0, E:E, I:station.insideW.clone(), D:station.dirW.clone(), dur:clamp(d/45,1.8,5), ctrl:E.clone().addScaledVector(station.dirW,Math.min(d*.6,90))};
+  state.dock={phase:'approach', t:0, p0:P0, E:E, I:dockPoint(), D:station.dirW.clone(), dur:clamp(d/45,1.8,5), ctrl:E.clone().addScaledVector(station.dirW,Math.min(d*.6,90))};
   setPrompt(null); state.vel.set(0,0,0); showFlightControls(false); $('warpPanel').hidden=true;
   toast('DOCKING CLEARANCE GRANTED');
+}
+function swapPlayerHull(){
+  var old=ship, nh=makePlayerHull(HULL_SPACE,false);
+  nh.position.copy(old.position); nh.quaternion.copy(old.quaternion);
+  spaceScene.remove(old); disposeObject(old); ship=nh; spaceScene.add(ship);
+  if(state.dock){ state.dock.I=dockPoint(); ship.position.copy(state.dock.I); }
+  renderer.compile(spaceScene,camera); updateHullCargo();
+}
+/* crates on the hull mirror what is actually in your hold */
+function updateHullCargo(){
+  var n=holdUsed();
+  [ship, S&&S.ship].forEach(function(h){ if(!h||!h.userData.cargo) return; var c=h.userData.cargo, tier=h.userData.tier;
+    c.forEach(function(m,i){ m.visible= tier===0 ? n>0 : i<n; }); });
 }
 function undock(){
   var K=state.dock; if(!K||K.phase!=='docked') return;
@@ -1997,8 +2164,9 @@ function updateDock(dt){
   ship.userData.flames.forEach(function(f){ var un=f.material.uniforms; un.intensity.value=K.phase==='docked'?.05:(K.phase==='leave'?1.6:.7); un.time.value=state.t; f.scale.y=K.phase==='leave'?1.2:.6; });
   var side=new THREE.Vector3().crossVectors(K.D,UP).normalize();
   if(K.phase==='turn'||K.phase==='docked'){
-    camera.position.lerp(V2.copy(K.I).addScaledVector(K.D,-8.5).addScaledVector(UP,3).addScaledVector(side,2.5),1-Math.pow(.02,dt));
-    camera.lookAt(V1.copy(K.I).addScaledVector(K.D,30).addScaledVector(UP,-1));
+    camera.position.lerp(V2.copy(station.mouthW).addScaledVector(K.D,6+hullLen(ship)*.55).addScaledVector(UP,3+hullTop(ship)*.4).addScaledVector(side,-6-hullLen(ship)*.15),1-Math.pow(.02,dt));
+    camera.lookAt(V1.copy(K.I).addScaledVector(UP,.5));
+    if(!$('stationPanel').hidden && window.innerWidth>620) camera.rotateY(-Math.atan(Math.tan(camera.fov*Math.PI/360)*camera.aspect*.42));
   } else {
     camera.position.lerp(V2.copy(ship.position).addScaledVector(fwd,-10).addScaledVector(UP,2.6),1-Math.pow(.004,dt));
     camera.lookAt(V1.copy(ship.position).addScaledVector(fwd,18));
@@ -2091,7 +2259,8 @@ $('stationPanel').addEventListener('click',function(e){
   if(act==='sell1'||act==='sellall'){ var el=t.dataset.el, q=state.inv[el]||0, n=act==='sell1'?Math.min(1,q):q; if(!n) return;
     var pr=priceAt(el,loc); state.inv[el]=q-n; state.credits+=n*pr; toast('SOLD '+n+' '+el+' · +'+fmt(n*pr)+' UNITS'); }
   else if(act==='buy'){ var u=UPGRADES.filter(function(x){ return x.id===t.dataset.id; })[0], l=lvl(u.id), c=u.costs[l];
-    if(c==null||state.credits<c) return; state.credits-=c; state.up[u.id]=l+1; toast(u.name+' · LEVEL '+(l+1)+' INSTALLED'); }
+    if(c==null||state.credits<c) return; state.credits-=c; state.up[u.id]=l+1;
+    if(u.id==='hold'){ swapPlayerHull(); toast('NEW HULL \u00b7 '+HULL_NAMES[hullTier()]+' \u00b7 '+holdCap()+' CRATE HOLD','life'); } else toast(u.name+' · LEVEL '+(l+1)+' INSTALLED'); }
   else if(act==='accept'){ var o=boardOffers(loc).filter(function(x){ return x.id===t.dataset.id; })[0];
     if(o && acceptOffer(o,loc)) toast('LOADED · '+o.name.toUpperCase()+' → '+o.dest.name); }
   else if(act==='deliver'){ var r=deliverHere(loc); if(r.n) toast('DELIVERED '+r.n+' CRATE'+(r.n>1?'S':'')+' · +'+fmt(r.total)+' UNITS'+(r.late?' · '+r.late+' LATE':''),'life'); }
@@ -2280,10 +2449,11 @@ function updateAtmo(dt){
     camera.position.lerp(V3.copy(sh.position).addScaledVector(fw,-15).addScaledVector(UP,4),1-Math.pow(.01,dt));
     camera.lookAt(V2.copy(sh.position).addScaledVector(fw,10));
     if(L.t>.4) sh.userData.legs.forEach(function(l){ l.visible=true; });
+    (sh.userData.tilts||[]).forEach(function(pv){ pv.rotation.x*=Math.pow(.02,dt); });
     if(L.t>=1){ disembark(); return; }
   } else {
     f=flyShip(dt, sh, 1.5, 26*speedMul(), 62*speedMul());
-    var g=Math.max(S.heightAt(sh.position.x,sh.position.z), S.waterLevel)+2.6;
+    var g=Math.max(S.heightAt(sh.position.x,sh.position.z), S.waterLevel)+hullGear(sh)+.35;
     if(sh.position.y<g){ var hitV=-state.vel.y; sh.position.y=g; if(state.vel.y<0) state.vel.y*=-.1; cargoImpact(hitV); }
     var hd=Math.hypot(sh.position.x,sh.position.z); if(hd>340){ sh.position.x*=340/hd; sh.position.z*=340/hd; }
     var cg=S.heightAt(camera.position.x,camera.position.z)+1.2; if(camera.position.y<cg) camera.position.y=cg;
@@ -2316,14 +2486,14 @@ function land(onPad){
   var sh=S.ship; setPrompt(null);
   state.vel.set(0,0,0);
   var x1=onPad?0:sh.position.x, z1=onPad?0:sh.position.z;
-  var y1=onPad?S.town.pad.y+2.3:S.heightAt(x1,z1)+2.25;
+  var y1=(onPad?S.town.pad.y:S.heightAt(x1,z1))+hullGear(sh);
   state.landing={t:0, pad:!!onPad, x0:sh.position.x, y0:Math.max(sh.position.y,y1+4), z0:sh.position.z, x1:x1, y1:y1, z1:z1};
 }
 function disembark(){
   var sh=S.ship, onPad=state.landing && state.landing.pad; state.landing=null;
   setShipFlying(sh,false);
   var right=new THREE.Vector3(-Math.cos(state.yaw),0,Math.sin(state.yaw));
-  var px=sh.position.x+right.x*5, pz=sh.position.z+right.z*5;
+  var off=hullBeam(sh)/2+2.5, px=sh.position.x+right.x*off, pz=sh.position.z+right.z*off;
   var gy=onPad?S.town.pad.y:Math.max(S.heightAt(px,pz),S.waterLevel-.6);
   state.pos.set(px, gy+1.7, pz); state.vy=0; state.grounded=true; state.pitch=-.05;
   state.camFrom={p:camera.position.clone(), q:camera.quaternion.clone(), t:1};
@@ -2396,7 +2566,8 @@ function updateSurface(dt){
   state.terminalCool=Math.max(0,(state.terminalCool||0)-dt);
 
   var sp=S.ship.position, dShip=Math.hypot(sp.x-p.x,sp.z-p.z);
-  var bc=S.beacon; bc.visible=true; bc.position.set(sp.x,sp.y-2,sp.z);
+  var boardR=Math.max(9,hullLen(S.ship)*.6);
+  var bc=S.beacon; bc.visible=true; bc.position.set(sp.x,sp.y-hullGear(S.ship),sp.z);
   var wdt=Math.max(.3,dShip*.005); bc.scale.set(wdt,420,wdt);
   bc.material.uniforms.fade.value=sstep(8,30,dShip); bc.material.uniforms.time.value=state.t;
 
@@ -2415,11 +2586,11 @@ function updateSurface(dt){
   drawCompass(crys.reverse().concat(markers));
   drawRadar(p, state.yaw, 160, surfaceRadarItems(true, p), Math.round(dShip)+'m TO SHIP');
   navTags(surfaceNav(p));
-  shipTag(dShip>9 && !termLoc ? {pos:V3.copy(sp).add(new THREE.Vector3(0,3.2,0)), dist:dShip} : null);
+  shipTag(dShip>boardR && !termLoc ? {pos:V3.copy(sp).add(new THREE.Vector3(0,hullTop(S.ship)+1.2,0)), dist:dShip} : null);
 
   if(termLoc) setPrompt(null);
   else if(S.town && Math.hypot(p.x-S.town.kiosk.x,p.z-S.town.kiosk.z)<4.5 && !state.terminalCool) setPrompt('CARGO TERMINAL',S.town.name,function(){ openTerminal(townLoc(S.idx)); });
-  else if(dShip<9) setPrompt('BOARD SHIP','TAKE OFF',board);
+  else if(dShip<boardR) setPrompt('BOARD SHIP','TAKE OFF',board);
   else setPrompt(null);
   veilHold=Math.max(0,veilHold-dt*.7); setVeil(veilHold,null,0);
 }
@@ -2530,7 +2701,7 @@ function updateTitle(dt){
   ship.position.set(base.x, base.y+Math.sin(state.t*.8)*.25, base.z);
   ship.rotation.set(0,Math.PI+.35,Math.sin(state.t*.6)*.06);
   ship.userData.flames.forEach(function(f){ f.material.uniforms.intensity.value=.6; f.material.uniforms.time.value=state.t; f.scale.y=.7; });
-  camera.position.set(base.x+Math.sin(a)*9+3, base.y+2.2+Math.sin(a*.7)*1.2, base.z+Math.cos(a)*9-1);
+  var cr=9*hullCam(ship); camera.position.set(base.x+Math.sin(a)*cr+3, base.y+2.2*hullCam(ship)+Math.sin(a*.7)*1.2, base.z+Math.cos(a)*cr-1);
   camera.lookAt(base.x-4,base.y-1,base.z-14);
   spaceAmbient(dt);
   setSun(SPACE_SUN.clone(),1);
