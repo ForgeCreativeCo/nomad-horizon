@@ -3037,7 +3037,7 @@ function audioStart(){
   for(i=0;i<d.length;i++){ var w=Math.random()*2-1; last=(last+.02*w)/1.02; d[i]=last*3.2+w*.08; }   // mostly brown noise
   AU.noise=nb;
   var wb=c.createBuffer(1,c.sampleRate,c.sampleRate), wd=wb.getChannelData(0); for(i=0;i<wd.length;i++) wd[i]=Math.random()*2-1; AU.white=wb;
-  buildEngine(); musicInit();
+  buildEngine(); musicInit(); setTimeout(cacheMusic,8000);
   Object.keys(SFX_FILES).forEach(function(k){
     fetch(SFX_FILES[k]).then(function(r){ return r.arrayBuffer(); }).then(function(ab){
       c.decodeAudioData(ab,function(buf){ AU.buf[k]=buf; if(BEDS.indexOf(k)>=0) startBed(k); },function(){});
@@ -3102,6 +3102,13 @@ function startTrack(){
   d.g.gain.cancelScheduledValues(AU.ctx.currentTime); d.g.gain.setValueAtTime(0,AU.ctx.currentTime); d.g.gain.linearRampToValueAtTime(1,AU.ctx.currentTime+5);
   MU.live=d;
 }
+/* ask the service worker to keep the whole soundtrack for offline play (once; it survives updates) */
+function cacheMusic(){
+  if(!('serviceWorker' in navigator) || location.protocol==='file:') return;
+  if(navigator.connection && navigator.connection.saveData) return;
+  navigator.serviceWorker.ready.then(function(reg){ if(reg.active) reg.active.postMessage({type:'cache-music', urls:MUSIC_TRACKS}); }).catch(function(){});
+}
+if('serviceWorker' in navigator){ navigator.serviceWorker.addEventListener('message',function(e){ if(e.data && e.data.type==='music-cached' && e.data.fresh>0) toast('SOUNDTRACK SAVED FOR OFFLINE PLAY'); }); }
 function setMusic(on){
   MU.on=on; try{ localStorage.setItem('nh_music',on?'1':'0'); }catch(e){}
   $('musBtn').classList.toggle('off',!on); $('musBtn').setAttribute('aria-pressed',on?'true':'false');

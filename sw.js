@@ -1,6 +1,7 @@
 /* Nomad Horizon service worker: offline play + fast reloads.
    Bump VERSION on every release so installed copies pick up the new game. */
-const VERSION = 'nh-2026-10-03-music';
+const VERSION = 'nh-2026-10-03-music-offline';
+const MUSIC_CACHE = 'nh-music-1';   // kept across releases so music downloads once
 const THREE_BASE = 'https://cdn.jsdelivr.net/npm/three@0.128.0/';
 const CORE = [
   './', './index.html', './manifest.webmanifest',
@@ -22,7 +23,7 @@ self.addEventListener('install', (e) => {
 self.addEventListener('activate', (e) => {
   e.waitUntil(
     caches.keys()
-      .then((keys) => Promise.all(keys.filter((k) => k !== VERSION).map((k) => caches.delete(k))))
+      .then((keys) => Promise.all(keys.filter((k) => k !== VERSION && k !== MUSIC_CACHE).map((k) => caches.delete(k))))
       .then(() => self.clients.claim())
   );
 });
@@ -55,8 +56,11 @@ self.addEventListener('fetch', (e) => {
     return;
   }
 
-  // Music streams with range requests straight from the network (too big to keep offline).
-  if (url.origin === location.origin && url.pathname.indexOf('/audio/music/') >= 0) return;
+  // Music: served from its own cache (fetched whole on first play), with byte ranges for the audio player.
+  if (url.origin === location.origin && url.pathname.indexOf('/audio/music/') >= 0) {
+    e.respondWith(musicResponse(req, url));
+    return;
+  }
 
   // Everything else from this site (icons, manifest): cached copy now, refresh in the background.
   if (url.origin === location.origin) {
@@ -67,4 +71,50 @@ self.addEventListener('fetch', (e) => {
       })
     );
   }
+});
+
+/* ---------- music for offline play ---------- */
+async function musicFull(key) {
+  const cache = await caches.open(MUSIC_CACHE);
+  let hit = await cache.match(key);
+  if (!hit) {
+    const res = await fetch(key);
+    if (!res.ok) return null;
+    await cache.put(key, res.clone());
+    hit = res;
+  }
+  return hit;
+}
+async function musicResponse(req, url) {
+  const key = url.origin + url.pathname;
+  let full;
+  try { full = await musicFull(key); } catch (err) { full = null; }
+  if (!full) return new Response('', { status: 504 });
+  const buf = await full.arrayBuffer(), total = buf.byteLength;
+  const head = { 'Content-Type': 'audio/mpeg', 'Accept-Ranges': 'bytes' };
+  const range = req.headers.get('range');
+  const m = range && /bytes=(\d*)-(\d*)/.exec(range);
+  if (!m) return new Response(buf, { status: 200, headers: Object.assign({ 'Content-Length': String(total) }, head) });
+  let start = m[1] ? +m[1] : 0, end = m[2] ? +m[2] : total - 1;
+  if (!m[1] && m[2]) { start = Math.max(0, total - +m[2]); end = total - 1; }
+  end = Math.min(end, total - 1);
+  if (start > end) return new Response('', { status: 416, headers: { 'Content-Range': 'bytes */' + total } });
+  return new Response(buf.slice(start, end + 1), { status: 206, headers: Object.assign({
+    'Content-Range': 'bytes ' + start + '-' + end + '/' + total, 'Content-Length': String(end - start + 1) }, head) });
+}
+// The page asks for the whole soundtrack in the background; reply when it is all stored.
+self.addEventListener('message', (e) => {
+  const d = e.data || {};
+  if (d.type !== 'cache-music' || !Array.isArray(d.urls)) return;
+  e.waitUntil((async () => {
+    const cache = await caches.open(MUSIC_CACHE);
+    let fresh = 0;
+    for (const u of d.urls) {
+      const key = new URL(u, self.registration.scope).href;
+      if (await cache.match(key)) continue;
+      try { const res = await fetch(key); if (res.ok) { await cache.put(key, res); fresh++; } } catch (err) { return; }
+    }
+    const all = await self.clients.matchAll();
+    all.forEach((c) => c.postMessage({ type: 'music-cached', fresh: fresh }));
+  })());
 });
