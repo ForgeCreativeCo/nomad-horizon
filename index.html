@@ -1976,7 +1976,7 @@ function save(){ try{ localStorage.setItem('nh_save',JSON.stringify({credits:sta
   mods:state.mods,modsOwned:state.modsOwned,lic:state.lic,fuel:state.fuel,hull:state.hull,company:state.company,cleared:state.cleared,heat:state.heat,flares:state.flares,
   food:state.food,rest:state.rest,rations:state.rations,fedT:state.fedT,restedT:state.restedT,needsOff:state.needsOff})); }catch(e){} }
 
-function toast(msg, cls){ if(typeof SND!=='undefined' && state.mode!=='title'){ if(cls==='life') SND.good(); else SND.blip(); } var el=document.createElement('div'); el.className='toast'+(cls?' '+cls:''); el.textContent=msg; $('toastWrap').appendChild(el); setTimeout(function(){ el.remove(); },2400); }
+function toast(msg, cls){ if(typeof SND!=='undefined' && state.mode!=='title' && !(typeof AU!=='undefined' && AU.hush)){ if(cls==='life') SND.good(); else SND.blip(); } var el=document.createElement('div'); el.className='toast'+(cls?' '+cls:''); el.textContent=msg; $('toastWrap').appendChild(el); setTimeout(function(){ el.remove(); },2400); }
 function renderInv(){
   var row=$('invrow'); row.innerHTML='';
   Object.keys(ELEMENTS).forEach(function(k){ var n=state.inv[k]; if(!n) return;
@@ -3009,7 +3009,9 @@ function updateSpace(dt){
    interface tones made live with Web Audio so they follow the throttle.
    ========================================================================= */
 var SFX_FILES={drone:'audio/cab_drone.mp3', station:'audio/station_amb.mp3', whoosh:'audio/warp_whoosh.mp3', hatchOpen:'audio/hatch_open.mp3', hatchClose:'audio/hatch_close.mp3',
-  forklift:'audio/forklift.mp3', warehouse:'audio/warehouse.mp3', warpSpool:'audio/warp_spool.mp3', landing:'audio/landing.mp3'};
+  forklift:'audio/forklift.mp3', warehouse:'audio/warehouse.mp3', warpSpool:'audio/warp_spool.mp3', landing:'audio/landing.mp3',
+  airbrake:'audio/airbrake.mp3', scanner:'audio/scanner.mp3', confirm:'audio/confirm.mp3', gateChains:'audio/gate_chains.mp3'};
+var SCAN_T=3;
 var BEDS=['drone','station','warehouse'];
 var AU={ctx:null, on:true, buf:{}, beds:{}, eng:null, zapT:0, forkT:12};
 try{ AU.on=localStorage.getItem('nh_sound')!=='0'; }catch(e){}
@@ -3310,7 +3312,8 @@ function customsScan(source, then){
   var wanted=heat>=3, late=!isCleared() && (source==='patrol'||source==='chase');
   if(!found.length && !wanted){
     var lateFine=(late?250:0)+logbookFine(); state.credits-=lateFine; state.cleared=SYS.seed; state.clearedT=state.t; setHeat(SYS.seed,Math.min(heat,2));
-    toast('CUSTOMS · CLEARED'+(lateFine?' · −'+fmt(lateFine)+(logbookFine()?' LOGBOOK: OVER YOUR HOURS':' LATE CHECK-IN FINE'):' · '+SYS.name),'life'); renderInv(); save();
+    if(AU.buf.confirm){ sfx('confirm',.85); AU.hush=true; }
+    toast('CUSTOMS · CLEARED'+(lateFine?' · −'+fmt(lateFine)+(logbookFine()?' LOGBOOK: OVER YOUR HOURS':' LATE CHECK-IN FINE'):' · '+SYS.name),'life'); AU.hush=false; renderInv(); save();
     if(then) then(); return;
   }
   var fine=found.reduce(function(a,c){ return a+CB_GRADES[c.grade].fine*c.crates; },0)+(wanted?Math.round(heat*700):0)+(late?250:0)+logbookFine();
@@ -3408,7 +3411,8 @@ function releaseScale(){
   var G=station&&station.gate, ran=isWanted(); state.scale=null;
   if(!G) return;
   stopRates(); setThrottle(ran?1:.4); state.vel.copy(G.dir).multiplyScalar(ran?45:18);
-  if(!ran) toast('EXIT IS GREEN · SAFE TRAVELS','life');
+  sfx('gateChains',ran?.9:.7,ran?1.15:1);
+  if(!ran){ AU.hush=true; toast('EXIT IS GREEN · SAFE TRAVELS','life'); AU.hush=false; }
 }
 function updateGate(dt){
   var G=station&&station.gate; if(!G) return;
@@ -3425,15 +3429,15 @@ function updateGate(dt){
   var lp=hallCollide(G), W2=HALL.W/2, H2=HALL.H/2, L2=HALL.L/2;
   var inside=Math.abs(lp.x)<W2 && Math.abs(lp.y)<H2 && Math.abs(lp.z)<L2;
   if(!sc && inside && need && lp.z>-L2+6 && lp.z<4 && !state.law){
-    state.scale={t:0, phase:'brake'}; stopRates(); setThrottle(0); toast('ON THE SCALE · HOLD STILL FOR THE SCAN');
+    state.scale={t:0, phase:'brake'}; stopRates(); setThrottle(0); sfx('airbrake',.9); AU.hush=true; toast('ON THE SCALE · HOLD STILL FOR THE SCAN'); AU.hush=false;
   }
   if(sc){
     sc.t+=dt;
     var tgt=G.group.localToWorld(HQ.set(0,-H2+hullGear(ship)*.8+3,4));
     ship.position.lerp(tgt,1-Math.pow(.03,dt)); state.vel.multiplyScalar(Math.pow(.01,dt)); setThrottle(0); stopRates();
     state.yaw=angLerp(state.yaw,G.yaw,dt*3); state.pitch*=Math.pow(.05,dt);
-    if(sc.phase==='brake' && sc.t>1.1){ sc.phase='scan'; sc.t=0; SND.scanHum(); }
-    else if(sc.phase==='scan' && sc.t>1.8){ sc.phase='wait'; sc.t=0; customsScan('gate',releaseScale); }
+    if(sc.phase==='brake' && sc.t>1.1){ sc.phase='scan'; sc.t=0; thump(.3,160,.45); if(AU.buf.scanner) sfx('scanner',.85); else SND.scanHum(); }
+    else if(sc.phase==='scan' && sc.t>SCAN_T){ sc.phase='wait'; sc.t=0; customsScan('gate',releaseScale); }
     else if(sc.phase==='wait' && !state.law && sc.t>.5) releaseScale();
   }
 }
@@ -3814,7 +3818,7 @@ function land(onPad){
 }
 function disembark(){
   var sh=S.ship, padT=state.landing && state.landing.pad?state.landing.town:null, onPad=!!padT; state.landing=null;
-  SND.touchdown(); setTimeout(function(){ sfx('hatchOpen',.9); },250);
+  SND.touchdown(); if(onPad) sfx('airbrake',.45,1.12); setTimeout(function(){ sfx('hatchOpen',.9); },onPad?700:250);
   setShipFlying(sh,false);
   var right=new THREE.Vector3(-Math.cos(state.yaw),0,Math.sin(state.yaw));
   var off=hullBeam(sh)/2+2.5, px=sh.position.x+right.x*off, pz=sh.position.z+right.z*off;
