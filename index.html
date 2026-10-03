@@ -208,6 +208,21 @@ button:focus-visible{outline:2px solid var(--cyan);outline-offset:3px;}
 .co-input{width:100%;box-sizing:border-box;font:inherit;font-family:var(--font-display);font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--ink);
   background:rgba(255,255,255,.05);border:1px solid var(--line);border-radius:.35rem;padding:.6rem .7rem;margin:.2rem 0 .5rem;}
 .st-row .acts.wrap{flex-wrap:wrap;justify-content:flex-end;}
+#lawPanel{position:absolute;left:50%;top:calc(3.6rem + env(safe-area-inset-top,0px));transform:translateX(-50%);z-index:32;width:min(92vw,25rem);
+  padding:.8rem .9rem;pointer-events:auto;display:flex;flex-direction:column;gap:.35rem;background:rgba(10,8,14,.9);border-width:1px;}
+#lawPanel.law-bad{border-color:rgba(255,90,60,.75);box-shadow:0 0 24px rgba(255,90,60,.25);} #lawPanel.law-warn{border-color:rgba(127,168,255,.8);box-shadow:0 0 24px rgba(127,168,255,.25);}
+#lwHead{display:flex;justify-content:space-between;align-items:baseline;gap:.5rem;}
+#lwEye{font-family:var(--font-mono);font-size:.58rem;letter-spacing:.18em;color:var(--ink-dim);}
+#lwTimer{font-family:var(--font-mono);font-size:.9rem;color:#ff7a5c;font-variant-numeric:tabular-nums;}
+#lwTitle{font-family:var(--font-display);font-weight:700;font-size:1.05rem;letter-spacing:.04em;}
+#lwBody{font-size:.86rem;color:var(--ink);line-height:1.35;} #lwBody p{margin:.15rem 0;} #lwBody ul{margin:.2rem 0 .2rem 1rem;padding:0;}
+#lwBody .lw-fine{font-family:var(--font-mono);font-size:.68rem;letter-spacing:.06em;color:#ff9a7c;}
+#lwBtns{display:flex;flex-wrap:wrap;gap:.4rem;margin-top:.2rem;}
+#lwBtns button{flex:1 1 auto;font-family:var(--font-display);font-weight:700;letter-spacing:.08em;font-size:.76rem;color:var(--ink);background:rgba(255,255,255,.06);
+  border:1px solid var(--line);border-radius:.35rem;padding:.6rem .7rem;cursor:pointer;}
+#lwBtns button small{display:block;font-family:var(--font-mono);font-size:.55rem;letter-spacing:.08em;color:var(--ink-dim);font-weight:400;}
+#lwBtns button.pri{background:linear-gradient(180deg,#ffd08a,var(--amber));color:#170c02;border:none;} #lwBtns button.run{border-color:rgba(255,90,60,.7);color:#ff9a7c;}
+.tag.k-contraband{color:#ffd0c8;background:#3a0c10;border:1px solid #d8402a;}
 .co-log{font-family:var(--font-mono);font-size:.62rem;letter-spacing:.05em;color:var(--ink-dim);line-height:1.6;}
 .tag.k-fragile{color:#04121a;background:var(--cyan);} .tag.k-perishable{color:#0b1a04;background:#9dff6a;} .tag.k-hazardous{color:#fff;background:#d8402a;}
 #stationPanel{position:absolute;right:1rem;top:calc(1rem + env(safe-area-inset-top,0px));bottom:calc(1rem + env(safe-area-inset-bottom,0px));z-index:30;
@@ -300,6 +315,7 @@ body.mapopen #joywrap,body.mapopen #actions,body.mapopen #throttle{visibility:hi
       <span class="k">HOLD</span><span class="v" id="holdVal">0/4</span>
       <span class="k">FUEL</span><div class="bar"><i id="fuFill"></i></div>
       <span class="k">HULL</span><span class="v" id="hullVal">100%</span>
+      <span class="k">LAW</span><span class="v" id="lawVal">CLEARED</span>
       <span class="k" id="clockK">SYSTEM</span><span class="v" id="clockV">ORIGIN</span>
     </div>
     <div id="invrow"></div>
@@ -327,6 +343,7 @@ body.mapopen #joywrap,body.mapopen #actions,body.mapopen #throttle{visibility:hi
       <div id="wpList"></div>
       <button id="wpClose" type="button">CANCEL</button>
     </div>
+    <div id="lawPanel" class="panel" hidden><div id="lwHead"><span id="lwEye"></span><span id="lwTimer"></span></div><div id="lwTitle"></div><div id="lwBody"></div><div id="lwBtns"></div></div>
     <div id="mapPanel" class="panel" hidden>
       <div class="wp-head">PLANET MAP &middot; <span id="mpPlanet"></span></div>
       <canvas id="mapCv" width="512" height="512"></canvas>
@@ -1916,20 +1933,20 @@ window.addEventListener('mouseup',function(){ setHold(false); });
 /* =========================================================================
    Game state + HUD
    ========================================================================= */
-var state={throttle:0, yawRate:0, pitchRate:0, mode:'title', yaw:Math.PI, pitch:0, vel:new THREE.Vector3(), energy:100, scan:1, credits:0, inv:{}, found:{}, sysSeed:0, up:{}, cargo:[], taken:{}, boardGen:{}, delivered:0, dock:null, mods:[], modsOwned:{}, lic:{}, fuel:null, hull:100, company:null,
+var state={throttle:0, yawRate:0, pitchRate:0, mode:'title', yaw:Math.PI, pitch:0, vel:new THREE.Vector3(), energy:100, scan:1, credits:0, inv:{}, found:{}, sysSeed:0, up:{}, cargo:[], taken:{}, boardGen:{}, delivered:0, dock:null, mods:[], modsOwned:{}, lic:{}, fuel:null, hull:100, company:null, cleared:0, heat:{}, flares:3, law:null, chase:null, arrivedT:0, pirateT:30,
   pos:new THREE.Vector3(), vy:0, grounded:true, bob:0, fovKick:0, exposure:1, exposureTarget:1, t:0, warp:null};
 var OLD_KEYS={'CINDER REACH':'PYRITE','GLASSWATER':'CYANITE','VERDANT HOLLOW':'AMETHINE','PALE SILICATE':'AURUM'};
 try{
   var sv=JSON.parse(localStorage.getItem('nh_save')||'null');
   if(sv){
     state.credits=sv.credits||0; state.found=sv.found||{}; state.sysSeed=sv.sys||0; state.up=sv.up||{}; state.cargo=sv.cargo||[]; state.taken=sv.taken||{}; state.boardGen=sv.boardGen||{}; state.delivered=sv.delivered||0;
-    state.mods=sv.mods||[]; state.modsOwned=sv.modsOwned||{}; state.lic=sv.lic||{}; state.fuel=sv.fuel; state.hull=sv.hull==null?100:sv.hull; state.company=sv.company||null;
+    state.mods=sv.mods||[]; state.modsOwned=sv.modsOwned||{}; state.lic=sv.lic||{}; state.fuel=sv.fuel; state.hull=sv.hull==null?100:sv.hull; state.company=sv.company||null; state.cleared=sv.cleared===undefined?(sv.sys||0):sv.cleared; state.heat=sv.heat||{}; state.flares=sv.flares==null?3:sv.flares;
     Object.keys(sv.inv||{}).forEach(function(k){ var nk=OLD_KEYS[k]||k; if(ELEMENTS[nk]) state.inv[nk]=(state.inv[nk]||0)+sv.inv[k]; });
   }
 }catch(e){}
 drawThrottle();
 function save(){ try{ localStorage.setItem('nh_save',JSON.stringify({credits:state.credits,inv:state.inv,found:state.found,sys:state.sysSeed,up:state.up,cargo:state.cargo,taken:state.taken,boardGen:state.boardGen,delivered:state.delivered,
-  mods:state.mods,modsOwned:state.modsOwned,lic:state.lic,fuel:state.fuel,hull:state.hull,company:state.company})); }catch(e){} }
+  mods:state.mods,modsOwned:state.modsOwned,lic:state.lic,fuel:state.fuel,hull:state.hull,company:state.company,cleared:state.cleared,heat:state.heat,flares:state.flares})); }catch(e){} }
 
 function toast(msg, cls){ var el=document.createElement('div'); el.className='toast'+(cls?' '+cls:''); el.textContent=msg; $('toastWrap').appendChild(el); setTimeout(function(){ el.remove(); },2400); }
 function renderInv(){
@@ -2022,6 +2039,7 @@ function loadSystem(seed){
   var d=near.mesh.position.clone().sub(ship.position).normalize();
   state.yaw=Math.atan2(d.x,d.z); state.pitch=Math.asin(clamp(d.y,-1,1))*.5;
   M4.lookAt(V3.copy(ship.position).sub(d), ship.position, UP); ship.quaternion.setFromRotationMatrix(M4);
+  state.arrivedT=state.t; initLaw();
   renderer.compile(spaceScene,camera);
   planets.forEach(function(p){ queueSurface(p.index,false); });
   save();
@@ -2219,7 +2237,10 @@ var MODULES=[
   {id:'reefer', name:'REEFER BAY', desc:'Refrigerated racks. Needed for perishable loads.', cost:1400},
   {id:'shock', name:'SHOCK RACKS', desc:'Suspended cradles. Fragile cargo takes 70% less damage.', cost:1100},
   {id:'vault', name:'SHIELDED VAULT', desc:'Blast-proof container. Needed for hazardous loads (with a hazmat licence).', cost:2200},
-  {id:'tank', name:'AUX FUEL TANK', desc:'Carries 60% more fuel for long warps.', cost:900}
+  {id:'tank', name:'AUX FUEL TANK', desc:'Carries 60% more fuel for long warps.', cost:900},
+  {id:'hidden', name:"SMUGGLER'S COMPARTMENT", desc:'Shielded false floor. Customs scans are 55% less likely to find contraband.', cost:2600},
+  {id:'shield', name:'DEFLECTOR SHIELD', desc:'Halves the hull damage raiders do while you run.', cost:2000},
+  {id:'flares', name:'DECOY FLARES', desc:'Drop flares to throw attacking raiders off for a few seconds. 3 charges, restocked when you dock.', cost:1200}
 ];
 var LICENCES=[
   {id:'hazmat', name:'HAZMAT LICENCE', desc:'Legal to haul hazardous cargo. Also needs a shielded vault fitted.', cost:2500},
@@ -2356,6 +2377,7 @@ function boardOffers(loc){
     out.push({id:id, kind:kind, name:names[Math.floor(r()*names.length)], crates:crates, reward:reward, from:loc.name, dest:dest, ly:ly,
       limit:kind==='perishable'?(remote?Math.round((ly*1.3+420)):Math.round((dist/90+4)*60)):0});
   }
+  if(loc.kind==='town') out=out.concat(contrabandOffers(loc,g));
   return out;
 }
 /* systems (other than this one) you are carrying freight for */
@@ -2367,7 +2389,7 @@ function remoteDests(){
 function acceptOffer(o, loc){
   if(holdUsed()+o.crates>holdCap() || kindNeeds(o.kind)) return false;
   state.taken[o.id]=1;
-  state.cargo.push({id:o.id, kind:o.kind, name:o.name, crates:o.crates, reward:o.reward, from:o.from, dest:o.dest, cond:1,
+  state.cargo.push({id:o.id, kind:o.kind, grade:o.grade, name:o.name, crates:o.crates, reward:o.reward, from:o.from, dest:o.dest, cond:1,
     expires:o.limit?Date.now()+o.limit*1000:0});
   if(!boardOffers(loc).length) state.boardGen[loc.key]=(state.boardGen[loc.key]||0)+1;
   return true;
@@ -2377,6 +2399,7 @@ function deliverHere(loc){
   var total=0, n=0, late=0;
   state.cargo=state.cargo.filter(function(c){
     if(c.dest.key!==loc.key) return true;
+    if(c.kind!=='contraband' && !isCleared()) return true;
     var p=cargoPay(c); total+=p.pay; n+=c.crates; if(p.late) late++; return false;
   });
   if(n){ state.credits+=total; state.delivered=(state.delivered||0)+n; }
@@ -2626,6 +2649,12 @@ function bez(a,c,b,t,out){ var u=1-t; return out.set(0,0,0).addScaledVector(a,u*
 function faceShip(dir,k){ M4.lookAt(V3.copy(ship.position).sub(dir), ship.position, UP); QT.setFromRotationMatrix(M4); ship.quaternion.slerp(QT,k); }
 function showFlightControls(on){ $('joywrap').classList.toggle('on',on); $('actions').classList.toggle('on',on); thWrap.classList.toggle('on',on); }
 function dockPoint(){ return station.insideW.clone().addScaledVector(UP,hullGear(ship)*.75+.4); }
+function dockArrived(){
+  if(hasMod('flares') && state.flares<3){ state.flares=3; toast('FLARES RESTOCKED'); }
+  piratesLeave('');
+  if(secOf(SYS.seed).customs && (!isCleared()||isWanted())) customsScan('dock',function(){ if(state.dock && state.dock.phase==='docked') openTerminal(stationLoc()); });
+  else openTerminal(stationLoc());
+}
 function startDock(){
   if(state.dock||!station) return;
   stopRates(); setThrottle(0);
@@ -2656,7 +2685,7 @@ function updateDock(dt){
   var prev=ship.position.clone();
   if(K.phase==='approach'){ bez(K.p0,K.ctrl,K.E,ease(K.t/K.dur),ship.position); if(K.t>=K.dur){ K.phase='enter'; K.t=0; } }
   else if(K.phase==='enter'){ ship.position.lerpVectors(K.E,K.I,ease(K.t/2.4)); if(K.t>=2.4){ K.phase='turn'; K.t=0; } }
-  else if(K.phase==='turn'){ if(K.t>=1.2){ K.phase='docked'; K.t=0; openTerminal(stationLoc()); } }
+  else if(K.phase==='turn'){ if(K.t>=1.2){ K.phase='docked'; K.t=0; dockArrived(); } }
   else if(K.phase==='leave'){
     var u=K.t/2.6; ship.position.lerpVectors(K.I,K.E.clone().addScaledVector(K.D,20),u*u);
     if(K.t>=2.6){ state.dock=null; state.dockCool=6; stopRates(); setThrottle(.5); state.vel.copy(K.D).multiplyScalar(30); state.yaw=Math.atan2(K.D.x,K.D.z); state.pitch=0; showFlightControls(true); setModeUI('space'); return; }
@@ -2700,7 +2729,7 @@ function closeTerminal(){
   $('stationPanel').hidden=true; termLoc=null;
   if(state.mode==='surface'){ showFlightControls(true); state.terminalCool=2; }
 }
-function tagHTML(kind){ return KIND_TAG[kind]?'<span class="tag k-'+kind+'">'+KIND_TAG[kind]+'</span>':''; }
+function tagHTML(kind, grade){ if(kind==='contraband') return '<span class="tag k-contraband">CONTRABAND · '+CB_GRADES[grade||1].tag+'</span>'; return KIND_TAG[kind]?'<span class="tag k-'+kind+'">'+KIND_TAG[kind]+'</span>':''; }
 function destLabel(d){ var here=!SYS||d.sys===SYS.seed; return (d.kind==='station'?d.name+' (station)':d.name+' ('+d.pname+')')+(here?'':' · '+d.sysName+' system'); }
 function renderTerminal(tab){
   var loc=termLoc; if(!loc) return;
@@ -2713,11 +2742,14 @@ function renderTerminal(tab){
     h+='<div class="hold"><span>HOLD</span><span class="slots">';
     for(var i=0;i<cap;i++) h+='<i class="'+(i<used?'on':'')+'"></i>';
     h+='</span><b>'+used+'/'+cap+'</b></div>';
+    var blocked=here.filter(function(c){ return c.kind!=='contraband' && !isCleared(); });
+    if(blocked.length) h+='<p class="st-note" style="color:var(--amber)">Customs clearance needed: '+blocked.length+' legal load'+(blocked.length>1?'s':'')+' can’t be signed for until you check in at the customs gate outside '+SYS.station.name+'.</p>';
+    here=here.filter(function(c){ return blocked.indexOf(c)<0; });
     if(here.length){
       var sum=here.reduce(function(a,c){ return a+cargoPay(c).pay; },0);
       h+='<div class="st-sub">DELIVER HERE</div>';
       here.forEach(function(c){ var p=cargoPay(c);
-        h+='<div class="st-row job ready"><span class="nm">'+c.name+tagHTML(c.kind)+'<small>'+c.crates+' crate'+(c.crates>1?'s':'')+' from '+c.from+'</small>'+
+        h+='<div class="st-row job ready"><span class="nm">'+c.name+tagHTML(c.kind,c.grade)+'<small>'+c.crates+' crate'+(c.crates>1?'s':'')+' from '+c.from+'</small>'+
           '<small class="fx">Pays '+fmt(p.pay)+' units'+(c.kind==='fragile'?' · condition '+Math.round(c.cond*100)+'%':'')+(p.late?' · late, reduced pay':'')+'</small></span></div>'; });
       h+='<button class="bigact" data-act="deliver">DELIVER ALL · +'+fmt(sum)+' UNITS</button>';
     }
@@ -2725,7 +2757,7 @@ function renderTerminal(tab){
     if(other.length){
       h+='<div class="st-sub">IN YOUR HOLD</div>';
       other.forEach(function(c){ var tl=timeLeft(c);
-        h+='<div class="st-row job"><span class="nm">'+c.name+tagHTML(c.kind)+'<small>To '+destLabel(c.dest)+'</small>'+
+        h+='<div class="st-row job"><span class="nm">'+c.name+tagHTML(c.kind,c.grade)+'<small>To '+destLabel(c.dest)+'</small>'+
           '<small class="fx">'+fmt(cargoPay(c).pay)+' units'+(tl?' · '+tl+' left':'')+(c.kind==='fragile'?' · condition '+Math.round(c.cond*100)+'%':'')+'</small></span></div>'; });
     }
     var offers=boardOffers(loc);
@@ -2733,7 +2765,7 @@ function renderTerminal(tab){
     if(!offers.length) h+='<p class="st-note">No contracts posted right now.</p>';
     offers.forEach(function(o){
       var fits=used+o.crates<=cap, need=kindNeeds(o.kind);
-      h+='<div class="st-row job'+(need?' locked':'')+'"><span class="nm">'+o.name+tagHTML(o.kind)+'<small>'+o.crates+' crate'+(o.crates>1?'s':'')+' to '+destLabel(o.dest)+'</small>'+
+      h+='<div class="st-row job'+(need?' locked':'')+'"><span class="nm">'+o.name+tagHTML(o.kind,o.grade)+'<small>'+o.crates+' crate'+(o.crates>1?'s':'')+' to '+destLabel(o.dest)+'</small>'+
         '<small class="fx">'+(o.ly?'<span class="xs">WARP '+o.ly+' LY</span> ':'')+'Pays '+fmt(o.reward)+' units'+(o.limit?' · '+Math.round(o.limit/60)+' min limit':'')+(o.kind==='fragile'?' · pay drops if you crash':'')+'</small></span>'+
         '<span class="acts"><button class="pri" data-act="accept" data-id="'+o.id+'"'+(fits&&!need?'':' disabled')+'>'+(need?need:fits?'LOAD':'HOLD FULL')+'</button></span></div>';
     });
@@ -2781,6 +2813,8 @@ function renderTerminal(tab){
       if(C.log.length) h+='<div class="st-sub">COMPANY LOG</div><div class="co-log">'+C.log.join('<br>')+'</div>';
     }
   } else if(stTab==='services'){
+    var hz=heatOf(SYS.seed);
+    if(loc.kind==='station' && hz>.05) h+='<div class="st-row upg"><span class="nm">CRIMINAL RECORD<small>Heat '+hz.toFixed(1)+' / 5 in '+SYS.name+' · more patrols and tougher scans</small></span><span class="acts"><button class="pri" data-act="clearrec"'+(state.credits>=Math.ceil(hz*700)?'':' disabled')+'>PAY OFF · '+fmt(Math.ceil(hz*700))+'</button></span></div>';
     var R=serviceRates(loc), cap2=fuelCap(), need2=Math.max(0,cap2-state.fuel), fu=fuelUnit(loc), fillCost=Math.ceil(need2*fu);
     var dmg=100-state.hull, ru=repairUnit(loc), repCost=Math.ceil(dmg*ru);
     h+='<p class="st-note">'+R.note+' Warps burn fuel; bumps, landings and jumps wear the hull, and a worn hull flies slower.</p>';
@@ -2850,6 +2884,7 @@ $('stationPanel').addEventListener('click',function(e){
     else if(act==='fsell'){ if(coConfirm!==sh.id){ coConfirm=sh.id; renderTerminal(); return; }
       coConfirm=null; state.credits+=FLEET_PRICE[sh.tier]/2; C4.ships=C4.ships.filter(function(x){ return x!==sh; }); fleetLog(sh.name+' · SOLD'); toast(sh.name+' SOLD · +'+fmt(FLEET_PRICE[sh.tier]/2)+' UNITS'); }
   }
+  else if(act==='clearrec'){ var hc=Math.ceil(heatOf(SYS.seed)*700); if(state.credits<hc) return; state.credits-=hc; setHeat(SYS.seed,0); toast('RECORD CLEARED IN '+SYS.name,'life'); }
   else if(act==='licbuy'){ var lc=LICENCES.filter(function(x){ return x.id===t.dataset.id; })[0]; if(!lc||state.credits<lc.cost) return;
     state.credits-=lc.cost; state.lic[lc.id]=1; toast(lc.name+' ISSUED','life'); }
   else if(act==='accept'){ var o=boardOffers(loc).filter(function(x){ return x.id===t.dataset.id; })[0];
@@ -2898,7 +2933,9 @@ function updateSpace(dt){
   if(sd<56 && ship.position.y>station.center.y-14){ cargoImpact(state.vel.length()*.6); ship.position.sub(station.center).setLength(56).add(station.center); state.vel.multiplyScalar(.3); }
   pierCollide();
   state.dockCool=Math.max(0,(state.dockCool||0)-dt);
-  if(sd<DOCK_RANGE && !state.dockCool && $('warpPanel').hidden) setPrompt('DOCK · '+SYS.station.name,'TRADE · UPGRADES · CONTRACTS',startDock); else setPrompt(null);
+  if(sd<DOCK_RANGE && !state.dockCool && $('warpPanel').hidden) setPrompt('DOCK · '+SYS.station.name,'TRADE · UPGRADES · CONTRACTS',startDock);
+  else if(hasMod('flares') && state.flares>0 && lawActors.some(function(a){ return a.kind==='pirate' && a.mode==='attack'; })) setPrompt('DROP FLARES',state.flares+' LEFT',dropFlares);
+  else setPrompt(null);
   spaceAmbient(dt);
   updateDust(-.05-(f.boosting?.05:0), clamp((state.vel.length()-8)/50,0,.7));
   var dests=activeDests();
@@ -2907,14 +2944,303 @@ function updateSpace(dt){
     return {bearing:bearingTo(dx,dz), color:drop?'#ffb24d':p.biome.crystal, label:drop?'DROP':(p===best?Math.round(bd)+'km':'')}; });
   if(station){ var sdrop=dests.some(function(d){ return d.loc.kind==='station'; });
     cm.push({bearing:bearingTo(station.center.x-ship.position.x,station.center.z-ship.position.z), color:sdrop?'#ffb24d':'#eef6ff', label:sdrop?'DROP':(sd<600?'STATION':'')}); }
-  drawCompass(cm);
+  drawCompass(cm.concat(lawCompass()));
   var ri=planets.map(function(p){ return {x:p.mesh.position.x, z:p.mesh.position.z, color:p.biome.crystal, kind:'planet', size:p.radius}; });
   if(station) ri.push({x:station.center.x, z:station.center.z, color:'#eef6ff', kind:'station'});
+  ri=ri.concat(lawRadar());
   drawRadar(ship.position, state.yaw, 1100, ri, sd<DOCK_RANGE?SYS.station.name:(best?best.biome.name:''));
   setSun(SPACE_SUN.clone(),1);
-  shipTag(null); navTags(spaceNav());
+  shipTag(null); navTags(spaceNav().concat(lawNav()));
   setClock('SYSTEM', SYS.name);
 }
+
+/* =========================================================================
+   Law and lawlessness: customs, contraband, patrols and pirates
+   ========================================================================= */
+var SECURITY={
+  high:{key:'high', name:'HIGH', col:'#7fe8ff', customs:true, scan:1.25, patrols:3, pirates:.06, bm:1},
+  medium:{key:'medium', name:'MEDIUM', col:'#9dff6a', customs:true, scan:1, patrols:2, pirates:.35, bm:1.05},
+  low:{key:'low', name:'LOW', col:'#ffb24d', customs:true, scan:.7, patrols:1, pirates:.75, bm:1.15},
+  lawless:{key:'lawless', name:'LAWLESS', col:'#ff5a3c', customs:false, scan:0, patrols:0, pirates:1.25, bm:1.35}
+};
+function secOf(seed){ if(!seed) return SECURITY.high; var v=ihash(seed,4747)%100; return v<30?SECURITY.high:v<65?SECURITY.medium:v<90?SECURITY.low:SECURITY.lawless; }
+var CB_GRADES=[null,
+  {name:'GREY GOODS', tag:'GREY', mult:1.8, detect:.35, fine:600, heat:0, items:['Untaxed Spirits','Grey-Market Chips','Bootleg Holovids','Unlicensed Stims','Counterfeit Parts']},
+  {name:'RESTRICTED', tag:'RESTRICTED', mult:2.6, detect:.55, fine:1800, heat:1, items:['Military Surplus','Stolen Nav Cores','Unregistered Drones','Restricted Pharma','Jammer Units']},
+  {name:'BLACK-MARKET', tag:'BLACK MARKET', mult:4, detect:.75, fine:4000, heat:2, items:['Xeno Artifacts','Weapon Components','Black-Box Data','Smuggled Reactor Cores','Forged Hull Permits']}];
+var IMPOUND_FEE=[600,1350,2700,4800];
+
+function isCleared(){ return !SYS || !secOf(SYS.seed).customs || state.cleared===SYS.seed; }
+function heatOf(seed){ var h=state.heat[seed]; if(!h) return 0; return Math.max(0,h.v-(Date.now()-h.t)/480000); }
+function setHeat(seed,v){ v=clamp(v,0,5); if(v<=0) delete state.heat[seed]; else state.heat[seed]={v:v, t:Date.now()}; }
+function isWanted(){ return SYS && heatOf(SYS.seed)>=3; }
+function contrabandAboard(){ return state.cargo.filter(function(c){ return c.kind==='contraband'; }); }
+
+/* contraband postings: settlements only, 1-2 per board */
+function contrabandOffers(loc, g){
+  var out=[], r=rng(ihash(ihash(SYS.seed+29,loc.planet*10+(loc.site||0)+3),g*17+5)), n=r()<.7?1:2, nbs=neighbourSeeds(SYS.seed,3);
+  var local=sysSiteLocs(SYS).filter(function(l){ return l.key!==loc.key; });
+  for(var k=0;k<n;k++){
+    var gr=r()<.5?1:(r()<.62?2:3), G=CB_GRADES[gr], remote=r()<.6 || !local.length, dest, ly=0, dist=0;
+    if(remote){ var ns=nbs[Math.floor(r()*nbs.length)], tl=sysSiteLocs(sysInfo(ns)); dest=tl[Math.floor(r()*tl.length)]; ly=lightYears(SYS.seed,ns); }
+    else { dest=local[Math.floor(r()*local.length)]; dist=locDist(loc,dest); }
+    var crates=r()<.3?2:1, base=remote?(600+ly*5.5):(210+dist*.55);
+    var reward=Math.round(base*G.mult*secOf(dest.sys).bm*(crates===2?1.75:1)/10)*10, id=loc.key+':'+g+':c'+k;
+    var name=G.items[Math.floor(r()*G.items.length)];
+    if(state.taken[id]) continue;
+    out.push({id:id, kind:'contraband', grade:gr, name:name, crates:crates, reward:reward, from:loc.name, dest:dest, ly:ly, limit:0});
+  }
+  return out;
+}
+
+/* ---------- the encounter panel (customs, patrol hails, pirates) ---------- */
+var lawPanel=null;
+function showLaw(o){
+  state.law=o; o.t0=state.t;
+  $('lwEye').textContent=o.eye; $('lwTitle').textContent=o.title; $('lwBody').innerHTML=o.body; $('lwTimer').textContent='';
+  $('lawPanel').className='panel law-'+(o.tone||'warn');
+  var bx=$('lwBtns'); bx.innerHTML='';
+  o.buttons.forEach(function(b){ var el=document.createElement('button'); el.type='button'; el.className=b.cls||''; el.innerHTML=b.label; if(b.disabled) el.disabled=true;
+    el.addEventListener('click',function(){ if(state.law!==o) return; hideLaw(); b.fn(); renderInv(); save(); }); bx.appendChild(el); });
+  $('lawPanel').hidden=false;
+}
+function hideLaw(){ state.law=null; $('lawPanel').hidden=true; }
+
+/* ---------- customs scan ---------- */
+function customsScan(source, then){
+  var sec=secOf(SYS.seed), harsh=source==='patrol'?1.25:source==='chase'?1.6:1, heat=heatOf(SYS.seed), found=[];
+  contrabandAboard().forEach(function(c){
+    var p=CB_GRADES[c.grade].detect*Math.max(sec.scan,.5)*harsh*(hasMod('hidden')?.45:1)*(1+heat*.12);
+    if(source==='chase' || Math.random()<Math.min(.97,p)) found.push(c);
+  });
+  var wanted=heat>=3, late=!isCleared() && (source==='patrol'||source==='chase');
+  if(!found.length && !wanted){
+    var lateFine=late?250:0; state.credits-=lateFine; state.cleared=SYS.seed; setHeat(SYS.seed,Math.min(heat,2));
+    toast('CUSTOMS · CLEARED'+(lateFine?' · −250 LATE CHECK-IN FINE':' · '+SYS.name),'life'); renderInv(); save();
+    if(then) then(); return;
+  }
+  var fine=found.reduce(function(a,c){ return a+CB_GRADES[c.grade].fine*c.crates; },0)+(wanted?Math.round(heat*700):0)+(late?250:0);
+  var worst=found.reduce(function(a,c){ return Math.max(a,c.grade); },0), bribe=Math.round(fine*.6), odds=clamp(.7-.12*worst-.06*heat-(source==='chase'?.2:0),.1,.8);
+  var list=found.map(function(c){ return '<li>'+c.name+' · '+c.crates+' crate'+(c.crates>1?'s':'')+' <span class="tag k-contraband">'+CB_GRADES[c.grade].tag+'</span></li>'; }).join('');
+  var body=(found.length?'<p>The scan flagged:</p><ul>'+list+'</ul>':'<p>You are wanted in this system.</p>')+
+    '<p class="lw-fine">Fine '+fmt(fine)+(worst===3?' · plus impound fee '+fmt(IMPOUND_FEE[hullTier()])+' and a licence revoked':'')+(found.length?' · flagged cargo confiscated':'')+'</p>';
+  var btns=[{label:'COMPLY · PAY '+fmt(fine), cls:'pri', fn:function(){ customsPenalty(found,fine,worst,1); if(then) then(); }},
+    {label:'BRIBE · '+fmt(bribe)+' <small>'+Math.round(odds*100)+'% CHANCE</small>', fn:function(){
+      state.credits-=bribe;
+      if(Math.random()<odds){ state.cleared=SYS.seed; setHeat(SYS.seed,Math.min(heat,1)); toast('THE OFFICER LOOKS THE OTHER WAY · CLEARED','life'); }
+      else { toast('BRIBE REFUSED · PENALTIES INCREASED'); customsPenalty(found,Math.round(fine*1.5),worst,2); }
+      if(then) then(); }}];
+  if(source==='gate'||source==='patrol') btns.push({label:'RUN', cls:'run', fn:function(){ goWanted(); }});
+  showLaw({type:'customs', eye:(source==='dock'?'STATION CUSTOMS':source==='gate'?'CUSTOMS GATE':'PATROL INSPECTION')+' · '+SYS.name, title:found.length?'Contraband found':'Wanted in this system',
+    body:body, buttons:btns, tone:'bad', noTimeout:true});
+}
+function customsPenalty(found, fine, worst, heatAdd){
+  state.credits-=fine;
+  state.cargo=state.cargo.filter(function(c){ return found.indexOf(c)<0; });
+  var msg='FINED '+fmt(fine);
+  if(found.length) msg+=' · '+found.length+' LOAD'+(found.length>1?'S':'')+' CONFISCATED';
+  if(worst===3){ var fee=IMPOUND_FEE[hullTier()]; state.credits-=fee; msg+=' · IMPOUND FEE '+fmt(fee);
+    var held=LICENCES.filter(function(L){ return hasLic(L.id); }); if(held.length){ var L=held[Math.floor(Math.random()*held.length)]; delete state.lic[L.id]; msg+=' · '+L.name+' REVOKED'; } }
+  var gh=found.reduce(function(a,c){ return Math.max(a,CB_GRADES[c.grade].heat); },0);
+  setHeat(SYS.seed,Math.min(2,(heatOf(SYS.seed)>=3?0:heatOf(SYS.seed))+gh+(heatAdd>1?1:0)));
+  state.cleared=SYS.seed; endChase();
+  toast(msg); renderInv(); save();
+}
+function goWanted(){ setHeat(SYS.seed,5); toast('YOU RAN · WANTED IN '+SYS.name+' · LOSE THE PATROLS'); renderInv(); save(); }
+
+/* ---------- the customs gate on the station approach ---------- */
+function buildCustomsGate(parent){
+  if(!station) return;
+  var pos=station.mouthW.clone().addScaledVector(station.dirW,175), g=new THREE.Group(); g.position.copy(pos);
+  g.lookAt(V3.copy(pos).add(station.dirW)); parent.add(g);
+  var mat=new THREE.MeshBasicMaterial({color:new THREE.Color(2.4,1.4,.3)});
+  var ring=new THREE.Mesh(new THREE.TorusGeometry(27,1.1,10,72),mat); g.add(ring);
+  var frame=new THREE.Mesh(new THREE.TorusGeometry(29.5,.6,8,72),new THREE.MeshStandardMaterial({color:0x3a3f48, metalness:.8, roughness:.4})); g.add(frame);
+  var veil=new THREE.Mesh(new THREE.CircleGeometry(26,48),new THREE.MeshBasicMaterial({color:new THREE.Color(.25,.6,.9), transparent:true, opacity:.08, blending:THREE.AdditiveBlending, depthWrite:false, side:THREE.DoubleSide})); g.add(veil);
+  var lamps=[]; for(var i=0;i<8;i++){ var a=i/8*TAU, l=new THREE.Mesh(new THREE.SphereGeometry(.9,10,8),new THREE.MeshBasicMaterial({color:new THREE.Color(3,2,.5)})); l.position.set(Math.cos(a)*29.5,Math.sin(a)*29.5,0); g.add(l); lamps.push(l); }
+  station.gate={group:g, pos:pos, dir:station.dirW.clone(), r:26, mat:mat, veil:veil, lamps:lamps, side:0};
+}
+function updateGate(dt){
+  var G=station&&station.gate; if(!G) return;
+  var sec=secOf(SYS.seed), need=sec.customs && (!isCleared()||isWanted()), t=state.t;
+  G.group.visible=sec.customs;
+  if(!sec.customs) return;
+  if(need) G.mat.color.setRGB(2.4,1.4,.3); else G.mat.color.setRGB(.4,2.4,.9);
+  G.lamps.forEach(function(l,i){ l.material.color.setRGB(need?3:.5,need?2:3,need?.5:1).multiplyScalar(((t*1.5+i/8)%1)<.5?1:.25); });
+  G.veil.material.opacity=.06+.04*Math.sin(t*3);
+  var rel=V3.copy(ship.position).sub(G.pos), along=rel.dot(G.dir), radial=rel.addScaledVector(G.dir,-along).length(), side=along>0?1:-1;
+  if(G.side && side!==G.side && radial<G.r && need && !state.law && !state.dock && !state.warp){ toast('CUSTOMS SCAN…'); customsScan('gate'); }
+  G.side=side;
+}
+
+/* ---------- patrol cutters ---------- */
+var lawActors=[], lawFx=null;
+function lightBar(obj, cols){
+  cols.forEach(function(c,i){ var sp=new THREE.Sprite(new THREE.SpriteMaterial({map:glowTex, color:c, blending:THREE.AdditiveBlending, depthWrite:false, transparent:true}));
+    sp.scale.set(5,5,1); sp.position.set((i-.5)*3.2,2.4,0); obj.add(sp); obj.userData.bar=(obj.userData.bar||[]).concat([sp]); });
+}
+function initLaw(){
+  lawActors=[]; hideLaw(); state.chase=null; state.pirateT=state.t+25;
+  if(!SYS || !station) return;
+  buildCustomsGate(sysGroup);
+  var sec=secOf(SYS.seed);
+  for(var i=0;i<sec.patrols;i++){
+    var h=buildHull(0,false); h.scale.setScalar(.55); h.userData.flames.concat(h.userData.glows).forEach(function(f){ f.visible=false; });
+    lightBar(h,[new THREE.Color(.4,.9,4),new THREE.Color(4,.4,.4)]); sysGroup.add(h);
+    var p=i===0?{c:station.center.clone(), r:320}:{c:planets[i%planets.length].mesh.position.clone(), r:planets[i%planets.length].radius*3.2};
+    var a={kind:'patrol', obj:h, home:p.c, r:p.r, ang:i*2.1, mode:'patrol', vel:new THREE.Vector3(), cool:0, caught:0};
+    h.position.copy(a.home).add(V3.set(Math.cos(a.ang)*a.r,10,Math.sin(a.ang)*a.r)); lawActors.push(a);
+  }
+  if(!lawFx){ lawFx=new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(),new THREE.Vector3(0,0,1)]),new THREE.LineBasicMaterial({color:new THREE.Color(4,.5,.3), transparent:true, blending:THREE.AdditiveBlending})); lawFx.frustumCulled=false; }
+  spaceScene.add(lawFx); lawFx.visible=false;
+}
+function steerActor(a, target, speed, dt){
+  var to=V1.copy(target).sub(a.obj.position), d=to.length();
+  if(d>.01){ to.multiplyScalar(1/d); a.vel.lerp(to.multiplyScalar(speed),1-Math.pow(.25,dt)); }
+  a.obj.position.addScaledVector(a.vel,dt);
+  if(a.vel.lengthSq()>1){ M4.lookAt(V3.copy(a.obj.position).sub(V2.copy(a.vel).normalize()), a.obj.position, UP); QT.setFromRotationMatrix(M4); a.obj.quaternion.slerp(QT,1-Math.pow(.05,dt)); }
+  (a.obj.userData.bar||[]).forEach(function(sp,i){ sp.material.opacity=((state.t*3+i*.5)%1)<.5?1:.15; });
+  return d;
+}
+function endChase(){ lawActors.forEach(function(a){ if(a.kind==='patrol' && a.mode!=='patrol'){ a.mode='return'; a.cool=20; } }); state.chase=null; if(state.law && (state.law.type==='hail')) hideLaw(); }
+
+function hailPatrol(a){
+  a.mode='hail';
+  showLaw({type:'hail', actor:a, eye:'PATROL CUTTER · '+secOf(SYS.seed).name+' SECURITY', title:'Cut your engines for inspection',
+    body:'<p>'+(isWanted()?'You are wanted in this system.':!isCleared()?'You have not checked in at customs.':'Random inspection.')+' Throttle to zero, or tap comply.</p>',
+    buttons:[{label:'COMPLY', cls:'pri', fn:function(){ stopRates(); setThrottle(0); state.vel.multiplyScalar(.2); a.mode='return'; a.cool=40; customsScan('patrol'); }},
+      {label:'RUN', cls:'run', fn:function(){ startChase(a); }}], timeout:8, onTimeout:function(){ startChase(a); }, tone:'warn'});
+}
+function startChase(a){ if(!isWanted()) goWanted(); a.mode='chase'; a.caught=0; state.chase={t:0}; }
+
+/* ---------- pirates ---------- */
+function cargoValue(){ return state.cargo.reduce(function(a,c){ return a+c.reward; },0); }
+function spawnPirates(){
+  var sec=secOf(SYS.seed), n=sec.key==='lawless'&&Math.random()<.5?2:1, fwd=V1.set(Math.sin(state.yaw),0,Math.cos(state.yaw));
+  for(var i=0;i<n;i++){
+    var h=buildHull(1+Math.floor(Math.random()*2),false); h.scale.setScalar(.6);
+    h.traverse(function(o){ if(o.material && o.material.isMeshStandardMaterial){ o.material=o.material.clone(); o.material.color.multiplyScalar(.35); o.material.emissive=new THREE.Color(.25,0,0); } });
+    lightBar(h,[new THREE.Color(4,.3,.2),new THREE.Color(4,.3,.2)]); sysGroup.add(h);
+    var ang=(Math.random()-.5)*1.6+(i?.5:0); V2.copy(fwd).applyAxisAngle(UP,ang).multiplyScalar(620);
+    h.position.copy(ship.position).add(V2).add(V3.set(0,(Math.random()-.5)*60,0));
+    lawActors.push({kind:'pirate', obj:h, mode:'approach', vel:new THREE.Vector3(), t:0, fire:0, flareT:0});
+  }
+  toast('UNKNOWN CONTACTS CLOSING · '+(n>1?'TWO SHIPS':'ONE SHIP'));
+}
+function pirateDemand(){
+  var val=cargoValue(), ransom=Math.max(300,Math.round(val*.15/10)*10), best=state.cargo.slice().sort(function(a,b){ return b.reward-a.reward; })[0];
+  var btns=[{label:'PAY · '+fmt(ransom), cls:'pri', fn:function(){ state.credits-=ransom; piratesLeave('THEY TAKE THE MONEY AND BREAK OFF'); }}];
+  if(best) btns.push({label:'DUMP '+best.name.toUpperCase(), fn:function(){ state.cargo=state.cargo.filter(function(c){ return c!==best; }); piratesLeave('THEY SCOOP THE CRATE AND BREAK OFF'); }});
+  btns.push({label:'RUN', cls:'run', fn:function(){ piratesAttack(); }});
+  showLaw({type:'pirate', eye:'OPEN CHANNEL · UNREGISTERED VESSEL', title:'“Nice cargo. Share it.”',
+    body:'<p>Pay '+fmt(ransom)+' or dump your most valuable load, or they open fire. Run for the station defence grid, an atmosphere or a warp.</p>',
+    buttons:btns, timeout:10, onTimeout:piratesAttack, tone:'bad'});
+}
+function piratesAttack(){ lawActors.forEach(function(a){ if(a.kind==='pirate') { a.mode='attack'; a.t=0; } }); toast('PIRATES ATTACKING · RUN!'); }
+function piratesLeave(msg){ var any=false; lawActors.forEach(function(a){ if(a.kind==='pirate' && a.mode!=='leave'){ a.mode='leave'; a.t=0; any=true; } }); if(state.law && state.law.type==='pirate') hideLaw(); if(any && msg) toast(msg); }
+function dropFlares(){
+  if(!hasMod('flares') || state.flares<=0) return;
+  state.flares--; lawActors.forEach(function(a){ if(a.kind==='pirate' && a.mode==='attack') a.flareT=6; });
+  toast('DECOY FLARES · '+state.flares+' LEFT'); save();
+}
+function pirateActive(){ return lawActors.some(function(a){ return a.kind==='pirate' && a.mode!=='leave'; }); }
+
+/* ---------- per-frame upkeep ---------- */
+function updateLaw(dt){
+  if(!SYS) return;
+  var inSpace=state.mode==='space' && !state.warp, free=inSpace && !state.dock;
+  // leaving space ends any chase or raid
+  if(!free){
+    if(state.chase && state.mode!=='space'){ endChase(); toast('PATROLS LOST YOU IN THE ATMOSPHERE'); }
+    if(pirateActive() && (state.mode!=='space'||state.warp)) piratesLeave(state.mode!=='space'?'THE RAIDERS WON’T FOLLOW YOU DOWN':'');
+    if(state.law && (state.law.type==='hail'||state.law.type==='pirate')) hideLaw();
+  }
+  if(state.mode==='space' && station) updateGate(dt);
+  if(state.law && state.law.timeout){
+    var left=state.law.timeout-(state.t-state.law.t0); $('lwTimer').textContent=Math.max(0,Math.ceil(left))+'s';
+    if(state.law.type==='hail' && state.vel.length()<3 && state.throttle<=0.01){ var la=state.law; hideLaw(); la.actor.mode='return'; la.actor.cool=40; customsScan('patrol'); }
+    else if(left<=0){ var lw=state.law; hideLaw(); lw.onTimeout(); }
+  }
+  if(state.mode!=='space') return;
+  var sec=secOf(SYS.seed), suspect=!state.law && free && ((!isCleared() && state.t-(state.arrivedT||0)>120) || isWanted());
+  var sd=station?ship.position.distanceTo(station.center):1e9, firing=false;
+  lawActors.forEach(function(a){
+    var d=a.obj.position.distanceTo(ship.position);
+    if(a.kind==='patrol'){
+      a.cool=Math.max(0,a.cool-dt);
+      if(a.mode==='patrol'||a.mode==='return'){
+        a.ang+=dt*22/a.r; var tgt=V2.copy(a.home).add(V3.set(Math.cos(a.ang)*a.r,10+Math.sin(a.ang*2)*14,Math.sin(a.ang)*a.r)).clone();
+        var dd=steerActor(a,tgt,a.mode==='return'?60:26,dt); if(a.mode==='return' && dd<40) a.mode='patrol';
+        if(free && !a.cool && d<260 && !state.law){
+          if(suspect) hailPatrol(a);
+          else if(contrabandAboard().length && d<140){ a.cool=90; if(Math.random()<.3) hailPatrol(a); }
+        }
+      } else if(a.mode==='hail'){ steerActor(a,V2.copy(ship.position).addScaledVector(V3.copy(a.obj.position).sub(ship.position).normalize(),40).clone(),70,dt); }
+      else if(a.mode==='chase'){
+        steerActor(a,ship.position,95,dt);
+        if(d<45 && free){ a.caught+=dt; if(a.caught>3){ a.mode='return'; a.cool=60; state.chase=null; stopRates(); setThrottle(0); state.vel.set(0,0,0); toast('PATROL HAS YOU · FORCED INSPECTION'); customsScan('chase'); } }
+        if(d>900){ endChase(); toast('YOU LOST THE PATROL · STILL WANTED HERE'); }
+      }
+    } else {
+      a.t+=dt; a.flareT=Math.max(0,a.flareT-dt);
+      if(a.mode==='approach'){ steerActor(a,ship.position,90,dt); if(d<260 && free && !state.law) pirateDemand(); if(a.t>60) a.mode='leave'; }
+      else if(a.mode==='attack'){
+        if(a.flareT>0) steerActor(a,V2.copy(ship.position).add(V3.set(200,80,-200)).clone(),90,dt);
+        else steerActor(a,V2.copy(ship.position).addScaledVector(V3.copy(a.obj.position).sub(ship.position).normalize(),35).clone(),88,dt);
+        if(d<120 && a.flareT<=0 && free){ firing=true; a.fire+=dt;
+          if(a.fire>.25){ a.fire=0; var dmg=(hasMod('shield')?.5:1)*1; state.hull=Math.max(0,state.hull-dmg); renderInv(); state.fovKick=Math.min(state.fovKick+1.5,6);
+            if(state.hull<=0) pirateDisable(); } }
+        if(d>950){ piratesLeave('YOU OUTRAN THE RAIDERS'); }
+        else if(sd<450){ piratesLeave('STATION DEFENCE GRID LOCKS ON · RAIDERS BREAK OFF'); }
+        else if(a.t>70) piratesLeave('THE RAIDERS GIVE UP THE CHASE');
+      } else {
+        a.t+=dt; V2.copy(a.obj.position).sub(ship.position).normalize(); steerActor(a,V3.copy(a.obj.position).addScaledVector(V2,200).clone(),110,dt);
+        if(d>1400 || a.t>12){ a.dead=true; sysGroup.remove(a.obj); disposeObject(a.obj); }
+      }
+    }
+  });
+  lawActors=lawActors.filter(function(a){ return !a.dead; });
+  if(lawFx){ lawFx.visible=firing && ((state.t*14)%1)<.5;
+    if(lawFx.visible){ var src=lawActors.filter(function(a){ return a.kind==='pirate' && a.mode==='attack'; })[0]; if(src){ var pa=lawFx.geometry.attributes.position; pa.setXYZ(0,src.obj.position.x,src.obj.position.y,src.obj.position.z); pa.setXYZ(1,ship.position.x+(Math.random()-.5)*3,ship.position.y+(Math.random()-.5)*2,ship.position.z+(Math.random()-.5)*3); pa.needsUpdate=true; } } }
+  // raiders show up in open space when you are hauling
+  if(free && !state.law && !pirateActive() && state.cargo.length && sd>500 && state.t>state.pirateT){
+    state.pirateT=state.t+18;
+    var cb=contrabandAboard().length, chance=sec.pirates*.1*(1+Math.min(2,cargoValue()/8000)+cb*.4);
+    if(Math.random()<chance) spawnPirates();
+  }
+}
+function pirateDisable(){
+  var take=Math.ceil(state.cargo.length/2), sorted=state.cargo.slice().sort(function(a,b){ return b.reward-a.reward; }).slice(0,take);
+  state.cargo=state.cargo.filter(function(c){ return sorted.indexOf(c)<0; }); state.hull=12;
+  piratesLeave(''); toast('HULL BREACHED · RAIDERS STRIPPED '+take+' LOAD'+(take>1?'S':'')+' · LIMP TO A STATION'); renderInv(); save();
+}
+function lawNav(){
+  var out=[];
+  if(station && station.gate && secOf(SYS.seed).customs && (!isCleared()||isWanted()) && !state.dock){
+    var d=ship.position.distanceTo(station.gate.pos); if(d>40) out.push({pos:station.gate.pos.clone().add(new THREE.Vector3(0,34,0)), name:'CUSTOMS GATE', sub:Math.round(d)+' KM · CHECK IN', drop:false});
+  }
+  return out;
+}
+function lawCompass(){
+  var m=[];
+  if(station && station.gate && secOf(SYS.seed).customs && !isCleared()) m.push({bearing:bearingTo(station.gate.pos.x-ship.position.x,station.gate.pos.z-ship.position.z), color:'#ffb24d', label:'CUSTOMS'});
+  lawActors.forEach(function(a){ if(a.kind==='pirate' && a.mode!=='leave') m.push({bearing:bearingTo(a.obj.position.x-ship.position.x,a.obj.position.z-ship.position.z), color:'#ff5a3c', label:'RAIDER'});
+    else if(a.kind==='patrol' && a.mode==='chase') m.push({bearing:bearingTo(a.obj.position.x-ship.position.x,a.obj.position.z-ship.position.z), color:'#7fa8ff', label:'PATROL'}); });
+  return m;
+}
+function lawRadar(){ return lawActors.map(function(a){ return {x:a.obj.position.x, z:a.obj.position.z, color:a.kind==='pirate'?'#ff5a3c':'#7fa8ff', kind:'life'}; }); }
+function lawHud(){
+  var el=$('lawVal'), t, c;
+  if(!SYS){ return; }
+  if(isWanted()){ t='WANTED'; c='#ff5a3c'; }
+  else if(!secOf(SYS.seed).customs){ t='LAWLESS'; c='#ff8a6a'; }
+  else if(!isCleared()){ t='CHECK IN'; c='var(--amber)'; }
+  else { t='CLEARED'; c='#9dff6a'; }
+  if(el.textContent!==t){ el.textContent=t; el.style.color=c; }
+}
+function placeInvRow(){ var st=$('status').getBoundingClientRect(); if(st.height) $('invrow').style.top=Math.round(st.bottom+6)+'px'; }
+setInterval(function(){ lawHud(); placeInvRow(); },500);
+window.addEventListener('resize',placeInvRow);
 
 /* =========================================================================
    Warp drive
@@ -2932,7 +3258,7 @@ function openWarp(){
     row.innerHTML='<span class="wp-star" style="color:'+sy.star.col+';background:'+sy.star.col+'"></span>'+
       '<span class="wp-name">'+(sd===0?'ORIGIN · HOME':sy.name)+'</span><span class="wp-dist">'+lightYears(SYS.seed,sd)+' LY · <span style="color:'+(state.fuel>=warpFuel(lightYears(SYS.seed,sd))?'var(--amber)':'#ff7a5c')+'">FUEL '+warpFuel(lightYears(SYS.seed,sd))+'</span></span>'+
       (d?'<span class="wp-drop">▸ DROP · '+d.crates+' CRATE'+(d.crates>1?'S':'')+' FOR '+Object.keys(d.stops).join(', ')+'</span>':'')+
-      '<span class="wp-meta">CLASS '+sy.star.cls+' · '+sy.biomes.length+' PLANETS · '+types+'</span>';
+      '<span class="wp-meta"><b style="color:'+secOf(sd).col+';font-weight:400">SECURITY '+secOf(sd).name+'</b> · CLASS '+sy.star.cls+' · '+sy.biomes.length+' PLANETS · '+types+'</span>';
     row.addEventListener('click',function(){ startWarp(sd); });
     list.appendChild(row);
   });
@@ -2969,6 +3295,7 @@ function updateWarp(dt){
   setVeil(white,'#e4f4ff',0);
   if(t>=1.6 && !W.swapped){ W.swapped=true; loadSystem(W.seed); state.exposure=2.5;
     var minF=Math.min.apply(null,neighbourSeeds(SYS.seed,3+lvl('warp')).map(function(sd){ return warpFuel(lightYears(SYS.seed,sd)); }));
+    var sc=secOf(SYS.seed); setTimeout(function(){ toast(sc.customs?'SECURITY '+sc.name+' · CHECK IN AT THE CUSTOMS GATE BY THE STATION':'LAWLESS SPACE · NO CUSTOMS · WATCH FOR RAIDERS'); },1800);
     if(state.fuel<minF) setTimeout(function(){ toast('LOW FUEL · '+Math.floor(state.fuel)+' LEFT · REFUEL BEFORE YOUR NEXT JUMP'); },3500); }
   spaceAmbient(dt);
   updateDust(-.06,clamp(spd/200,0,1)*(1-sstep(2.8,3.6,t)));
@@ -3378,6 +3705,7 @@ function frame(){
   else if(state.mode==='space') updateSpace(dt);
   else if(state.mode==='atmo' && S) updateAtmo(dt);
   else if(state.mode==='surface' && S) updateSurface(dt);
+  if(state.mode!=='title') updateLaw(dt);
   state.exposure=lerp(state.exposure,state.exposureTarget,1-Math.pow(.25,dt));
   var u=finalPass.uniforms; u.exposure.value=state.exposure; u.time.value=state.t;
   if(!navSet){ navTags([]); navSet=false; }
@@ -3449,7 +3777,8 @@ async function boot(){
 }
 window.__nh={enterPlanet:function(i){ enterAtmosphere(planets[i]); }, ready:function(i){ return !!surfaces[i]; }, land:land, board:board, exitAtmo:exitAtmosphere,
   warp:startWarp, dock:startDock, cam:function(){ return camera; }, station:function(){ return station; }, ship:function(){ return ship; }, state:state, getS:function(){ return S; }, sys:function(){ return SYS; }, enter:function(){ $('enterBtn').click(); },
-  queue:queueSurface, terrain:planetTerrain, normalFromSurf:normalFromSurf, openMap:openMap, chunkBuilder:chunkBuilder, planets:function(){ return planets; }, offers:boardOffers, townLoc:townLoc};
+  queue:queueSurface, terrain:planetTerrain, normalFromSurf:normalFromSurf, openMap:openMap, chunkBuilder:chunkBuilder, planets:function(){ return planets; }, offers:boardOffers, townLoc:townLoc,
+  law:{spawnPirates:spawnPirates, scan:customsScan, actors:function(){ return lawActors; }, heat:heatOf, sec:secOf}};
 boot().catch(function(e){ console.error(e); $('loader').firstChild.nodeValue='Your device could not start the renderer: '+(e&&e.message||e); });
 })();
 </script>
