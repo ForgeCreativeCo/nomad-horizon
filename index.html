@@ -223,6 +223,17 @@ button:focus-visible{outline:2px solid var(--cyan);outline-offset:3px;}
 #lwBtns button small{display:block;font-family:var(--font-mono);font-size:.55rem;letter-spacing:.08em;color:var(--ink-dim);font-weight:400;}
 #lwBtns button.pri{background:linear-gradient(180deg,#ffd08a,var(--amber));color:#170c02;border:none;} #lwBtns button.run{border-color:rgba(255,90,60,.7);color:#ff9a7c;}
 .tag.k-contraband{color:#ffd0c8;background:#3a0c10;border:1px solid #d8402a;}
+#tiredV{position:absolute;inset:0;z-index:6;pointer-events:none;opacity:0;background:radial-gradient(ellipse at center,rgba(0,0,0,0) 35%,rgba(2,3,8,.92) 100%);transition:opacity 1s linear;}
+#blinkV{position:absolute;inset:0;z-index:7;pointer-events:none;opacity:0;background:#000;transition:opacity .12s linear;}
+#pilotRow{display:flex;gap:.35rem;}
+.need{pointer-events:auto;display:inline-flex;align-items:center;gap:.25rem;font-family:var(--font-mono);font-size:.62rem;color:var(--ink);background:rgba(255,255,255,.06);
+  border:1px solid var(--line);border-radius:99px;padding:.12rem .45rem .12rem .35rem;cursor:pointer;font-variant-numeric:tabular-nums;}
+.need svg{width:.8rem;height:.8rem;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;}
+.need i{font-style:normal;min-width:1.2rem;text-align:right;}
+.need.good{color:#9dff6a;border-color:rgba(157,255,106,.45);}
+.need.warn{color:#ff7a5c;border-color:rgba(255,122,92,.7);animation:needpulse 1s ease-in-out infinite;}
+@keyframes needpulse{50%{background:rgba(255,122,92,.22);}}
+@media (prefers-reduced-motion:reduce){ .need.warn{animation:none;} }
 .co-log{font-family:var(--font-mono);font-size:.62rem;letter-spacing:.05em;color:var(--ink-dim);line-height:1.6;}
 .tag.k-fragile{color:#04121a;background:var(--cyan);} .tag.k-perishable{color:#0b1a04;background:#9dff6a;} .tag.k-hazardous{color:#fff;background:#d8402a;}
 #stationPanel{position:absolute;right:1rem;top:calc(1rem + env(safe-area-inset-top,0px));bottom:calc(1rem + env(safe-area-inset-bottom,0px));z-index:30;
@@ -321,6 +332,7 @@ body.mapopen #joywrap,body.mapopen #actions,body.mapopen #throttle{visibility:hi
       <span class="k">FUEL</span><div class="bar"><i id="fuFill"></i></div>
       <span class="k">HULL</span><span class="v" id="hullVal">100%</span>
       <span class="k">LAW</span><span class="v" id="lawVal">CLEARED</span>
+      <span class="k" id="pilotK">PILOT</span><span class="v" id="pilotRow"><button class="need" id="foodBtn" type="button" aria-label="Hunger, tap to eat a ration"><svg viewBox="0 0 24 24"><path d="M7 3v8M5 3v5a2 2 0 0 0 4 0V3M7 11v10M17 3c-2 2-3 5-3 8h3v10"/></svg><i>100</i></button><button class="need" id="restBtn" type="button" aria-label="Fatigue, tap to sleep"><svg viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></svg><i>100</i></button></span>
       <span class="k" id="clockK">SYSTEM</span><span class="v" id="clockV">ORIGIN</span>
     </div>
     <div id="invrow"></div>
@@ -370,6 +382,7 @@ body.mapopen #joywrap,body.mapopen #actions,body.mapopen #throttle{visibility:hi
   <div id="veil"></div>
   <div id="heat"></div>
   <div id="fade"></div>
+  <div id="tiredV"></div><div id="blinkV"></div>
 
   <div id="title">
     <div class="inner">
@@ -1939,7 +1952,7 @@ window.addEventListener('mouseup',function(){ setHold(false); });
 /* =========================================================================
    Game state + HUD
    ========================================================================= */
-var state={throttle:0, yawRate:0, pitchRate:0, mode:'title', yaw:Math.PI, pitch:0, vel:new THREE.Vector3(), energy:100, scan:1, credits:0, inv:{}, found:{}, sysSeed:0, up:{}, cargo:[], taken:{}, boardGen:{}, delivered:0, dock:null, mods:[], modsOwned:{}, lic:{}, fuel:null, hull:100, company:null, cleared:0, heat:{}, flares:3, law:null, chase:null, arrivedT:0, pirateT:30,
+var state={throttle:0, yawRate:0, pitchRate:0, mode:'title', yaw:Math.PI, pitch:0, vel:new THREE.Vector3(), energy:100, scan:1, credits:0, inv:{}, found:{}, sysSeed:0, up:{}, cargo:[], taken:{}, boardGen:{}, delivered:0, dock:null, mods:[], modsOwned:{}, lic:{}, fuel:null, hull:100, company:null, cleared:0, heat:{}, flares:3, food:100, rest:100, rations:2, fedT:0, restedT:0, needsOff:false, blinkT:0, sleeping:false, law:null, chase:null, arrivedT:0, pirateT:30,
   pos:new THREE.Vector3(), vy:0, grounded:true, bob:0, fovKick:0, exposure:1, exposureTarget:1, t:0, warp:null};
 var OLD_KEYS={'CINDER REACH':'PYRITE','GLASSWATER':'CYANITE','VERDANT HOLLOW':'AMETHINE','PALE SILICATE':'AURUM'};
 try{
@@ -1947,12 +1960,14 @@ try{
   if(sv){
     state.credits=sv.credits||0; state.found=sv.found||{}; state.sysSeed=sv.sys||0; state.up=sv.up||{}; state.cargo=sv.cargo||[]; state.taken=sv.taken||{}; state.boardGen=sv.boardGen||{}; state.delivered=sv.delivered||0;
     state.mods=sv.mods||[]; state.modsOwned=sv.modsOwned||{}; state.lic=sv.lic||{}; state.fuel=sv.fuel; state.hull=sv.hull==null?100:sv.hull; state.company=sv.company||null; state.cleared=sv.cleared===undefined?(sv.sys||0):sv.cleared; state.heat=sv.heat||{}; state.flares=sv.flares==null?3:sv.flares;
+    state.food=sv.food==null?100:sv.food; state.rest=sv.rest==null?100:sv.rest; state.rations=sv.rations==null?2:sv.rations; state.fedT=sv.fedT||0; state.restedT=sv.restedT||0; state.needsOff=!!sv.needsOff;
     Object.keys(sv.inv||{}).forEach(function(k){ var nk=OLD_KEYS[k]||k; if(ELEMENTS[nk]) state.inv[nk]=(state.inv[nk]||0)+sv.inv[k]; });
   }
 }catch(e){}
 drawThrottle();
 function save(){ try{ localStorage.setItem('nh_save',JSON.stringify({credits:state.credits,inv:state.inv,found:state.found,sys:state.sysSeed,up:state.up,cargo:state.cargo,taken:state.taken,boardGen:state.boardGen,delivered:state.delivered,
-  mods:state.mods,modsOwned:state.modsOwned,lic:state.lic,fuel:state.fuel,hull:state.hull,company:state.company,cleared:state.cleared,heat:state.heat,flares:state.flares})); }catch(e){} }
+  mods:state.mods,modsOwned:state.modsOwned,lic:state.lic,fuel:state.fuel,hull:state.hull,company:state.company,cleared:state.cleared,heat:state.heat,flares:state.flares,
+  food:state.food,rest:state.rest,rations:state.rations,fedT:state.fedT,restedT:state.restedT,needsOff:state.needsOff})); }catch(e){} }
 
 function toast(msg, cls){ var el=document.createElement('div'); el.className='toast'+(cls?' '+cls:''); el.textContent=msg; $('toastWrap').appendChild(el); setTimeout(function(){ el.remove(); },2400); }
 function renderInv(){
@@ -2125,12 +2140,14 @@ function exitAtmosphere(){
 /* shared ship flight model */
 var V1=new THREE.Vector3(), V2=new THREE.Vector3(), V3=new THREE.Vector3(), QT=new THREE.Quaternion(), M4=new THREE.Matrix4(), UP=new THREE.Vector3(0,1,0);
 function inputAxes(){
+  if(blinking()) return {x:0, y:0, hold:false};
   var x=joy.x+((keys.KeyD||keys.ArrowRight)?1:0)-((keys.KeyA||keys.ArrowLeft)?1:0);
   var y=joy.y+((keys.KeyS||keys.ArrowDown)?1:0)-((keys.KeyW||keys.ArrowUp)?1:0);
   return {x:clamp(x,-1,1), y:clamp(y,-1,1), hold: holdA||keys.Space||keys.ShiftLeft};
 }
 /* Flight: the stick sets a turn RATE (with inertia), the throttle lever holds speed, dragging is free-look. */
 function flightAxes(){
+  if(blinking()) return {x:0, y:0, hold:false};
   var x=joy.x+((keys.KeyD||keys.ArrowRight)?1:0)-((keys.KeyA||keys.ArrowLeft)?1:0);
   var y=joy.y+(keys.ArrowDown?1:0)-(keys.ArrowUp?1:0);
   return {x:clamp(x,-1,1), y:clamp(y,-1,1), hold:holdA||keys.Space||keys.ShiftLeft||keys.ShiftRight};
@@ -2143,7 +2160,7 @@ function flyShip(dt, obj, sc, cruiseSpd, boostSpd, openK){
   // throttle keys (desktop)
   if(keys.KeyW) setThrottle(state.throttle+dt*.7); if(keys.KeyS) setThrottle(state.throttle-dt*.7);
   // turn rates with inertia
-  var tYaw=-curve(inp.x)*HH.yaw, tPitch=(INVERT_PITCH?1:-1)*curve(inp.y)*HH.pitch, k=1-Math.exp(-HH.agi*dt);
+  var tYaw=-curve(inp.x)*HH.yaw, tPitch=(INVERT_PITCH?1:-1)*curve(inp.y)*HH.pitch, k=1-Math.exp(-HH.agi*needsAgi()*dt);
   state.yawRate+=(tYaw-state.yawRate)*k; state.pitchRate+=(tPitch-state.pitchRate)*k;
   // soft pitch limit: resistance builds near vertical instead of a wall
   var lim=1.3, pr=state.pitchRate;
@@ -2152,7 +2169,7 @@ function flyShip(dt, obj, sc, cruiseSpd, boostSpd, openK){
   var fwd=FWD.set(Math.sin(state.yaw)*Math.cos(state.pitch),Math.sin(state.pitch),Math.cos(state.yaw)*Math.cos(state.pitch)).normalize();
   // speed from the throttle lever (boost overrides)
   var boosting=inp.hold && state.energy>1, thr=state.throttle;
-  if(boosting){ state.energy=Math.max(0,state.energy-dt*16); thr=Math.max(thr,1); } else state.energy=Math.min(100,state.energy+dt*8);
+  if(boosting){ state.energy=Math.max(0,state.energy-dt*16); thr=Math.max(thr,1); } else state.energy=Math.min(100,state.energy+dt*8*needsEnergyMul());
   var speed=(boosting?boostSpd:cruiseSpd)*thr;
   var target=new THREE.Vector3().copy(fwd).multiplyScalar(speed);
   state.vel.lerp(target,1-Math.pow(HH.grip,dt));
@@ -2246,6 +2263,8 @@ var MODULES=[
   {id:'tank', name:'AUX FUEL TANK', desc:'Carries 60% more fuel for long warps.', cost:900},
   {id:'hidden', name:"SMUGGLER'S COMPARTMENT", desc:'Shielded false floor. Customs scans are 55% less likely to find contraband.', cost:2600},
   {id:'shield', name:'DEFLECTOR SHIELD', desc:'Halves the hull damage raiders do while you run.', cost:2000},
+  {id:'galley', name:'GALLEY', desc:'A tiny kitchen in the cab. Ration packs become hot meals that leave you well fed.', cost:900},
+  {id:'sleeper', name:'SLEEPER CAB', desc:'A bunk behind the seat. Sleep parked in open space (raiders may find you in rough systems).', cost:1500},
   {id:'flares', name:'DECOY FLARES', desc:'Drop flares to throw attacking raiders off for a few seconds. 3 charges, restocked when you dock.', cost:1200}
 ];
 var LICENCES=[
@@ -2285,7 +2304,7 @@ var ROUTES={local:{name:'LOCAL RUNS', mult:1, wear:.25, len:4, risk:.05}, long:{
 var PILOT_FIRST=['ARI','BEX','CORA','DMITRI','EZRA','FEN','GALE','HOLLIS','IVO','JUNO','KAI','LIOR','MARA','NIKO','ODA','PELL','QUINN','RHEA','SOLLY','TAM','UMA','VEX','WREN','YARA','ZED'];
 var fleetAway=null, coConfirm=null;
 function fleetNet(s){ if(!s.pilot || s.cond<=0) return 0; var P=PILOT_GRADES[s.pilot.grade], R=ROUTES[s.route]; return FLEET_RATE[s.tier]*R.mult*P.skill*(1-P.cut)*(.6+.4*s.cond/100); }
-function fleetStatus(s){ return s.cond<=0?'GROUNDED':!s.pilot?'NO PILOT':(s.runT<ROUTES[s.route].len*.25?'LOADING':'EN ROUTE'); }
+function fleetStatus(s){ return s.cond<=0?'GROUNDED':!s.pilot?'NO PILOT':s.restLeft>0?'RESTING':(s.runT<ROUTES[s.route].len*.25?'LOADING':'EN ROUTE'); }
 function fleetLog(msg){ var C=state.company; C.log.unshift(msg); if(C.log.length>8) C.log.length=8; }
 function simFleet(mins, eff, quiet){
   var C=state.company; if(!C) return 0; var total=0;
@@ -2293,6 +2312,7 @@ function simFleet(mins, eff, quiet){
     var left=mins;
     while(left>1e-6){
       if(!s.pilot || s.cond<=0) break;
+      if(s.restLeft>0){ var rs=Math.min(left,s.restLeft); s.restLeft-=rs; left-=rs; continue; }
       var R=ROUTES[s.route], step=Math.min(left,R.len-s.runT);
       s.runT+=step; s.cond=Math.max(0,s.cond-R.wear*step); left-=step;
       if(s.runT>=R.len-1e-6){
@@ -2301,6 +2321,7 @@ function simFleet(mins, eff, quiet){
         if(roll<R.risk/P.skill){ s.cond=Math.max(0,s.cond-15); pay*=.5; var m=s.name+' · BREAKDOWN · HULL '+Math.round(s.cond)+'%'; fleetLog(m); if(!quiet) toast('FLEET · '+m); }
         else if(roll>1-.05*P.skill){ pay*=1.5; fleetLog(s.name+' · BONUS RUN · +'+fmt(pay)); }
         pay=Math.round(pay); s.earned+=pay; C.bank+=pay; total+=pay;
+        s.shift=(s.shift||0)+1; if(s.shift>=6){ s.shift=0; s.restLeft=6; fleetLog(s.name+' · '+s.pilot.name+' ON A REST BREAK'); }
         if(s.cond<=0){ fleetLog(s.name+' · GROUNDED · NEEDS REPAIR'); if(!quiet) toast('FLEET · '+s.name+' GROUNDED · NEEDS REPAIR'); }
       }
     }
@@ -2819,6 +2840,14 @@ function renderTerminal(tab){
       if(C.log.length) h+='<div class="st-sub">COMPANY LOG</div><div class="co-log">'+C.log.join('<br>')+'</div>';
     }
   } else if(stTab==='services'){
+    var PR=placeRates(loc);
+    if(needsOn()){
+      h+='<div class="st-sub">PILOT · HUNGER '+Math.round(state.food)+' · REST '+Math.round(state.rest)+(isFed()?' · WELL FED':'')+(isSharp()?' · WELL RESTED':'')+'</div>';
+      h+='<div class="st-row upg"><span class="nm">HOT MEAL<small>'+dishFor(loc)+' · fills you up and recharges energy faster for 15 min</small></span><span class="acts"><button class="pri" data-act="meal"'+(state.credits>=PR.meal?'':' disabled')+'>EAT · '+PR.meal+'</button></span></div>';
+      h+='<div class="st-row upg"><span class="nm">RATION PACKS<small>'+state.rations+' / 6 on board · eat one any time from the fork on your HUD'+(hasMod('galley')?' (your galley turns them into hot meals)':'')+'</small></span><span class="acts"><button data-act="ration"'+(state.rations<6&&state.credits>=20?'':' disabled')+'>BUY · 20</button></span></div>';
+      h+='<div class="st-row upg"><span class="nm">'+PR.bedName+'<small>Sleep 8 hours, wake well rested · perishable deadlines keep running</small></span><span class="acts"><button class="pri" data-act="bed"'+(state.credits>=PR.bed?'':' disabled')+'>SLEEP · '+PR.bed+'</button><button data-act="cab">CAB · FREE</button></span></div>';
+    }
+    h+='<div class="st-row upg"><span class="nm">PILOT NEEDS · '+(needsOn()?'ON':'OFF')+'<small>'+(needsOn()?'Hunger, fatigue and logbook checks are on. Relaxed mode turns them off.':'Relaxed mode: no hunger, fatigue or logbook checks.')+'</small></span><span class="acts"><button data-act="needs">'+(needsOn()?'RELAXED MODE':'TURN ON')+'</button></span></div>';
     var hz=heatOf(SYS.seed);
     if(loc.kind==='station' && hz>.05) h+='<div class="st-row upg"><span class="nm">CRIMINAL RECORD<small>Heat '+hz.toFixed(1)+' / 5 in '+SYS.name+' · more patrols and tougher scans</small></span><span class="acts"><button class="pri" data-act="clearrec"'+(state.credits>=Math.ceil(hz*700)?'':' disabled')+'>PAY OFF · '+fmt(Math.ceil(hz*700))+'</button></span></div>';
     var R=serviceRates(loc), cap2=fuelCap(), need2=Math.max(0,cap2-state.fuel), fu=fuelUnit(loc), fillCost=Math.ceil(need2*fu);
@@ -2890,6 +2919,11 @@ $('stationPanel').addEventListener('click',function(e){
     else if(act==='fsell'){ if(coConfirm!==sh.id){ coConfirm=sh.id; renderTerminal(); return; }
       coConfirm=null; state.credits+=FLEET_PRICE[sh.tier]/2; C4.ships=C4.ships.filter(function(x){ return x!==sh; }); fleetLog(sh.name+' · SOLD'); toast(sh.name+' SOLD · +'+fmt(FLEET_PRICE[sh.tier]/2)+' UNITS'); }
   }
+  else if(act==='meal'){ eatMeal(loc); }
+  else if(act==='ration'){ if(state.rations<6 && state.credits>=20){ state.credits-=20; state.rations++; } }
+  else if(act==='bed'){ sleep('paid',loc); }
+  else if(act==='cab'){ sleep('cab',loc); }
+  else if(act==='needs'){ state.needsOff=!state.needsOff; if(state.needsOff){ state.blinkT=0; } toast(state.needsOff?'RELAXED MODE · PILOT NEEDS OFF':'PILOT NEEDS ON'); }
   else if(act==='clearrec'){ var hc=Math.ceil(heatOf(SYS.seed)*700); if(state.credits<hc) return; state.credits-=hc; setHeat(SYS.seed,0); toast('RECORD CLEARED IN '+SYS.name,'life'); }
   else if(act==='licbuy'){ var lc=LICENCES.filter(function(x){ return x.id===t.dataset.id; })[0]; if(!lc||state.credits<lc.cost) return;
     state.credits-=lc.cost; state.lic[lc.id]=1; toast(lc.name+' ISSUED','life'); }
@@ -2961,6 +2995,108 @@ function updateSpace(dt){
 }
 
 /* =========================================================================
+   Pilot needs: hunger, fatigue and the logbook
+   ========================================================================= */
+var DISHES={ocean:['FISH FRY','KELP NOODLES','SMOKED EEL PLATE'], lush:['FRUIT STEW','GRILLED TUBERS','FOREST MUSHROOM PIE'], desert:['SPICED FLATBREAD','CACTUS CHILI','DUNE BEAN BOWL'],
+  frozen:['HOT BROTH','ICE-FISH CHOWDER'], scorched:['FIRE-ROAST SKEWERS','ASH-BAKED ROOTS'], toxic:['FILTERED-GREENS SALAD','SEALED-POT CURRY'], exotic:['GLOWBERRY TART','STRANGE STEW'],
+  station:['CANTINA PROTEIN BOWL','HYDROPONIC SALAD','STATION BURGER'], outpost:['MESS HALL HASH','RECONSTITUTED CHILI']};
+function needsOn(){ return !state.needsOff; }
+function dishFor(loc){
+  var list=loc.kind==='station'?DISHES.station:loc.outpost?DISHES.outpost:(DISHES[(SYS.biomes[loc.planet]||{}).type]||DISHES.outpost);
+  return list[ihash(SYS.seed+7,(loc.key||'').length*31+(loc.site||0)*7+(loc.planet||0))%list.length];
+}
+function placeRates(loc){
+  if(loc.kind==='station') return {meal:50, bed:80, bedName:'CREW BUNK'};
+  if(loc.outpost) return {meal:90, bed:60, bedName:'BUNKHOUSE COT'};
+  return {meal:60, bed:120, bedName:'MOTEL ROOM'};
+}
+function isFed(){ return state.fedT>0; }
+function isSharp(){ return state.restedT>0; }
+function needsEnergyMul(){ if(!needsOn()) return 1; var m=isFed()?1.25:1; if(state.food<25) m*=state.food<=0?.3:.5; return m; }
+function needsScanMul(){ if(!needsOn()) return 1; var m=isSharp()?1.3:1; if(state.food<25) m*=.6; return m; }
+function needsAgi(){ if(!needsOn()) return 1; var m=isSharp()?1.1:1; if(state.rest<30) m*=lerp(.6,1,state.rest/30); return m; }
+function blinking(){ return needsOn() && state.blinkT>0; }
+
+var needsWarned={food:false, rest:false, nod:false};
+function updateNeeds(dt){
+  if(state.mode==='title' || state.sleeping) return;
+  var paused=!!termLoc || !$('stationPanel').hidden;
+  if(needsOn() && !paused){
+    var foot=state.mode==='surface', boosting=(holdA||keys.Space||keys.ShiftLeft||keys.ShiftRight) && state.energy>1 && !foot;
+    state.food=Math.max(0,state.food-dt*(2.5/60)*(foot?.7:1));
+    state.rest=Math.max(0,state.rest-dt*(1.33/60)*(foot?.7:1)*(boosting?1.6:1));
+    state.fedT=Math.max(0,state.fedT-dt); state.restedT=Math.max(0,state.restedT-dt);
+    if(state.food<25 && !needsWarned.food){ needsWarned.food=true; toast('HUNGRY · GRAB A HOT MEAL AT A TERMINAL OR TAP THE FORK FOR A RATION'); }
+    if(state.food>40) needsWarned.food=false;
+    if(state.rest<30 && !needsWarned.rest){ needsWarned.rest=true; toast('TIRED · FIND A BUNK, OR LAND AND SLEEP IN YOUR CAB'); }
+    if(state.rest>45) needsWarned.rest=false;
+    // exhausted: brief microsleeps
+    if(state.rest<10 && state.mode!=='surface'){
+      state.nextBlink=(state.nextBlink==null?15+Math.random()*20:state.nextBlink)-dt;
+      if(state.nextBlink<=0){ state.blinkT=.7; state.nextBlink=15+Math.random()*20; if(!needsWarned.nod){ needsWarned.nod=true; toast('YOU NODDED OFF · SLEEP SOON'); } }
+    } else { state.nextBlink=null; needsWarned.nod=false; }
+  }
+  state.blinkT=Math.max(0,(state.blinkT||0)-dt);
+  var tv=needsOn()&&state.rest<30?(30-state.rest)/30*.8:0;
+  $('tiredV').style.opacity=tv.toFixed(3); $('blinkV').style.opacity=blinking()?1:0;
+}
+function renderNeeds(){
+  var row=$('pilotRow'), k=$('pilotK'); row.hidden=!needsOn(); k.hidden=!needsOn(); if(!needsOn()) return;
+  var f=$('foodBtn'), r=$('restBtn');
+  f.querySelector('i').textContent=Math.round(state.food); r.querySelector('i').textContent=Math.round(state.rest);
+  f.classList.toggle('warn',state.food<25); r.classList.toggle('warn',state.rest<30);
+  f.classList.toggle('good',isFed()); r.classList.toggle('good',isSharp());
+  f.title=(isFed()?'Well fed · faster energy recharge':'Hunger')+' · '+state.rations+' ration'+(state.rations===1?'':'s')+' · tap to eat one';
+  r.title=(isSharp()?'Well rested · sharper handling and scans':'Fatigue')+' · tap to sleep';
+}
+setInterval(renderNeeds,500);
+
+function eatRation(){
+  if(!needsOn()) return;
+  if(state.rations<=0){ toast('NO RATIONS · BUY THEM AT ANY TERMINAL'); return; }
+  state.rations--;
+  if(hasMod('galley')){ state.food=100; state.fedT=900; toast('COOKED A HOT MEAL IN THE GALLEY · WELL FED','life'); }
+  else { state.food=Math.min(100,state.food+45); toast('ATE A RATION PACK · '+state.rations+' LEFT'); }
+  renderNeeds(); save();
+}
+function eatMeal(loc){
+  var R=placeRates(loc); if(state.credits<R.meal) return;
+  state.credits-=R.meal; state.food=100; state.fedT=900; toast(dishFor(loc)+' · WELL FED','life');
+}
+/* sleep: the clock jumps 8 hours, so perishable deadlines move on while you rest */
+function sleep(kind, loc){
+  if(state.sleeping) return;
+  var paid=kind==='paid';
+  if(paid){ var R=placeRates(loc); if(state.credits<R.bed) return; state.credits-=R.bed; }
+  state.sleeping=true; var fd=$('fade'); fd.style.opacity=1;
+  setTimeout(function(){
+    state.rest=paid?100:Math.max(state.rest,85); state.restedT=paid?900:0; state.food=Math.max(0,state.food-25); state.fedT=0; state.blinkT=0;
+    state.cargo.forEach(function(c){ if(c.expires) c.expires-=240000; });
+    if(S && S.day){ S.day.phase+=TAU*8/24; if(S.day.phase>Math.PI*1.5) S.day.phase-=TAU; }
+    var ambush=kind==='space' && Math.random()<secOf(SYS.seed).pirates*.5 && state.cargo.length;
+    state.sleeping=false; fd.style.opacity=0; renderInv(); renderNeeds(); save();
+    if(termLoc) renderTerminal();
+    showBanner('8 HOURS LATER', paid?'WELL RESTED':'RESTED', state.cargo.some(function(c){ return c.expires; })?'PERISHABLE DEADLINES MOVED ON WHILE YOU SLEPT':'');
+    if(ambush){ setTimeout(function(){ toast('YOU WAKE TO PROXIMITY ALARMS'); spawnPirates(); },1200); }
+  },1700);
+}
+function tapSleep(){
+  if(!needsOn()) return;
+  if(termLoc){ renderTerminal('services'); return; }
+  if(state.mode==='surface'){ sleep('cab'); return; }
+  if(state.mode==='atmo'){ toast('LAND FIRST, THEN SLEEP IN YOUR CAB'); return; }
+  if(state.mode==='space'){
+    if(state.dock){ toast('DOCKED · USE THE CREW BUNK IN SERVICES'); return; }
+    if(state.law || state.chase || pirateActive()){ toast('NOT NOW'); return; }
+    if(!hasMod('sleeper')){ toast('NO BUNK ON BOARD · DOCK, LAND, OR FIT A SLEEPER CAB'); return; }
+    if(state.vel.length()>3){ toast('CUT YOUR THROTTLE TO PARK BEFORE SLEEPING'); return; }
+    sleep('space');
+  }
+}
+/* the logbook: customs fine you for flying over your hours */
+function logbookFine(){ return needsOn() && state.rest<25 ? 400 : 0; }
+
+/* =========================================================================
    Law and lawlessness: customs, contraband, patrols and pirates
    ========================================================================= */
 var SECURITY={
@@ -3021,15 +3157,15 @@ function customsScan(source, then){
   });
   var wanted=heat>=3, late=!isCleared() && (source==='patrol'||source==='chase');
   if(!found.length && !wanted){
-    var lateFine=late?250:0; state.credits-=lateFine; state.cleared=SYS.seed; state.clearedT=state.t; setHeat(SYS.seed,Math.min(heat,2));
-    toast('CUSTOMS · CLEARED'+(lateFine?' · −250 LATE CHECK-IN FINE':' · '+SYS.name),'life'); renderInv(); save();
+    var lateFine=(late?250:0)+logbookFine(); state.credits-=lateFine; state.cleared=SYS.seed; state.clearedT=state.t; setHeat(SYS.seed,Math.min(heat,2));
+    toast('CUSTOMS · CLEARED'+(lateFine?' · −'+fmt(lateFine)+(logbookFine()?' LOGBOOK: OVER YOUR HOURS':' LATE CHECK-IN FINE'):' · '+SYS.name),'life'); renderInv(); save();
     if(then) then(); return;
   }
-  var fine=found.reduce(function(a,c){ return a+CB_GRADES[c.grade].fine*c.crates; },0)+(wanted?Math.round(heat*700):0)+(late?250:0);
+  var fine=found.reduce(function(a,c){ return a+CB_GRADES[c.grade].fine*c.crates; },0)+(wanted?Math.round(heat*700):0)+(late?250:0)+logbookFine();
   var worst=found.reduce(function(a,c){ return Math.max(a,c.grade); },0), bribe=Math.round(fine*.6), odds=clamp(.7-.12*worst-.06*heat-(source==='chase'?.2:0),.1,.8);
   var list=found.map(function(c){ return '<li>'+c.name+' · '+c.crates+' crate'+(c.crates>1?'s':'')+' <span class="tag k-contraband">'+CB_GRADES[c.grade].tag+'</span></li>'; }).join('');
   var body=(found.length?'<p>The scan flagged:</p><ul>'+list+'</ul>':'<p>You are wanted in this system.</p>')+
-    '<p class="lw-fine">Fine '+fmt(fine)+(worst===3?' · plus impound fee '+fmt(IMPOUND_FEE[hullTier()])+' and a licence revoked':'')+(found.length?' · flagged cargo confiscated':'')+'</p>';
+    (logbookFine()?'<p>Your logbook shows you flying over your hours.</p>':'')+'<p class="lw-fine">Fine '+fmt(fine)+(worst===3?' · plus impound fee '+fmt(IMPOUND_FEE[hullTier()])+' and a licence revoked':'')+(found.length?' · flagged cargo confiscated':'')+'</p>';
   var btns=[{label:'COMPLY · PAY '+fmt(fine), cls:'pri', fn:function(){ customsPenalty(found,fine,worst,1); if(then) then(); }},
     {label:'BRIBE · '+fmt(bribe)+' <small>'+Math.round(odds*100)+'% CHANCE</small>', fn:function(){
       state.credits-=bribe;
@@ -3349,7 +3485,7 @@ function startWarp(seed){
   var ly=lightYears(SYS.seed,seed), fuel=warpFuel(ly);
   if(state.fuel<fuel && state.mode==='space'){ toast('NOT ENOUGH FUEL · NEED '+fuel+', HAVE '+Math.floor(state.fuel)+' · REFUEL AT A STATION, TOWN OR FUEL DEPOT'); return; }
   warpPanel.hidden=true;
-  state.fuel=Math.max(0,state.fuel-fuel); wearHull(2+ly/100); save(); state.warp={t:0, seed:seed, swapped:false, ly:ly, cruise:clamp(ly/75,.6,5.4), prog:0};
+  state.fuel=Math.max(0,state.fuel-fuel); wearHull(2+ly/100); if(needsOn()) state.rest=Math.max(0,state.rest-3); save(); state.warp={t:0, seed:seed, swapped:false, ly:ly, cruise:clamp(ly/75,.6,5.4), prog:0};
   setPrompt(null); toast('WARP DRIVE ENGAGED');
 }
 function updateWarp(dt){
@@ -3553,7 +3689,7 @@ function updateSurface(dt){
   var ground=gh+1.7;
   var jet=inp.hold && state.energy>1;
   if(jet){ state.vy=Math.min(state.vy+dt*(26+3*lvl('jet')),9+1.5*lvl('jet')); state.energy=Math.max(0,state.energy-dt*22*(1-.25*lvl('jet'))); state.grounded=false; }
-  else { state.vy-=dt*16; if(state.grounded) state.energy=Math.min(100,state.energy+dt*18); }
+  else { state.vy-=dt*16; if(state.grounded) state.energy=Math.min(100,state.energy+dt*18*needsEnergyMul()); }
   p.y+=state.vy*dt;
   if(p.y<=ground){ p.y=lerp(p.y,ground,state.grounded?1:.6); if(state.vy<0) state.vy=0; state.grounded=true; } else if(p.y>ground+.15) state.grounded=false;
 
@@ -3571,7 +3707,7 @@ function updateSurface(dt){
   updateGrass(false, p);
   updateFauna(dt, p, state.yaw, true);
   aimLamp(camera.position, V1, (1-S.dayF)*3.2);
-  if(state.scan<1) state.scan=Math.min(1,state.scan+dt/(3.5*Math.pow(.8,lvl('scan'))));
+  if(state.scan<1) state.scan=Math.min(1,state.scan+dt*needsScanMul()/(3.5*Math.pow(.8,lvl('scan'))));
   state.terminalCool=Math.max(0,(state.terminalCool||0)-dt);
 
   var sp=S.ship.position, dShip=Math.hypot(sp.x-p.x,sp.z-p.z);
@@ -3653,6 +3789,8 @@ function drawMap(){
   x.beginPath(); x.moveTo(0,-11); x.lineTo(8,8); x.lineTo(0,3); x.lineTo(-8,8); x.closePath(); x.fill(); x.restore();
   x.fillStyle='rgba(238,246,255,.8)'; x.fillRect(14,W-20,500*sc,3); x.textAlign='left'; x.fillText('500 M',14,W-28);
 }
+$('foodBtn').addEventListener('click',eatRation);
+$('restBtn').addEventListener('click',tapSleep);
 $('radarWrap').addEventListener('click',function(){ if(mapOpen) closeMap(); else openMap(); });
 $('mpClose').addEventListener('click',closeMap);
 
@@ -3783,7 +3921,7 @@ function frame(){
   else if(state.mode==='space') updateSpace(dt);
   else if(state.mode==='atmo' && S) updateAtmo(dt);
   else if(state.mode==='surface' && S) updateSurface(dt);
-  if(state.mode!=='title') updateLaw(dt);
+  if(state.mode!=='title'){ updateLaw(dt); updateNeeds(dt); }
   state.exposure=lerp(state.exposure,state.exposureTarget,1-Math.pow(.25,dt));
   var u=finalPass.uniforms; u.exposure.value=state.exposure; u.time.value=state.t;
   if(!navSet){ navTags([]); navSet=false; }
