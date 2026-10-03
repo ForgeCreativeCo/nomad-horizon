@@ -3009,7 +3009,7 @@ function updateSpace(dt){
    interface tones made live with Web Audio so they follow the throttle.
    ========================================================================= */
 var SFX_FILES={drone:'audio/cab_drone.mp3', station:'audio/station_amb.mp3', whoosh:'audio/warp_whoosh.mp3', hatchOpen:'audio/hatch_open.mp3', hatchClose:'audio/hatch_close.mp3',
-  forklift:'audio/forklift.mp3', warehouse:'audio/warehouse.mp3', warpSpool:'audio/warp_spool.mp3'};
+  forklift:'audio/forklift.mp3', warehouse:'audio/warehouse.mp3', warpSpool:'audio/warp_spool.mp3', landing:'audio/landing.mp3'};
 var BEDS=['drone','station','warehouse'];
 var AU={ctx:null, on:true, buf:{}, beds:{}, eng:null, zapT:0, forkT:12};
 try{ AU.on=localStorage.getItem('nh_sound')!=='0'; }catch(e){}
@@ -3097,11 +3097,15 @@ function audioUpdate(dt){
 }
 
 /* one-shots */
-function sfx(name, vol, rate){
+function sfx(name, vol, rate, offset){
   if(!AU.ctx || !AU.buf[name] || !AU.on) return;
   var c=AU.ctx, s=c.createBufferSource(), g=c.createGain(); s.buffer=AU.buf[name]; s.playbackRate.value=rate||1; g.gain.value=vol==null?1:vol;
-  s.connect(g); g.connect(AU.sfx); s.start(); return {s:s, g:g};
+  s.connect(g); g.connect(AU.sfx); s.start(0,offset||0); return {s:s, g:g};
 }
+function sfxFade(h, after, len){ if(!h || !AU.ctx) return; var t=AU.ctx.currentTime+(after||0); try{ h.g.gain.setTargetAtTime(0,t,(len||.4)/3); h.s.stop(t+(len||.4)+.1); }catch(e){} }
+/* landing burn: the clip's closing swell and engine cut line up with touchdown */
+var LAND_T={pad:4.2, ground:3};
+function landingSound(dur){ var b=AU.buf.landing; if(!b) return; sfx('landing',.85,1,Math.max(0,b.duration-dur-.05)); }
 function tones(freqs, step, type, vol, len){
   if(!AU.ctx || !AU.on) return;
   var c=AU.ctx, t0=c.currentTime+.01;
@@ -3755,7 +3759,7 @@ function destMarkersSurface(from){
 function updateAtmo(dt){
   var sh=S.ship, f;
   if(state.landing){
-    var L=state.landing; L.t=Math.min(1,L.t+dt/(L.pad?1.8:1.1)); var e=L.t*L.t*(3-2*L.t);
+    var L=state.landing; L.t=Math.min(1,L.t+dt/(L.pad?LAND_T.pad:LAND_T.ground)); var e=L.t*L.t*(3-2*L.t);
     sh.position.set(lerp(L.x0,L.x1,e), lerp(L.y0,L.y1,e), lerp(L.z0,L.z1,e));
     M4.lookAt(V3.set(sh.position.x-Math.sin(state.yaw),sh.position.y,sh.position.z-Math.cos(state.yaw)), sh.position, UP);
     QT.setFromRotationMatrix(M4); sh.quaternion.slerp(QT,1-Math.pow(.01,dt));
@@ -3805,6 +3809,7 @@ function land(onPad){
   var nt=onPad?nearestTown(sh.position.x,sh.position.z):null, T=nt?nt.T:null; onPad=!!T;
   var x1=onPad?T.x:sh.position.x, z1=onPad?T.z:sh.position.z;
   var y1=(onPad?T.pad.y:S.heightAt(x1,z1))+hullGear(sh);
+  landingSound(onPad?LAND_T.pad:LAND_T.ground);
   state.landing={t:0, pad:onPad, town:T, x0:sh.position.x, y0:Math.max(sh.position.y,y1+4), z0:sh.position.z, x1:x1, y1:y1, z1:z1};
 }
 function disembark(){
@@ -3824,6 +3829,7 @@ function disembark(){
 }
 function board(){
   if(!S) return; setPrompt(null); closeTerminal(); sfx('hatchClose',.7,1.15);
+  var lift=sfx('landing',.6,1.12,.25); sfxFade(lift,2.6,1.2);
   state.mode='atmo'; setModeUI('atmo');
   setShipFlying(S.ship,true);
   state.vel.set(0,11,0); state.pitch=.05; state.landHint=true; stopRates(); setThrottle(.35);
