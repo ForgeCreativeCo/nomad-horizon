@@ -850,16 +850,21 @@ function buildShip(landed){
 
 /* =========================================================================
    Freighter hulls (tier follows the Freighter Hull / cargo upgrade)
-   0 SKIFF · 1 MULE · 2 LONGHAUL · 3 ATLAS
+   0 SKIFF · 1 MULE · 2 LONGHAUL · 3 ATLAS · 4/5 the two Rooks (bought outright, not upgrades)
    ========================================================================= */
 var DOCK_RANGE=82;
-var HULL_NAMES=['SKIFF','MULE','LONGHAUL','ATLAS'], HULL_CLASS=['LIGHT COURIER','SHORT-HAUL HAULER','TRACTOR-TRAILER','HEAVY LIFTER'];
+var HULL_NAMES=['SKIFF','MULE','LONGHAUL','ATLAS','ROOK TWIN-BOOM','ROOK WEDGE RUNNER'], HULL_CLASS=['LIGHT COURIER','SHORT-HAUL HAULER','TRACTOR-TRAILER','HEAVY LIFTER','SMUGGLER\u2019S FREIGHTER','SMUGGLER\u2019S FREIGHTER'];
+var ROOK_TIERS=[4,5], ROOK_PRICE=7200;
+function isRookTier(t){ return t===4||t===5; }
+function isRook(){ return isRookTier(hullTier()); }
 var HULL_SPACE=.62, HULL_GROUND=.8;
 var HULL_HANDLING=[
   {spd:1,   grip:.03,  yaw:1.55, pitch:1.15, agi:6.0, bank:.75},
   {spd:.95, grip:.045, yaw:1.15, pitch:.9,  agi:4.0, bank:.6},
   {spd:.9,  grip:.07,  yaw:.82,  pitch:.65, agi:2.6, bank:.42},
-  {spd:.86, grip:.06,  yaw:.72,  pitch:.58, agi:2.2, bank:.35}];
+  {spd:.86, grip:.06,  yaw:.72,  pitch:.58, agi:2.2, bank:.35},
+  {spd:1.14,grip:.028, yaw:1.7,  pitch:1.25, agi:6.6, bank:.8},
+  {spd:1.18,grip:.026, yaw:1.62, pitch:1.3,  agi:6.8, bank:.85}];
 var hullTex=null;
 function hullTextures(){
   if(hullTex) return hullTex;
@@ -920,7 +925,8 @@ function buildHull(tier, landed){
   function crate(w,h,d,x,y,z,i){ cargo.push(box(w,h,d,MT.crates[i%MT.crates.length],x,y,z)); box(w+.06,.12,.12,MT.frame,x,y+h/2,z-d/2+.06,g,false); box(w+.06,.12,.12,MT.frame,x,y+h/2,z+d/2-.06,g,false); }
   function nav(xs,y,z){ M(new THREE.SphereGeometry(.12,8,6),MT.red,-xs,y,z,g,false); M(new THREE.SphereGeometry(.12,8,6),MT.green,xs,y,z,g,false); }
   var gear;
-  if(tier===0){
+  if(tier===4||tier===5){ gear=buildRookParts(tier,g,MT,{M:M,box:box,prof:prof,nozzle:nozzle,leg:leg,crate:crate,nav:nav}); }
+  else if(tier===0){
     prof([[-4.4,.1],[-4.4,.75],[-3.3,1.55],[-1.3,1.8],[.6,1.72],[.9,.2],[-.4,-.35],[-3.6,-.25]],2.6,.12,MT.paint);
     prof([[-4.05,.8],[-3.2,1.5],[-2.05,1.68],[-2.4,.98]],2.72,.03,MT.glass);
     box(2.64,.07,2.4,MT.trim,0,1.78,-.5,g,false);
@@ -988,7 +994,94 @@ function buildHull(tier, landed){
   tilts.forEach(function(p){ p.rotation.x=landed?0:-Math.PI/2; });
   return g;
 }
-function hullTier(){ var top=Math.min(lvl('hold'),3), sel=state.hullSel; return (sel==null||sel>top||sel<0)?top:sel; }
+/* the Rook: a patched-up smuggler's freighter, in two builds */
+var rookMat=null;
+function rookMats(MT){
+  if(rookMat) return rookMat;
+  var plate=hullTextures().plate;
+  function ct(w,h,draw){ var c=document.createElement('canvas'); c.width=w; c.height=h; draw(c.getContext('2d'),w,h); var t=new THREE.CanvasTexture(c); t.wrapS=t.wrapT=THREE.RepeatWrapping; t.encoding=THREE.sRGBEncoding; t.anisotropy=maxAniso; tud(t).shared=true; return t; }
+  var r=rng(777);
+  var num=ct(256,128,function(x,w,h){ x.clearRect(0,0,w,h); x.fillStyle='rgba(235,226,205,.92)'; x.font='bold 74px "Share Tech Mono", monospace'; x.textAlign='center'; x.textBaseline='middle';
+    x.save(); x.translate(w/2,h/2); x.rotate(-.04); x.fillText('R-77',0,4); x.restore();
+    x.globalCompositeOperation='destination-out'; for(var i=0;i<260;i++){ x.fillStyle='rgba(0,0,0,'+(.3+r()*.6).toFixed(2)+')'; x.fillRect(r()*w,r()*h,2+r()*4,2+r()*3); } });
+  var haz=ct(128,32,function(x,w,h){ x.fillStyle='#16181c'; x.fillRect(0,0,w,h); x.fillStyle='#e0a83a'; for(var i=-h;i<w+h;i+=24){ x.beginPath(); x.moveTo(i,0); x.lineTo(i+12,0); x.lineTo(i+12-h,h); x.lineTo(i-h,h); x.closePath(); x.fill(); } });
+  rookMat={
+    patch:['#8d5a40','#5f6f7c','#6f7550','#9c9488','#b8a27a','#4f5560'].map(function(c){ return new THREE.MeshStandardMaterial({color:lin(c), map:plate, metalness:.4, roughness:.6}); }),
+    scorch:new THREE.MeshStandardMaterial({color:0x0c0a08, transparent:true, opacity:.55, roughness:1, metalness:0, depthWrite:false, polygonOffset:true, polygonOffsetFactor:-2}),
+    belly:new THREE.MeshStandardMaterial({color:lin('#1c1f24'), metalness:.7, roughness:.5}),
+    num:new THREE.MeshStandardMaterial({map:num, transparent:true, roughness:.8, metalness:.1, polygonOffset:true, polygonOffsetFactor:-2}),
+    haz:new THREE.MeshStandardMaterial({map:haz, roughness:.7})
+  };
+  return rookMat;
+}
+function buildRookParts(tier,g,MT,H){
+  var RM=rookMats(MT), M=H.M, box=H.box, R=rng(tier===4?77:91);
+  function prof(pts,w,bv,mat){ return M(hullProfile(pts,w,bv),mat,0,0,0); }
+  function plan(pts,height,bevel){
+    var s=new THREE.Shape(); s.moveTo(pts[0][0],pts[0][1]); for(var i=1;i<pts.length;i++) s.lineTo(pts[i][0],pts[i][1]); s.closePath();
+    var gg=new THREE.ExtrudeGeometry(s,{depth:height, bevelEnabled:true, bevelThickness:bevel, bevelSize:bevel, bevelSegments:2, curveSegments:2});
+    gg.rotateX(Math.PI/2); gg.translate(0,height/2,0); return gg;
+  }
+  function patches(n,face){ for(var i=0;i<n;i++){ var w=.5+R()*1.3, d=.5+R()*1.5, m=RM.patch[Math.floor(R()*RM.patch.length)], p=face(R);
+    box(face.vert?.05:w, face.vert?w*.7:.05, d, m, p[0], p[1], p[2], g, false); } }
+  function scorch(n,face){ for(var i=0;i<n;i++){ var p=face(R), sz=.4+R()*1.1, m=new THREE.Mesh(new THREE.CircleGeometry(sz,14),RM.scorch); m.position.set(p[0],p[1],p[2]); m.rotation.x=-Math.PI/2; m.scale.set(1,.6+R()*.6,1); g.add(m); } }
+  function bellyHatch(w,d,y,z){ box(w,.06,d,RM.belly,0,y,z,g,false); [-1,1].forEach(function(s){ box(w+.2,.07,.16,RM.haz,0,y-.01,z+s*d/2,g,false); box(.16,.07,d,RM.haz,s*w/2,y-.01,z,g,false); }); }
+  function decal(w,h,x,y,z,ry){ var m=M(new THREE.PlaneGeometry(w,h),RM.num,x,y,z,g,false); m.rotation.y=ry||0; return m; }
+  if(tier===4){
+    // TWIN-BOOM: cargo spine, high bridge, two booms with mismatched engines
+    prof([[-6.6,-.2],[-6.6,.5],[-5.6,1.25],[4.8,1.35],[5.4,.8],[5.4,-.55],[-5.8,-.7]],2.8,.12,MT.paint);
+    prof([[-5.9,1.2],[-5.9,1.9],[-5.0,2.95],[-2.6,3.1],[-2.2,2.6],[-2.2,1.2]],2.0,.12,MT.paint);
+    prof([[-5.84,1.95],[-4.98,2.86],[-4.0,2.98],[-4.5,1.98]],2.1,.03,MT.glass);
+    box(2.02,.08,1.2,MT.trim,0,2.4,-3.4,g,false);
+    M(new THREE.CylinderGeometry(.04,.06,1.6,6),MT.dark,.6,3.9,-2.8); M(new THREE.SphereGeometry(.09,8,6),MT.red,.6,4.7,-2.8,g,false);
+    box(2.3,.12,6.2,MT.dark,0,1.38,1.2,g,false);
+    [-1,1].forEach(function(s){ box(.18,.55,6.4,MT.frame,s*1.28,1.6,1.2); });
+    var i=0; [-1.4,.35,2.1,3.85].forEach(function(z){ [-.55,.55].forEach(function(x){ H.crate(1.0,.9,1.6,x,1.9,z,i++); }); });
+    [-1,1].forEach(function(s){
+      M(hullProfile([[.6,-.25],[1.2,.35],[4.2,.35],[4.6,-.25]],1.0,.08),MT.paint,s*2.2,0,0);
+      box(2.6,.32,3.2,MT.paint,s*2.1,.05,2.4);
+      var boom=M(new THREE.CylinderGeometry(.62,.72,7.2,14),s<0?MT.paint:RM.patch[2],s*3.55,.05,2.2); boom.rotation.x=Math.PI/2;
+      box(1.0,.25,6.6,MT.trim,s*3.55,.72,2.4,g,false);
+    });
+    var cowl=M(new THREE.CylinderGeometry(1.0,.9,1.8,22),MT.dark,-3.55,.05,6.2); cowl.rotation.x=Math.PI/2;
+    H.nozzle(.85,.7,-3.55,.05,7.3);
+    box(1.6,2.1,2.0,RM.patch[0],3.55,.35,6.0);
+    H.nozzle(.5,.5,3.55,.85,7.2); H.nozzle(.5,.5,3.55,-.2,7.2);
+    box(.5,.5,.5,MT.dark,4.3,.9,5.6);
+    H.nozzle(.42,.4,0,.35,5.75);
+    bellyHatch(1.6,3.0,-.74,0);
+    patches(9,function(R){ return [(R()-.5)*2.2,1.38,-5+R()*9.5]; });
+    var side=function(R){ return [(R()<.5?-1:1)*1.42,.2+R()*.8,-5.5+R()*10]; }; side.vert=true; patches(7,side);
+    scorch(6,function(R){ return [(R()-.5)*2.4,1.39,-5+R()*10]; });
+    decal(1.7,.85,-1.43,.75,-1.0,-Math.PI/2); decal(1.7,.85,1.43,.75,-1.0,Math.PI/2);
+    H.nav(4.2,.3,2.2);
+    H.leg(-1.0,-4.8,1.5); H.leg(1.0,-4.8,1.5); H.leg(-3.55,4.6,1.6); H.leg(3.55,4.6,1.6);
+    return 1.6;
+  }
+  // WEDGE RUNNER: flat arrowhead, squat cab, three salvaged engines across the tail
+  M(plan([[0,-7.4],[1.6,-3.4],[4.6,3.6],[4.2,5.6],[-4.2,5.6],[-4.6,3.6],[-1.6,-3.4]],1.1,.18),MT.paint,0,.35,0);
+  M(plan([[0,-5.2],[1.1,-2.6],[3.0,2.8],[-3.0,2.8],[-1.1,-2.6]],.5,.12),RM.patch[3],0,1.15,0);
+  prof([[-3.4,1.3],[-3.4,1.8],[-2.6,2.55],[-.4,2.6],[0,2.2],[0,1.3]],2.4,.12,MT.paint);
+  prof([[-3.34,1.85],[-2.58,2.48],[-1.7,2.52],[-2.1,1.86]],2.5,.03,MT.glass);
+  box(2.42,.08,1.0,MT.trim,0,2.15,-1.2,g,false);
+  box(3.6,.1,4.0,MT.dark,0,1.42,2.6,g,false);
+  var lid=box(3.7,.12,2.0,RM.patch[1],0,1.95,.4); lid.rotation.x=-.5;
+  var j=0; [1.2,2.2,3.2,4.2].forEach(function(z){ [-.8,.8].forEach(function(x){ H.crate(1.5,.8,.9,x,1.85,z,j++); }); });
+  var c1=M(new THREE.CylinderGeometry(.9,.8,1.6,20),MT.dark,-2.4,.6,5.8); c1.rotation.x=Math.PI/2; H.nozzle(.75,.6,-2.4,.6,6.7);
+  box(1.4,1.2,1.6,RM.patch[0],0,.75,5.9); H.nozzle(.45,.5,-.3,.75,6.8); H.nozzle(.45,.5,.35,.75,6.8);
+  var c3=M(new THREE.CylinderGeometry(.6,.7,2.2,16),RM.patch[2],2.4,.55,5.6); c3.rotation.x=Math.PI/2; H.nozzle(.55,.5,2.4,.55,6.9);
+  [-1,1].forEach(function(s){ M(hullProfile([[3.4,.9],[4.6,2.3],[5.4,2.3],[5.5,.9]],.14,0),MT.trim,s*3.7,0,0); });
+  M(new THREE.CylinderGeometry(.03,.05,1.3,6),MT.dark,-.7,3.2,-1.4); M(new THREE.SphereGeometry(.09,8,6),MT.red,-.7,3.9,-1.4,g,false);
+  bellyHatch(2.0,2.6,-.24,.4);
+  patches(10,function(R){ return [(R()-.5)*5,1.47,-2+R()*7]; });
+  scorch(7,function(R){ return [(R()-.5)*6,1.48,-3+R()*8]; });
+  decal(1.5,.75,0,1.49,-4.3,0).rotation.x=-Math.PI/2;
+  H.nav(4.4,.4,4.4);
+  H.leg(0,-4.6,1.5); H.leg(-3.0,3.8,1.5); H.leg(3.0,3.8,1.5);
+  return 1.75;
+}
+function hullTier(){ var top=Math.min(lvl('hold'),3), sel=state.hullSel; if(isRookTier(sel) && state.rooks && state.rooks[sel]) return sel; return (sel==null||sel>top||sel<0)?top:sel; }
+function ownsHull(t){ return isRookTier(t)?!!(state.rooks&&state.rooks[t]):t<=Math.min(lvl('hold'),3); }
 /* size helpers: everything below is in world units for the object's current scale */
 function hullGear(obj){ return obj.userData.gear*obj.scale.y; }
 function hullLen(obj){ return obj.userData.len*obj.scale.z; }
@@ -1965,21 +2058,21 @@ window.addEventListener('mouseup',function(){ setHold(false); });
 /* =========================================================================
    Game state + HUD
    ========================================================================= */
-var state={throttle:0, yawRate:0, pitchRate:0, mode:'title', yaw:Math.PI, pitch:0, vel:new THREE.Vector3(), energy:100, scan:1, credits:0, inv:{}, found:{}, sysSeed:0, up:{}, cargo:[], taken:{}, boardGen:{}, delivered:0, dock:null, mods:[], modsOwned:{}, lic:{}, fuel:null, hull:100, company:null, hullSel:null, fits:{}, fuelReserve:0, cleared:0, heat:{}, flares:3, food:100, rest:100, rations:2, fedT:0, restedT:0, needsOff:false, blinkT:0, sleeping:false, law:null, chase:null, arrivedT:0, pirateT:30,
+var state={throttle:0, yawRate:0, pitchRate:0, mode:'title', yaw:Math.PI, pitch:0, vel:new THREE.Vector3(), energy:100, scan:1, credits:0, inv:{}, found:{}, sysSeed:0, up:{}, cargo:[], taken:{}, boardGen:{}, delivered:0, dock:null, mods:[], modsOwned:{}, lic:{}, fuel:null, hull:100, company:null, hullSel:null, rooks:{}, fits:{}, fuelReserve:0, cleared:0, heat:{}, flares:3, food:100, rest:100, rations:2, fedT:0, restedT:0, needsOff:false, blinkT:0, sleeping:false, law:null, chase:null, arrivedT:0, pirateT:30,
   pos:new THREE.Vector3(), vy:0, grounded:true, bob:0, fovKick:0, exposure:1, exposureTarget:1, t:0, warp:null};
 var OLD_KEYS={'CINDER REACH':'PYRITE','GLASSWATER':'CYANITE','VERDANT HOLLOW':'AMETHINE','PALE SILICATE':'AURUM'};
 try{
   var sv=JSON.parse(localStorage.getItem('nh_save')||'null');
   if(sv){
     state.credits=sv.credits||0; state.found=sv.found||{}; state.sysSeed=sv.sys||0; state.up=sv.up||{}; state.cargo=sv.cargo||[]; state.taken=sv.taken||{}; state.boardGen=sv.boardGen||{}; state.delivered=sv.delivered||0;
-    state.mods=sv.mods||[]; state.modsOwned=sv.modsOwned||{}; state.lic=sv.lic||{}; state.fuel=sv.fuel; state.hull=sv.hull==null?100:sv.hull; state.company=sv.company||null; state.hullSel=sv.hullSel==null?null:sv.hullSel; state.fits=sv.fits||{}; state.fuelReserve=sv.fuelReserve||0; state.cleared=sv.cleared===undefined?(sv.sys||0):sv.cleared; state.heat=sv.heat||{}; state.flares=sv.flares==null?3:sv.flares;
+    state.mods=sv.mods||[]; state.modsOwned=sv.modsOwned||{}; state.lic=sv.lic||{}; state.fuel=sv.fuel; state.hull=sv.hull==null?100:sv.hull; state.company=sv.company||null; state.hullSel=sv.hullSel==null?null:sv.hullSel; state.rooks=sv.rooks||{}; state.fits=sv.fits||{}; state.fuelReserve=sv.fuelReserve||0; state.cleared=sv.cleared===undefined?(sv.sys||0):sv.cleared; state.heat=sv.heat||{}; state.flares=sv.flares==null?3:sv.flares;
     state.food=sv.food==null?100:sv.food; state.rest=sv.rest==null?100:sv.rest; state.rations=sv.rations==null?2:sv.rations; state.fedT=sv.fedT||0; state.restedT=sv.restedT||0; state.needsOff=!!sv.needsOff;
     Object.keys(sv.inv||{}).forEach(function(k){ var nk=OLD_KEYS[k]||k; if(ELEMENTS[nk]) state.inv[nk]=(state.inv[nk]||0)+sv.inv[k]; });
   }
 }catch(e){}
 drawThrottle();
 function save(){ try{ localStorage.setItem('nh_save',JSON.stringify({credits:state.credits,inv:state.inv,found:state.found,sys:state.sysSeed,up:state.up,cargo:state.cargo,taken:state.taken,boardGen:state.boardGen,delivered:state.delivered,
-  mods:state.mods,modsOwned:state.modsOwned,lic:state.lic,fuel:state.fuel,hull:state.hull,company:state.company,hullSel:state.hullSel,fits:state.fits,fuelReserve:state.fuelReserve,cleared:state.cleared,heat:state.heat,flares:state.flares,
+  mods:state.mods,modsOwned:state.modsOwned,lic:state.lic,fuel:state.fuel,hull:state.hull,company:state.company,hullSel:state.hullSel,rooks:state.rooks,fits:state.fits,fuelReserve:state.fuelReserve,cleared:state.cleared,heat:state.heat,flares:state.flares,
   food:state.food,rest:state.rest,rations:state.rations,fedT:state.fedT,restedT:state.restedT,needsOff:state.needsOff})); }catch(e){} }
 
 function toast(msg, cls){ if(typeof SND!=='undefined' && state.mode!=='title' && !(typeof AU!=='undefined' && AU.hush)){ if(cls==='life') SND.good(); else SND.blip(); } var el=document.createElement('div'); el.className='toast'+(cls?' '+cls:''); el.textContent=msg; $('toastWrap').appendChild(el); setTimeout(function(){ el.remove(); },2400); }
@@ -2252,7 +2345,7 @@ function spaceAmbient(dt){
    Economy: prices, upgrades, freight
    ========================================================================= */
 var BASE_PRICE=120;
-var HOLD_CAPS=[4,6,9,12];
+var HOLD_CAPS=[4,6,9,12,8,8];
 var UPGRADES=[
   {id:'hold', name:'FREIGHTER HULL', desc:'Trade up to a bigger freighter: more crate slots, heavier handling.', costs:[700,1800,4200], fx:function(l){ return HULL_NAMES[l]+' \u00b7 '+HOLD_CAPS[l]+' crates'; }},
   {id:'pulse', name:'PULSE ENGINE', desc:'Faster cruise and boost, in space and in atmosphere.', costs:[600,1600,3800], fx:function(l){ return '+'+(l*25)+'% flight speed'; }},
@@ -2284,17 +2377,17 @@ var LICENCES=[
   {id:'hazmat', name:'HAZMAT LICENCE', desc:'Legal to haul hazardous cargo. Also needs a shielded vault fitted.', cost:2500},
   {id:'oversize', name:'OVERSIZE PERMIT', desc:'Haul 3–4 crate oversize loads that pay big. Needs a Longhaul or Atlas hull.', cost:3500}
 ];
-var MOD_SLOTS=[1,2,2,3], FUEL_PRICE=7, REPAIR_PRICE=[6,9,13,18];
+var MOD_SLOTS=[1,2,2,3,2,2], FUEL_PRICE=7, REPAIR_PRICE=[6,9,13,18,11,11], ROOK_FRAGILE=1.6;
 function modSlots(){ return MOD_SLOTS[hullTier()]; }
-function hasMod(id){ return state.mods.indexOf(id)>=0; }
+function hasMod(id){ return state.mods.indexOf(id)>=0 || (id==='hidden' && isRook()); }
 function hasLic(id){ return !!state.lic[id]; }
-var HULL_TANK=[100,120,150,180], HULL_BURN=[1,1.12,1.25,1.4], HANGAR_FEEL=['nimble, snaps into turns','responsive all-rounder','heavy, takes wide turns','very heavy, swings wide and coasts'];
+var HULL_TANK=[100,120,150,180,130,120], HULL_BURN=[1,1.12,1.25,1.4,1.05,.95], HANGAR_FEEL=['nimble, snaps into turns','responsive all-rounder','heavy, takes wide turns','very heavy, swings wide and coasts','fast and twitchy, but thin plating','fastest thing in the yard, thin plating'];
 function fuelCap(){ return Math.round(HULL_TANK[hullTier()]*(hasMod('tank')?1.6:1)); }
 function warpFuel(ly){ return Math.ceil(ly*.22*HULL_BURN[hullTier()]); }
 function kindNeeds(kind){
   if(kind==='perishable' && !hasMod('reefer')) return 'NEEDS REEFER BAY';
   if(kind==='hazardous'){ if(!hasLic('hazmat')) return 'NEEDS HAZMAT LICENCE'; if(!hasMod('vault')) return 'NEEDS SHIELDED VAULT'; }
-  if(kind==='oversize'){ if(!hasLic('oversize')) return 'NEEDS OVERSIZE PERMIT'; if(hullTier()<2) return 'NEEDS LONGHAUL HULL'; }
+  if(kind==='oversize'){ if(!hasLic('oversize')) return 'NEEDS OVERSIZE PERMIT'; if(hullTier()<2 || isRook()) return 'NEEDS LONGHAUL HULL'; }
   return '';
 }
 /* local price multipliers: fuel depots sell cheap fuel, remote outposts charge a premium */
@@ -2306,7 +2399,7 @@ function serviceRates(loc){
 }
 function fuelUnit(loc){ return FUEL_PRICE*serviceRates(loc).fuel; }
 function repairUnit(loc){ return REPAIR_PRICE[hullTier()]*serviceRates(loc).repair; }
-function wearHull(pct){ var before=state.hull; state.hull=Math.max(0,state.hull-pct);
+function wearHull(pct){ var before=state.hull; if(isRook()) pct*=ROOK_FRAGILE; state.hull=Math.max(0,state.hull-pct);
   if(before>=35 && state.hull<35) toast('HULL AT '+Math.round(state.hull)+'% · REPAIR AT A STATION OR TOWN'); renderInv(); }
 function hullFactor(){ return state.hull>=50?1:lerp(.7,1,state.hull/50); }
 
@@ -2845,7 +2938,7 @@ function renderTerminal(tab){
           '<span class="acts wrap">'+acts+'</span></div>';
       });
       h+='<div class="st-sub">BUY A FREIGHTER'+(C.ships.length>=cap3?' · OFFICE FULL':'')+'</div>';
-      HULL_NAMES.forEach(function(nm,ti){
+      HULL_NAMES.slice(0,4).forEach(function(nm,ti){
         h+='<div class="st-row upg"><span class="nm">'+nm+'<small>'+HULL_CLASS[ti]+' · grosses ~'+fmt(FLEET_RATE[ti]*60)+' units/hr on local runs</small></span>'+
           '<span class="acts"><button class="pri" data-act="fbuy" data-tier="'+ti+'"'+(state.credits>=FLEET_PRICE[ti]&&C.ships.length<cap3?'':' disabled')+'>'+fmt(FLEET_PRICE[ti])+' UNITS</button></span></div>';
       });
@@ -2877,18 +2970,29 @@ function renderTerminal(tab){
       '<span class="gauge"><span class="bar"><i style="width:'+Math.round(state.hull)+'%;background:'+(state.hull<35?'#ff5a3c':state.hull<65?'#ffb24d':'#7fe8ff')+'"></i></span></span></span>'+
       '<span class="acts"><button class="pri" data-act="repair"'+(dmg>=1&&state.credits>=ru?'':' disabled')+'>'+(dmg>=1?'REPAIR · '+fmt(Math.min(repCost,state.credits)):'PRISTINE')+'</button></span></div>';
   } else {
-    var owned=Math.min(lvl('hold'),3);
-    if(owned>=1){
+    var owned=Math.min(lvl('hold'),3), hlist=[];
+    for(var hq=0;hq<=owned;hq++) hlist.push(hq); ROOK_TIERS.forEach(function(rt){ if(ownsHull(rt)) hlist.push(rt); });
+    if(hlist.length>1){
       var used2=holdUsed();
       h+='<div class="st-sub">YOUR HANGAR · CHOOSE WHICH FREIGHTER TO FLY'+(state.fuelReserve>=1?' · '+Math.floor(state.fuelReserve)+' FUEL IN STATION TANKS':'')+'</div>';
-      for(var ht=0;ht<=owned;ht++){
+      for(var hi=0;hi<hlist.length;hi++){ var ht=hlist[hi];
         var cur=ht===hullTier(), fits=used2<=HOLD_CAPS[ht];
         h+='<div class="st-row upg'+(cur?' hangar-on':'')+'"><span class="nm">'+HULL_NAMES[ht]+(cur?'<span class="tag hi">FLYING</span>':'')+'<small>'+HULL_CLASS[ht]+' · '+HANGAR_FEEL[ht]+'</small>'+
-          '<small class="fx">'+HOLD_CAPS[ht]+' crates · '+MOD_SLOTS[ht]+' module slot'+(MOD_SLOTS[ht]>1?'s':'')+' · '+HULL_TANK[ht]+' fuel tank · warp burn ×'+HULL_BURN[ht].toFixed(2)+(ht>=2?' · can haul oversize':'')+'</small></span>'+
+          '<small class="fx">'+HOLD_CAPS[ht]+' crates · '+MOD_SLOTS[ht]+' module slot'+(MOD_SLOTS[ht]>1?'s':'')+' · '+HULL_TANK[ht]+' fuel tank · warp burn ×'+HULL_BURN[ht].toFixed(2)+(ht===2||ht===3?' · can haul oversize':'')+(isRookTier(ht)?' · built-in smuggler\u2019s compartment':'')+'</small></span>'+
           '<span class="acts">'+(cur?'<span class="maxed">IN USE</span>':'<button class="pri" data-act="hullsel" data-tier="'+ht+'"'+(fits?'':' disabled')+'>'+(fits?'FLY THIS':'HOLD TOO FULL')+'</button>')+'</span></div>';
       }
-      h+='<div class="st-sub">UPGRADES</div>';
     }
+    // the Rook: sold off the books, cheaper where nobody asks questions
+    var lawlessHere=secOf(SYS.seed).key==='lawless', rp=Math.round(ROOK_PRICE*(lawlessHere?.75:1));
+    h+='<div class="st-sub">SPECIAL ORDER · THE ROOK'+(lawlessHere?' · BACK-ROOM PRICE':'')+'</div>';
+    h+='<p class="st-note">A patched-up smuggler\u2019s freighter. 8 crates, 2 module slots and a smuggler\u2019s compartment built into the floor (no slot needed). Fastest hulls you can buy with the quickest turns, but the plating is thin: bumps, jumps and raider fire do '+Math.round((ROOK_FRAGILE-1)*100)+'% more damage. No oversize loads. Both join your hangar once bought.'+(lawlessHere?'':' Cheaper in lawless systems.')+'</p>';
+    ROOK_TIERS.forEach(function(rt){
+      var got=ownsHull(rt), cur=hullTier()===rt;
+      h+='<div class="st-row upg'+(cur?' hangar-on':'')+'"><span class="nm">'+HULL_NAMES[rt]+(got?'<span class="tag hi">OWNED</span>':'')+'<small>'+(rt===4?'Cargo spine with a high bridge and two engine booms':'Flat arrowhead with three salvaged engines across the tail')+' · '+HANGAR_FEEL[rt]+'</small>'+
+        '<small class="fx">'+HOLD_CAPS[rt]+' crates · '+MOD_SLOTS[rt]+' module slots · '+HULL_TANK[rt]+' fuel tank · warp burn ×'+HULL_BURN[rt].toFixed(2)+'</small></span>'+
+        '<span class="acts">'+(got?(cur?'<span class="maxed">IN USE</span>':'<span class="maxed">IN HANGAR</span>'):'<button class="pri" data-act="rookbuy" data-tier="'+rt+'"'+(state.credits>=rp?'':' disabled')+'>'+fmt(rp)+' UNITS</button>')+'</span></div>';
+    });
+    h+='<div class="st-sub">UPGRADES</div>';
     UPGRADES.forEach(function(u){
       var l=lvl(u.id), max=u.costs.length, next=l<max?u.costs[l]:null, pips='';
       for(var i=0;i<max;i++) pips+='<i class="'+(i<l?'on':'')+'"></i>';
@@ -2900,6 +3004,7 @@ function renderTerminal(tab){
     h+='<div class="st-sub">CARGO MODULES · '+usedS+'/'+slots+' SLOTS ('+HULL_NAMES[hullTier()]+')</div>';
     MODULES.forEach(function(m){
       var own=!!state.modsOwned[m.id], on=hasMod(m.id), btn;
+      if(m.id==='hidden' && isRook()){ h+='<div class="st-row upg"><span class="nm">'+m.name+'<span class="tag hi">BUILT IN</span><small>'+m.desc+' Part of the Rook, takes no slot.</small></span><span class="acts"><span class="maxed">BUILT IN</span></span></div>'; return; }
       if(!own) btn='<button class="pri" data-act="modbuy" data-id="'+m.id+'"'+(state.credits>=m.cost?'':' disabled')+'>'+fmt(m.cost)+' UNITS</button>';
       else if(on) btn='<button data-act="modoff" data-id="'+m.id+'">REMOVE</button>';
       else btn='<button class="pri" data-act="modon" data-id="'+m.id+'"'+(usedS<slots?'':' disabled')+'>'+(usedS<slots?'FIT':'NO SLOT')+'</button>';
@@ -2953,11 +3058,13 @@ $('stationPanel').addEventListener('click',function(e){
   else if(act==='bed'){ sleep('paid',loc); }
   else if(act==='cab'){ sleep('cab',loc); }
   else if(act==='needs'){ state.needsOff=!state.needsOff; if(state.needsOff){ state.blinkT=0; } toast(state.needsOff?'RELAXED MODE · PILOT NEEDS OFF':'PILOT NEEDS ON'); }
-  else if(act==='hullsel'){ var nt=+t.dataset.tier; if(nt>Math.min(lvl('hold'),3) || holdUsed()>HOLD_CAPS[nt]) return;
+  else if(act==='rookbuy'){ var rt=+t.dataset.tier, rp2=Math.round(ROOK_PRICE*(secOf(SYS.seed).key==='lawless'?.75:1)); if(!isRookTier(rt)||ownsHull(rt)||state.credits<rp2) return;
+    state.credits-=rp2; state.rooks=state.rooks||{}; state.rooks[rt]=1; toast(HULL_NAMES[rt]+' BOUGHT · IT\u2019S IN YOUR HANGAR','life'); }
+  else if(act==='hullsel'){ var nt=+t.dataset.tier; if(!ownsHull(nt) || holdUsed()>HOLD_CAPS[nt]) return;
     // each hull keeps its own module fit-out, and spare fuel waits in the station tanks
     var ot=hullTier(); state.fits=state.fits||{}; state.fits[ot]=state.mods.slice();
     state.hullSel=nt;
-    var want=(state.fits[nt]||state.mods).filter(function(id){ return state.modsOwned[id]; }), dropped=0;
+    var want=(state.fits[nt]||state.mods).filter(function(id){ return state.modsOwned[id] && !(id==='hidden' && isRookTier(nt)); }), dropped=0;
     state.mods=want.slice(0,MOD_SLOTS[nt]); dropped=want.length-state.mods.length;
     var cap=fuelCap(); state.fuelReserve=state.fuelReserve||0;
     if(state.fuel>cap){ state.fuelReserve+=state.fuel-cap; state.fuel=cap; }
@@ -3393,7 +3500,7 @@ var CB_GRADES=[null,
   {name:'GREY GOODS', tag:'GREY', mult:1.8, detect:.35, fine:600, heat:0, items:['Untaxed Spirits','Grey-Market Chips','Bootleg Holovids','Unlicensed Stims','Counterfeit Parts']},
   {name:'RESTRICTED', tag:'RESTRICTED', mult:2.6, detect:.55, fine:1800, heat:1, items:['Military Surplus','Stolen Nav Cores','Unregistered Drones','Restricted Pharma','Jammer Units']},
   {name:'BLACK-MARKET', tag:'BLACK MARKET', mult:4, detect:.75, fine:4000, heat:2, items:['Xeno Artifacts','Weapon Components','Black-Box Data','Smuggled Reactor Cores','Forged Hull Permits']}];
-var IMPOUND_FEE=[600,1350,2700,4800];
+var IMPOUND_FEE=[600,1350,2700,4800,2400,2400];
 
 function isCleared(){ return !SYS || !secOf(SYS.seed).customs || state.cleared===SYS.seed; }
 function heatOf(seed){ var h=state.heat[seed]; if(!h) return 0; return Math.max(0,h.v-(Date.now()-h.t)/480000); }
@@ -3688,7 +3795,7 @@ function updateLaw(dt){
         if(a.flareT>0) steerActor(a,V2.copy(ship.position).add(V3.set(200,80,-200)).clone(),90,dt);
         else steerActor(a,V2.copy(ship.position).addScaledVector(V3.copy(a.obj.position).sub(ship.position).normalize(),35).clone(),88,dt);
         if(d<120 && a.flareT<=0 && free){ firing=true; a.fire+=dt;
-          if(a.fire>.25){ a.fire=0; SND.zap(); var dmg=(hasMod('shield')?.5:1)*1; state.hull=Math.max(0,state.hull-dmg); renderInv(); state.fovKick=Math.min(state.fovKick+1.5,6);
+          if(a.fire>.25){ a.fire=0; SND.zap(); var dmg=(hasMod('shield')?.5:1)*(isRook()?ROOK_FRAGILE:1); state.hull=Math.max(0,state.hull-dmg); renderInv(); state.fovKick=Math.min(state.fovKick+1.5,6);
             if(state.hull<=0) pirateDisable(); } }
         if(d>950){ piratesLeave('YOU OUTRAN THE RAIDERS'); }
         else if(sd<450){ piratesLeave('STATION DEFENCE GRID LOCKS ON · RAIDERS BREAK OFF'); }
@@ -4316,7 +4423,7 @@ async function boot(){
   setTimeout(function(){ ld.style.opacity=0; },400);
   frame();
 }
-window.__nh={enterPlanet:function(i){ enterAtmosphere(planets[i]); }, ready:function(i){ return !!surfaces[i]; }, land:land, board:board, exitAtmo:exitAtmosphere,
+window.__nh={fx:{hasMod:hasMod, modSlots:modSlots, holdCap:holdCap, fuelCap:fuelCap, kindNeeds:kindNeeds, wearHull:wearHull, save:save, swap:swapPlayerHull}, enterPlanet:function(i){ enterAtmosphere(planets[i]); }, ready:function(i){ return !!surfaces[i]; }, land:land, board:board, exitAtmo:exitAtmosphere,
   warp:startWarp, dock:startDock, cam:function(){ return camera; }, station:function(){ return station; }, ship:function(){ return ship; }, state:state, getS:function(){ return S; }, sys:function(){ return SYS; }, enter:function(){ $('enterBtn').click(); },
   queue:queueSurface, terrain:planetTerrain, normalFromSurf:normalFromSurf, openMap:openMap, chunkBuilder:chunkBuilder, planets:function(){ return planets; }, offers:boardOffers, townLoc:townLoc,
   au:function(){ return AU; }, mu:function(){ return MU; }, law:{hall:function(){ return station&&station.gate; }, spawnPirates:spawnPirates, scan:customsScan, actors:function(){ return lawActors; }, heat:heatOf, sec:secOf}};
