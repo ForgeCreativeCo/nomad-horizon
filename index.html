@@ -3080,8 +3080,9 @@ function audioUpdate(dt){
       if(state.spool){ var sk=Math.min(1,state.spool.t/SPOOL_T); thrust+=.15*sk; tf+=700*sk; tone+=.05*sk; of+=34*sk; } }
     else { thrust=.02; tone=.015; }
   } else if(m==='atmo'){
-    drone=.38; thrust=.05+.22*thr+(boosting?.28:0); tf=200+spd*9+(boosting?500:0); tone=.03+.07*thr; of=42+spd*.4;
-    wind=clamp(spd/70,0,1)*.4+.04; wf=300+spd*14;
+    // in air the wind carries the sense of speed; the engine is a soft, dark rumble that only opens up on boost
+    drone=.2; thrust=.015+.05*thr+(boosting?.14:0); tf=110+spd*2.5+(boosting?260:0); tone=0;
+    wind=clamp(spd/70,0,1)*.42+.05; wf=260+spd*9;
   } else if(m==='surface'){
     wind=.05; wf=420; jet=(state.vy>.5 && !state.grounded)?.16:0;
   }
