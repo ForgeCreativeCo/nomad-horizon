@@ -2937,8 +2937,8 @@ $('stationPanel').addEventListener('click',function(e){
   else if(act==='licbuy'){ var lc=LICENCES.filter(function(x){ return x.id===t.dataset.id; })[0]; if(!lc||state.credits<lc.cost) return;
     state.credits-=lc.cost; state.lic[lc.id]=1; toast(lc.name+' ISSUED','life'); }
   else if(act==='accept'){ var o=boardOffers(loc).filter(function(x){ return x.id===t.dataset.id; })[0];
-    if(o && acceptOffer(o,loc)) toast('LOADED · '+o.name.toUpperCase()+' → '+o.dest.name); }
-  else if(act==='deliver'){ var r=deliverHere(loc); if(r.n) SND.cash(); if(r.n) toast('DELIVERED '+r.n+' CRATE'+(r.n>1?'S':'')+' · +'+fmt(r.total)+' UNITS'+(r.late?' · '+r.late+' LATE':''),'life'); }
+    if(o && acceptOffer(o,loc)){ sfx('forklift',.55); AU.forkT=Math.max(AU.forkT,10); } if(o && state.taken[o.id]) toast('LOADED · '+o.name.toUpperCase()+' → '+o.dest.name); }
+  else if(act==='deliver'){ var r=deliverHere(loc); if(r.n){ SND.cash(); sfx('forklift',.5,1.06); AU.forkT=Math.max(AU.forkT,10); } if(r.n) toast('DELIVERED '+r.n+' CRATE'+(r.n>1?'S':'')+' · +'+fmt(r.total)+' UNITS'+(r.late?' · '+r.late+' LATE':''),'life'); }
   renderInv(); save(); renderTerminal();
 });
 $('undockBtn').addEventListener('click',function(){ if(termLoc && termLoc.kind==='station') undock(); else closeTerminal(); });
@@ -3007,8 +3007,10 @@ function updateSpace(dt){
    Sound: recorded beds and one-shots from /audio, plus engine, wind and
    interface tones made live with Web Audio so they follow the throttle.
    ========================================================================= */
-var SFX_FILES={drone:'audio/cab_drone.mp3', station:'audio/station_amb.mp3', whoosh:'audio/warp_whoosh.mp3', hatchOpen:'audio/hatch_open.mp3', hatchClose:'audio/hatch_close.mp3'};
-var AU={ctx:null, on:true, buf:{}, beds:{}, eng:null, zapT:0};
+var SFX_FILES={drone:'audio/cab_drone.mp3', station:'audio/station_amb.mp3', whoosh:'audio/warp_whoosh.mp3', hatchOpen:'audio/hatch_open.mp3', hatchClose:'audio/hatch_close.mp3',
+  forklift:'audio/forklift.mp3', warehouse:'audio/warehouse.mp3'};
+var BEDS=['drone','station','warehouse'];
+var AU={ctx:null, on:true, buf:{}, beds:{}, eng:null, zapT:0, forkT:12};
 try{ AU.on=localStorage.getItem('nh_sound')!=='0'; }catch(e){}
 function audioStart(){
   var AC=window.AudioContext||window.webkitAudioContext; if(!AC) return;
@@ -3026,7 +3028,7 @@ function audioStart(){
   buildEngine();
   Object.keys(SFX_FILES).forEach(function(k){
     fetch(SFX_FILES[k]).then(function(r){ return r.arrayBuffer(); }).then(function(ab){
-      c.decodeAudioData(ab,function(buf){ AU.buf[k]=buf; if(k==='drone'||k==='station') startBed(k); },function(){});
+      c.decodeAudioData(ab,function(buf){ AU.buf[k]=buf; if(BEDS.indexOf(k)>=0) startBed(k); },function(){});
     }).catch(function(){});
   });
 }
@@ -3076,6 +3078,14 @@ function audioUpdate(dt){
     wind=.05; wf=420; jet=(state.vy>.5 && !state.grounded)?.16:0;
   }
   if(termLoc && m==='surface'){ wind*=.4; }
+  // loading-dock life: warehouse room tone at terminals and the pier, the odd forklift backing up
+  var wh=0, crew=0;
+  if(termLoc){ wh=.5; crew=.22; }
+  else if(m==='space' && state.dock && state.dock.phase!=='approach'){ wh=.32; crew=.18; }
+  else if(m==='surface' && S && S.towns){ var nt=nearestTown(state.pos.x,state.pos.z); if(nt && nt.d<70){ wh=.22*(1-nt.d/70); crew=.2*(1-nt.d/70); } }
+  if(AU.beds.warehouse) setAt(AU.beds.warehouse.gain.gain,wh,.5);
+  AU.forkT-=dt;
+  if(AU.forkT<=0){ AU.forkT=16+Math.random()*26; if(crew>.02 && !state.sleeping) sfx('forklift',crew*(.6+Math.random()*.5),.88+Math.random()*.24); }
   setAt(E.thrust.gain,thrust); setAt(E.thrustF.frequency,tf,.2); setAt(E.tone.gain,tone); setAt(E.o1.frequency,of,.25); setAt(E.o2.frequency,of*1.013,.25);
   setAt(E.wind.gain,wind,.3); setAt(E.windF.frequency,wf,.3); setAt(E.jet.gain,jet,.08);
   if(AU.beds.drone) setAt(AU.beds.drone.gain.gain,drone,.4);
