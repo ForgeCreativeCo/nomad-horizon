@@ -3010,9 +3010,11 @@ function updateSpace(dt){
    ========================================================================= */
 var SFX_FILES={drone:'audio/cab_drone.mp3', station:'audio/station_amb.mp3', whoosh:'audio/warp_whoosh.mp3', hatchOpen:'audio/hatch_open.mp3', hatchClose:'audio/hatch_close.mp3',
   forklift:'audio/forklift.mp3', warehouse:'audio/warehouse.mp3', warpSpool:'audio/warp_spool.mp3', landing:'audio/landing.mp3',
-  airbrake:'audio/airbrake.mp3', scanner:'audio/scanner.mp3', confirm:'audio/confirm.mp3', gateChains:'audio/gate_chains.mp3'};
+  airbrake:'audio/airbrake.mp3', scanner:'audio/scanner.mp3', confirm:'audio/confirm.mp3', gateChains:'audio/gate_chains.mp3',
+  steps:'audio/steps.mp3', town:'audio/town_amb.mp3'};
+var STEP_SLOTS=10, STEP_SLOT=.5;
 var SCAN_T=3;
-var BEDS=['drone','station','warehouse'];
+var BEDS=['drone','station','warehouse','town'];
 var AU={ctx:null, on:true, buf:{}, beds:{}, eng:null, zapT:0, forkT:12};
 try{ AU.on=localStorage.getItem('nh_sound')!=='0'; }catch(e){}
 function audioStart(){
@@ -3083,7 +3085,13 @@ function audioUpdate(dt){
   }
   if(termLoc && m==='surface'){ wind*=.4; }
   // loading-dock life: warehouse room tone at terminals and the pier, the odd forklift backing up
-  var wh=0, crew=0;
+  var wh=0, crew=0, town=0;
+  if(S && S.towns && (m==='surface' || m==='atmo')){
+    var fp=m==='surface'?state.pos:S.ship.position, ntw=nearestTown(fp.x,fp.z);
+    if(ntw && ntw.d<160 && !ntw.T.outpost){ var alt=m==='atmo'?Math.max(0,fp.y-ntw.T.hs):0; town=.55*(1-ntw.d/160)*(1-clamp(alt/60,0,1)); }
+  }
+  if(termLoc && termLoc.kind==='town' && !termLoc.outpost) town=Math.max(town,.22);
+  if(AU.beds.town) setAt(AU.beds.town.gain.gain,town,.6);
   if(termLoc){ wh=.5; crew=.22; }
   else if(m==='space' && state.dock && state.dock.phase!=='approach'){ wh=.32; crew=.18; }
   else if(m==='surface' && S && S.towns){ var nt=nearestTown(state.pos.x,state.pos.z); if(nt && nt.d<70){ wh=.22*(1-nt.d/70); crew=.2*(1-nt.d/70); } }
@@ -3104,6 +3112,12 @@ function sfx(name, vol, rate, offset){
   var c=AU.ctx, s=c.createBufferSource(), g=c.createGain(); s.buffer=AU.buf[name]; s.playbackRate.value=rate||1; g.gain.value=vol==null?1:vol;
   s.connect(g); g.connect(AU.sfx); s.start(0,offset||0); return {s:s, g:g};
 }
+function sfxSlice(name, offset, dur, vol, rate){
+  if(!AU.ctx || !AU.buf[name] || !AU.on) return;
+  var c=AU.ctx, s=c.createBufferSource(), g=c.createGain(); s.buffer=AU.buf[name]; s.playbackRate.value=rate||1; g.gain.value=vol==null?1:vol;
+  s.connect(g); g.connect(AU.sfx); s.start(0,offset,dur);
+}
+function footstep(vol){ sfxSlice('steps',Math.floor(Math.random()*STEP_SLOTS)*STEP_SLOT,.4,vol*(.8+Math.random()*.35),.9+Math.random()*.2); }
 function sfxFade(h, after, len){ if(!h || !AU.ctx) return; var t=AU.ctx.currentTime+(after||0); try{ h.g.gain.setTargetAtTime(0,t,(len||.4)/3); h.s.stop(t+(len||.4)+.1); }catch(e){} }
 /* landing burn: the clip's closing swell and engine cut line up with touchdown */
 var LAND_T={pad:4.2, ground:3};
@@ -3877,7 +3891,10 @@ function updateSurface(dt){
   p.y+=state.vy*dt;
   if(p.y<=ground){ p.y=lerp(p.y,ground,state.grounded?1:.6); if(state.vy<0) state.vy=0; state.grounded=true; } else if(p.y>ground+.15) state.grounded=false;
 
+  var wasAir=state.wasAir; state.wasAir=!state.grounded;
+  if(wasAir && state.grounded && !termLoc) footstep(.55);
   state.bob+=dt*mag*(state.grounded?9:0);
+  var stepK=Math.floor(state.bob/Math.PI); if(stepK!==state.stepK){ if(state.stepK!=null && mag>.15 && state.grounded) footstep(.25+.2*mag); state.stepK=stepK; }
   var bobY=Math.sin(state.bob)*.06*mag, bobX=Math.cos(state.bob*.5)*.03*mag;
   camera.position.set(p.x+rx*bobX, p.y+bobY, p.z+rz*bobX);
   V1.set(Math.sin(state.yaw)*Math.cos(state.pitch),Math.sin(state.pitch),Math.cos(state.yaw)*Math.cos(state.pitch));
