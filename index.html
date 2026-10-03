@@ -67,6 +67,11 @@ canvas#scene{position:absolute;inset:0;width:100%;height:100%;display:block;}
 #gfxBtn{position:absolute;right:.75rem;top:calc(.75rem + env(safe-area-inset-top,0px));pointer-events:auto;
   font-family:var(--font-mono);font-size:.64rem;letter-spacing:.08em;color:var(--ink);padding:.5rem .65rem;cursor:pointer;}
 #gfxBtn b{color:var(--cyan);font-weight:400;}
+#sndBtn{position:absolute;right:8.7rem;top:calc(3.4rem + env(safe-area-inset-top,0px));pointer-events:auto;width:2.2rem;height:2.2rem;padding:0;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;color:var(--cyan);cursor:pointer;}
+#sndBtn svg{width:1.05rem;height:1.05rem;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;}
+#sndBtn .x{display:none;} #sndBtn.off{color:var(--ink-dim);} #sndBtn.off .w{display:none;} #sndBtn.off .x{display:inline;}
+@media (max-width:560px){ #sndBtn{right:7.2rem;} }
 #radarWrap{position:absolute;right:.75rem;top:calc(3.3rem + env(safe-area-inset-top,0px));width:7.4rem;}
 #radar{width:7.4rem;height:7.4rem;display:block;border-radius:50%;border:1px solid var(--line);
   box-shadow:0 0 18px rgba(0,0,0,.35);}
@@ -339,6 +344,7 @@ body.mapopen #joywrap,body.mapopen #actions,body.mapopen #throttle{visibility:hi
     <div id="compassWrap" class="panel"><canvas id="compass" width="520" height="40"></canvas></div>
     <button id="pitchBtn" class="panel" type="button" aria-pressed="true">PITCH <b id="pitchName">INV</b></button>
     <button id="gfxBtn" class="panel" type="button">GFX <b id="gfxName">HIGH</b></button>
+    <button id="sndBtn" class="panel" type="button" aria-pressed="true" aria-label="Sound on or off"><svg viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9z"/><path class="w" d="M16 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12"/><path class="x" d="M16 9l5 6M21 9l-5 6"/></svg></button>
     <div id="radarWrap" role="button" aria-label="Open planet map"><canvas id="radar" width="200" height="200"></canvas><div id="radarCap"></div><div class="maptap">TAP · MAP</div></div>
     <div id="fps"></div>
     <div id="navTags"></div>
@@ -1969,7 +1975,7 @@ function save(){ try{ localStorage.setItem('nh_save',JSON.stringify({credits:sta
   mods:state.mods,modsOwned:state.modsOwned,lic:state.lic,fuel:state.fuel,hull:state.hull,company:state.company,cleared:state.cleared,heat:state.heat,flares:state.flares,
   food:state.food,rest:state.rest,rations:state.rations,fedT:state.fedT,restedT:state.restedT,needsOff:state.needsOff})); }catch(e){} }
 
-function toast(msg, cls){ var el=document.createElement('div'); el.className='toast'+(cls?' '+cls:''); el.textContent=msg; $('toastWrap').appendChild(el); setTimeout(function(){ el.remove(); },2400); }
+function toast(msg, cls){ if(typeof SND!=='undefined' && state.mode!=='title'){ if(cls==='life') SND.good(); else SND.blip(); } var el=document.createElement('div'); el.className='toast'+(cls?' '+cls:''); el.textContent=msg; $('toastWrap').appendChild(el); setTimeout(function(){ el.remove(); },2400); }
 function renderInv(){
   var row=$('invrow'); row.innerHTML='';
   Object.keys(ELEMENTS).forEach(function(k){ var n=state.inv[k]; if(!n) return;
@@ -2104,7 +2110,7 @@ function enterAtmosphere(p){
     renderer.compile(S.scene,camera);
   }
   updateHullCargo();
-  state.entryNormal=ship.position.clone().sub(p.mesh.position).normalize(); wearHull(.4);
+  state.entryNormal=ship.position.clone().sub(p.mesh.position).normalize(); wearHull(.4); sfx('whoosh',.55,1.35);
   setDayFromElevation(S, state.entryNormal.dot(V3.copy(SPACE_SUN).sub(p.mesh.position).normalize()));
   state.mode='atmo'; setScene(S.scene); setModeUI('atmo');
   var fx=Math.sin(state.yaw), fz=Math.cos(state.yaw), spot=surfFromNormal(state.entryNormal), lim=WORLD_E-260;
@@ -2125,7 +2131,7 @@ function enterAtmosphere(p){
   showBanner('ENTERING ATMOSPHERE', S.biome.name, S.biome.meta);
 }
 function exitAtmosphere(){
-  var p=planets[S.idx], n=normalFromSurf(S.ship.position.x,S.ship.position.z); state.entryNormal=n;
+  var p=planets[S.idx], n=normalFromSurf(S.ship.position.x,S.ship.position.z); state.entryNormal=n; sfx('whoosh',.45,1.2);
   ship.position.copy(p.mesh.position).addScaledVector(n,p.radius*1.95);
   state.yaw=Math.atan2(n.x,n.z); state.pitch=Math.asin(clamp(n.y,-1,1))*.6; state.camYaw=null; state.camPitch=null;
   state.vel.copy(n).multiplyScalar(32);
@@ -2435,6 +2441,7 @@ function deliverHere(loc){
 var lastImpactToast=0;
 function cargoImpact(v){
   if(v<7) return;
+  SND.impact(v);
   var hit=false;
   var dmg=(v-6)*.035*(hasMod('shock')?.3:1);
   state.cargo.forEach(function(c){ if(c.kind==='fragile'){ c.cond=Math.max(.3,c.cond-dmg); hit=true; } });
@@ -2677,6 +2684,7 @@ function faceShip(dir,k){ M4.lookAt(V3.copy(ship.position).sub(dir), ship.positi
 function showFlightControls(on){ $('joywrap').classList.toggle('on',on); $('actions').classList.toggle('on',on); thWrap.classList.toggle('on',on); }
 function dockPoint(){ return station.insideW.clone().addScaledVector(UP,hullGear(ship)*.75+.4); }
 function dockArrived(){
+  sfx('hatchClose',.8); SND.touchdown();
   if(hasMod('flares') && state.flares<3){ state.flares=3; toast('FLARES RESTOCKED'); }
   piratesLeave('');
   if(secOf(SYS.seed).customs && (!isCleared()||isWanted())) customsScan('dock',function(){ if(state.dock && state.dock.phase==='docked') openTerminal(stationLoc()); });
@@ -2705,7 +2713,7 @@ function updateHullCargo(){
 }
 function undock(){
   var K=state.dock; if(!K||K.phase!=='docked') return;
-  $('stationPanel').hidden=true; termLoc=null; K.phase='leave'; K.t=0; save();
+  $('stationPanel').hidden=true; termLoc=null; K.phase='leave'; K.t=0; save(); sfx('hatchOpen',.8);
 }
 function updateDock(dt){
   var K=state.dock; K.t+=dt;
@@ -2888,6 +2896,7 @@ function renderTerminal(tab){
 }
 $('stationPanel').addEventListener('click',function(e){
   var t=e.target.closest('button'); if(!t||!termLoc) return;
+  SND.click();
   if(t.dataset.tab){ renderTerminal(t.dataset.tab); return; }
   var act=t.dataset.act, loc=termLoc;
   if(act==='sell1'||act==='sellall'){ var el=t.dataset.el, q=state.inv[el]||0, n=act==='sell1'?Math.min(1,q):q; if(!n) return;
@@ -2929,7 +2938,7 @@ $('stationPanel').addEventListener('click',function(e){
     state.credits-=lc.cost; state.lic[lc.id]=1; toast(lc.name+' ISSUED','life'); }
   else if(act==='accept'){ var o=boardOffers(loc).filter(function(x){ return x.id===t.dataset.id; })[0];
     if(o && acceptOffer(o,loc)) toast('LOADED · '+o.name.toUpperCase()+' → '+o.dest.name); }
-  else if(act==='deliver'){ var r=deliverHere(loc); if(r.n) toast('DELIVERED '+r.n+' CRATE'+(r.n>1?'S':'')+' · +'+fmt(r.total)+' UNITS'+(r.late?' · '+r.late+' LATE':''),'life'); }
+  else if(act==='deliver'){ var r=deliverHere(loc); if(r.n) SND.cash(); if(r.n) toast('DELIVERED '+r.n+' CRATE'+(r.n>1?'S':'')+' · +'+fmt(r.total)+' UNITS'+(r.late?' · '+r.late+' LATE':''),'life'); }
   renderInv(); save(); renderTerminal();
 });
 $('undockBtn').addEventListener('click',function(){ if(termLoc && termLoc.kind==='station') undock(); else closeTerminal(); });
@@ -2993,6 +3002,132 @@ function updateSpace(dt){
   shipTag(null); navTags(spaceNav().concat(lawNav()));
   setClock('SYSTEM', SYS.name);
 }
+
+/* =========================================================================
+   Sound: recorded beds and one-shots from /audio, plus engine, wind and
+   interface tones made live with Web Audio so they follow the throttle.
+   ========================================================================= */
+var SFX_FILES={drone:'audio/cab_drone.mp3', station:'audio/station_amb.mp3', whoosh:'audio/warp_whoosh.mp3', hatchOpen:'audio/hatch_open.mp3', hatchClose:'audio/hatch_close.mp3'};
+var AU={ctx:null, on:true, buf:{}, beds:{}, eng:null, zapT:0};
+try{ AU.on=localStorage.getItem('nh_sound')!=='0'; }catch(e){}
+function audioStart(){
+  var AC=window.AudioContext||window.webkitAudioContext; if(!AC) return;
+  if(AU.ctx){ if(AU.ctx.state==='suspended' && !document.hidden) AU.ctx.resume(); return; }
+  var c=AU.ctx=new AC(), i;
+  AU.master=c.createGain(); AU.master.gain.value=AU.on?1:0;
+  AU.muffle=c.createBiquadFilter(); AU.muffle.type='lowpass'; AU.muffle.frequency.value=18000;
+  var comp=c.createDynamicsCompressor(); comp.threshold.value=-16; comp.ratio.value=3; comp.attack.value=.01; comp.release.value=.25;
+  AU.muffle.connect(AU.master); AU.master.connect(comp); comp.connect(c.destination);
+  AU.sfx=c.createGain(); AU.sfx.gain.value=.9; AU.sfx.connect(AU.muffle);
+  var nb=c.createBuffer(1,c.sampleRate*2,c.sampleRate), d=nb.getChannelData(0), last=0;
+  for(i=0;i<d.length;i++){ var w=Math.random()*2-1; last=(last+.02*w)/1.02; d[i]=last*3.2+w*.08; }   // mostly brown noise
+  AU.noise=nb;
+  var wb=c.createBuffer(1,c.sampleRate,c.sampleRate), wd=wb.getChannelData(0); for(i=0;i<wd.length;i++) wd[i]=Math.random()*2-1; AU.white=wb;
+  buildEngine();
+  Object.keys(SFX_FILES).forEach(function(k){
+    fetch(SFX_FILES[k]).then(function(r){ return r.arrayBuffer(); }).then(function(ab){
+      c.decodeAudioData(ab,function(buf){ AU.buf[k]=buf; if(k==='drone'||k==='station') startBed(k); },function(){});
+    }).catch(function(){});
+  });
+}
+function startBed(k){
+  var c=AU.ctx, b=AU.buf[k], s=c.createBufferSource(), g=c.createGain();
+  s.buffer=b; s.loop=true; s.loopStart=.1; s.loopEnd=b.duration-.1; g.gain.value=0;
+  s.connect(g); g.connect(AU.muffle); s.start(0,.1); AU.beds[k]={src:s, gain:g};
+}
+function noiseSrc(buf){ var s=AU.ctx.createBufferSource(); s.buffer=buf||AU.noise; s.loop=true; s.start(); return s; }
+function buildEngine(){
+  var c=AU.ctx, E={};
+  function chain(src,type,freq,q){ var f=c.createBiquadFilter(); f.type=type; f.frequency.value=freq; f.Q.value=q||.7; var g=c.createGain(); g.gain.value=0; src.connect(f); f.connect(g); g.connect(AU.muffle); return {f:f, g:g}; }
+  var t=chain(noiseSrc(),'lowpass',220,.8); E.thrust=t.g; E.thrustF=t.f;
+  E.o1=c.createOscillator(); E.o2=c.createOscillator(); E.o1.type=E.o2.type='sawtooth'; E.o1.frequency.value=46; E.o2.frequency.value=46.6;
+  var lp=c.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=160; var og=c.createGain(); og.gain.value=0;
+  E.o1.connect(lp); E.o2.connect(lp); lp.connect(og); og.connect(AU.muffle); E.o1.start(); E.o2.start(); E.tone=og; E.toneF=lp;
+  var w=chain(noiseSrc(AU.white),'bandpass',500,.6); E.wind=w.g; E.windF=w.f;
+  var j=chain(noiseSrc(AU.white),'highpass',1800,.5); E.jet=j.g;
+  AU.eng=E;
+}
+function setAt(p,v,tc){ p.setTargetAtTime(v,AU.ctx.currentTime,tc||.12); }
+function setSound(on){
+  AU.on=on; try{ localStorage.setItem('nh_sound',on?'1':'0'); }catch(e){}
+  if(AU.ctx) setAt(AU.master.gain,on?1:0,.05);
+  $('sndBtn').classList.toggle('off',!on); $('sndBtn').setAttribute('aria-pressed',on?'true':'false');
+}
+document.addEventListener('visibilitychange',function(){ if(!AU.ctx) return; if(document.hidden) AU.ctx.suspend(); else AU.ctx.resume(); });
+['pointerdown','touchend','keydown'].forEach(function(ev){ window.addEventListener(ev,function(){ if(state.mode!=='title' || AU.ctx) audioStart(); },{passive:true}); });
+
+/* every frame: beds, engine and wind follow what the ship is doing */
+function audioUpdate(dt){
+  if(!AU.ctx || !AU.eng) return;
+  var E=AU.eng, m=state.mode, spd=state.vel.length(), thr=Math.max(0,state.throttle||0);
+  var boosting=(holdA||keys.Space||keys.ShiftLeft||keys.ShiftRight) && state.energy>1;
+  var drone=0, stn=0, thrust=0, tone=0, wind=0, jet=0, tf=220, of=46, wf=500;
+  if(m==='space'){
+    var docked=state.dock && state.dock.phase!=='approach';
+    drone=docked?.32:.55;
+    var sd=station?ship.position.distanceTo(station.center):1e9; stn=docked?.6:clamp(1-sd/260,0,1)*.35;
+    if(state.warp){ var W=state.warp, k=W.t<1.5?W.t/1.5:(W.t<1.5+W.cruise?1:Math.max(0,1-(W.t-1.5-W.cruise)/2)); thrust=.25+.5*k; tf=250+k*1400; tone=.08+.1*k; of=46+k*40; }
+    else if(!docked){ thrust=.04+.22*thr+(boosting?.28:0); tf=180+spd*10+(boosting?500:0); tone=.03+.07*thr+(boosting?.05:0); of=40+spd*.45; }
+    else { thrust=.02; tone=.015; }
+  } else if(m==='atmo'){
+    drone=.38; thrust=.05+.22*thr+(boosting?.28:0); tf=200+spd*9+(boosting?500:0); tone=.03+.07*thr; of=42+spd*.4;
+    wind=clamp(spd/70,0,1)*.4+.04; wf=300+spd*14;
+  } else if(m==='surface'){
+    wind=.05; wf=420; jet=(state.vy>.5 && !state.grounded)?.16:0;
+  }
+  if(termLoc && m==='surface'){ wind*=.4; }
+  setAt(E.thrust.gain,thrust); setAt(E.thrustF.frequency,tf,.2); setAt(E.tone.gain,tone); setAt(E.o1.frequency,of,.25); setAt(E.o2.frequency,of*1.013,.25);
+  setAt(E.wind.gain,wind,.3); setAt(E.windF.frequency,wf,.3); setAt(E.jet.gain,jet,.08);
+  if(AU.beds.drone) setAt(AU.beds.drone.gain.gain,drone,.4);
+  if(AU.beds.station) setAt(AU.beds.station.gain.gain,stn,.5);
+  var dull=state.sleeping||blinking();
+  setAt(AU.muffle.frequency,dull?380:18000,dull?.05:.3);
+}
+
+/* one-shots */
+function sfx(name, vol, rate){
+  if(!AU.ctx || !AU.buf[name] || !AU.on) return;
+  var c=AU.ctx, s=c.createBufferSource(), g=c.createGain(); s.buffer=AU.buf[name]; s.playbackRate.value=rate||1; g.gain.value=vol==null?1:vol;
+  s.connect(g); g.connect(AU.sfx); s.start();
+}
+function tones(freqs, step, type, vol, len){
+  if(!AU.ctx || !AU.on) return;
+  var c=AU.ctx, t0=c.currentTime+.01;
+  freqs.forEach(function(f,i){
+    var o=c.createOscillator(), g=c.createGain(), t=t0+i*step, L=len||step*.9;
+    o.type=type||'sine'; o.frequency.value=f; g.gain.setValueAtTime(0,t); g.gain.linearRampToValueAtTime(vol||.1,t+.008); g.gain.exponentialRampToValueAtTime(.0005,t+L);
+    o.connect(g); g.connect(AU.sfx); o.start(t); o.stop(t+L+.02);
+  });
+}
+function sweep(f0, f1, dur, type, vol){
+  if(!AU.ctx || !AU.on) return;
+  var c=AU.ctx, t=c.currentTime+.01, o=c.createOscillator(), g=c.createGain();
+  o.type=type||'sine'; o.frequency.setValueAtTime(f0,t); o.frequency.exponentialRampToValueAtTime(f1,t+dur);
+  g.gain.setValueAtTime(0,t); g.gain.linearRampToValueAtTime(vol||.1,t+.02); g.gain.exponentialRampToValueAtTime(.0005,t+dur);
+  o.connect(g); g.connect(AU.sfx); o.start(t); o.stop(t+dur+.05);
+}
+function thump(vol, freq, dur){
+  if(!AU.ctx || !AU.on) return;
+  var c=AU.ctx, t=c.currentTime+.01, s=c.createBufferSource(), f=c.createBiquadFilter(), g=c.createGain();
+  s.buffer=AU.white; f.type='lowpass'; f.frequency.value=freq||220; g.gain.setValueAtTime(vol||.5,t); g.gain.exponentialRampToValueAtTime(.0005,t+(dur||.35));
+  s.connect(f); f.connect(g); g.connect(AU.sfx); s.start(t); s.stop(t+(dur||.35)+.05);
+  sweep(90,38,(dur||.35)*.9,'sine',(vol||.5)*.6);
+}
+var SND={
+  blip:function(){ tones([1180],.05,'sine',.05); },
+  click:function(){ tones([1500],.03,'square',.025); },
+  good:function(){ tones([660,990],.08,'triangle',.09); },
+  cash:function(){ tones([1320,1760,2640],.055,'triangle',.07); },
+  bad:function(){ tones([196,147],.2,'sawtooth',.08,.22); },
+  ping:function(){ sweep(500,1800,.5,'sine',.08); setTimeout(function(){ sweep(500,1800,.5,'sine',.03); },180); },
+  scanHum:function(){ sweep(220,880,1.8,'triangle',.05); tones([440,440,440],.6,'sine',.03,.25); },
+  siren:function(){ sweep(620,980,.35,'square',.04); setTimeout(function(){ sweep(980,620,.35,'square',.04); },350); setTimeout(function(){ sweep(620,980,.35,'square',.04); },700); },
+  alarm:function(){ tones([880,660,880,660,880,660],.16,'square',.05,.14); },
+  zap:function(){ sweep(1400,180,.13,'sawtooth',.05); },
+  pop:function(){ thump(.25,2400,.18); tones([1600,2400],.04,'square',.03); },
+  impact:function(v){ thump(clamp(v/30,.15,.8),260,.4); },
+  touchdown:function(){ thump(.35,180,.5); }
+};
 
 /* =========================================================================
    Pilot needs: hunger, fatigue and the logbook
@@ -3173,6 +3308,7 @@ function customsScan(source, then){
       else { toast('BRIBE REFUSED · PENALTIES INCREASED'); customsPenalty(found,Math.round(fine*1.5),worst,2); }
       if(then) then(); }}];
   if(source==='gate'||source==='patrol') btns.push({label:'RUN', cls:'run', fn:function(){ goWanted(); if(then) then(); }});
+  SND.bad();
   showLaw({type:'customs', eye:(source==='dock'?'STATION CUSTOMS':source==='gate'?'CUSTOMS HALL':'PATROL INSPECTION')+' · '+SYS.name, title:found.length?'Contraband found':'Wanted in this system',
     body:body, buttons:btns, tone:'bad', noTimeout:true});
 }
@@ -3279,7 +3415,7 @@ function updateGate(dt){
     var tgt=G.group.localToWorld(HQ.set(0,-H2+hullGear(ship)*.8+3,4));
     ship.position.lerp(tgt,1-Math.pow(.03,dt)); state.vel.multiplyScalar(Math.pow(.01,dt)); setThrottle(0); stopRates();
     state.yaw=angLerp(state.yaw,G.yaw,dt*3); state.pitch*=Math.pow(.05,dt);
-    if(sc.phase==='brake' && sc.t>1.1){ sc.phase='scan'; sc.t=0; }
+    if(sc.phase==='brake' && sc.t>1.1){ sc.phase='scan'; sc.t=0; SND.scanHum(); }
     else if(sc.phase==='scan' && sc.t>1.8){ sc.phase='wait'; sc.t=0; customsScan('gate',releaseScale); }
     else if(sc.phase==='wait' && !state.law && sc.t>.5) releaseScale();
   }
@@ -3317,7 +3453,7 @@ function steerActor(a, target, speed, dt){
 function endChase(){ lawActors.forEach(function(a){ if(a.kind==='patrol' && a.mode!=='patrol'){ a.mode='return'; a.cool=20; } }); state.chase=null; if(state.law && (state.law.type==='hail')) hideLaw(); }
 
 function hailPatrol(a){
-  a.mode='hail';
+  a.mode='hail'; SND.siren();
   showLaw({type:'hail', actor:a, eye:'PATROL CUTTER · '+secOf(SYS.seed).name+' SECURITY', title:'Cut your engines for inspection',
     body:'<p>'+(isWanted()?'You are wanted in this system.':!isCleared()?'You have not checked in at customs.':'Random inspection.')+' Throttle to zero, or tap comply.</p>',
     buttons:[{label:'COMPLY', cls:'pri', fn:function(){ stopRates(); setThrottle(0); state.vel.multiplyScalar(.2); a.mode='return'; a.cool=40; customsScan('patrol'); }},
@@ -3340,6 +3476,7 @@ function spawnPirates(){
   toast('UNKNOWN CONTACTS CLOSING · '+(n>1?'TWO SHIPS':'ONE SHIP'));
 }
 function pirateDemand(){
+  SND.alarm();
   var val=cargoValue(), ransom=Math.max(300,Math.round(val*.15/10)*10), best=state.cargo.slice().sort(function(a,b){ return b.reward-a.reward; })[0];
   var btns=[{label:'PAY · '+fmt(ransom), cls:'pri', fn:function(){ state.credits-=ransom; piratesLeave('THEY TAKE THE MONEY AND BREAK OFF'); }}];
   if(best) btns.push({label:'DUMP '+best.name.toUpperCase(), fn:function(){ state.cargo=state.cargo.filter(function(c){ return c!==best; }); piratesLeave('THEY SCOOP THE CRATE AND BREAK OFF'); }});
@@ -3352,7 +3489,7 @@ function piratesAttack(){ lawActors.forEach(function(a){ if(a.kind==='pirate') {
 function piratesLeave(msg){ var any=false; lawActors.forEach(function(a){ if(a.kind==='pirate' && a.mode!=='leave'){ a.mode='leave'; a.t=0; any=true; } }); if(state.law && state.law.type==='pirate') hideLaw(); if(any && msg) toast(msg); }
 function dropFlares(){
   if(!hasMod('flares') || state.flares<=0) return;
-  state.flares--; lawActors.forEach(function(a){ if(a.kind==='pirate' && a.mode==='attack') a.flareT=6; });
+  state.flares--; SND.pop(); lawActors.forEach(function(a){ if(a.kind==='pirate' && a.mode==='attack') a.flareT=6; });
   toast('DECOY FLARES · '+state.flares+' LEFT'); save();
 }
 function pirateActive(){ return lawActors.some(function(a){ return a.kind==='pirate' && a.mode!=='leave'; }); }
@@ -3400,7 +3537,7 @@ function updateLaw(dt){
         if(a.flareT>0) steerActor(a,V2.copy(ship.position).add(V3.set(200,80,-200)).clone(),90,dt);
         else steerActor(a,V2.copy(ship.position).addScaledVector(V3.copy(a.obj.position).sub(ship.position).normalize(),35).clone(),88,dt);
         if(d<120 && a.flareT<=0 && free){ firing=true; a.fire+=dt;
-          if(a.fire>.25){ a.fire=0; var dmg=(hasMod('shield')?.5:1)*1; state.hull=Math.max(0,state.hull-dmg); renderInv(); state.fovKick=Math.min(state.fovKick+1.5,6);
+          if(a.fire>.25){ a.fire=0; SND.zap(); var dmg=(hasMod('shield')?.5:1)*1; state.hull=Math.max(0,state.hull-dmg); renderInv(); state.fovKick=Math.min(state.fovKick+1.5,6);
             if(state.hull<=0) pirateDisable(); } }
         if(d>950){ piratesLeave('YOU OUTRAN THE RAIDERS'); }
         else if(sd<450){ piratesLeave('STATION DEFENCE GRID LOCKS ON · RAIDERS BREAK OFF'); }
@@ -3484,7 +3621,7 @@ $('wpClose').addEventListener('click',function(){ warpPanel.hidden=true; });
 function startWarp(seed){
   var ly=lightYears(SYS.seed,seed), fuel=warpFuel(ly);
   if(state.fuel<fuel && state.mode==='space'){ toast('NOT ENOUGH FUEL · NEED '+fuel+', HAVE '+Math.floor(state.fuel)+' · REFUEL AT A STATION, TOWN OR FUEL DEPOT'); return; }
-  warpPanel.hidden=true;
+  warpPanel.hidden=true; sfx('whoosh',1);
   state.fuel=Math.max(0,state.fuel-fuel); wearHull(2+ly/100); if(needsOn()) state.rest=Math.max(0,state.rest-3); save(); state.warp={t:0, seed:seed, swapped:false, ly:ly, cruise:clamp(ly/75,.6,5.4), prog:0};
   setPrompt(null); toast('WARP DRIVE ENGAGED');
 }
@@ -3636,6 +3773,7 @@ function land(onPad){
 }
 function disembark(){
   var sh=S.ship, padT=state.landing && state.landing.pad?state.landing.town:null, onPad=!!padT; state.landing=null;
+  SND.touchdown(); setTimeout(function(){ sfx('hatchOpen',.9); },250);
   setShipFlying(sh,false);
   var right=new THREE.Vector3(-Math.cos(state.yaw),0,Math.sin(state.yaw));
   var off=hullBeam(sh)/2+2.5, px=sh.position.x+right.x*off, pz=sh.position.z+right.z*off;
@@ -3649,7 +3787,7 @@ function disembark(){
   else if(!state.landedHere){ state.landedHere=true; toast('SHIP PARKED · FOLLOW THE BEACON OR RADAR TO RETURN'); }
 }
 function board(){
-  if(!S) return; setPrompt(null); closeTerminal();
+  if(!S) return; setPrompt(null); closeTerminal(); sfx('hatchClose',.7,1.15);
   state.mode='atmo'; setModeUI('atmo');
   setShipFlying(S.ship,true);
   state.vel.set(0,11,0); state.pitch=.05; state.landHint=true; stopRates(); setThrottle(.35);
@@ -3658,7 +3796,7 @@ function board(){
 
 function doScan(){
   if(state.mode!=='surface'||!S||state.scan<1) return;
-  state.scan=0;
+  state.scan=0; SND.ping();
   var ring=$('scanring'); ring.style.animation='none'; void ring.offsetWidth; ring.style.animation='scanpulse 1.6s ease-out forwards';
   var found=0, newSp=[];
   S.resources.forEach(function(r){ if(r.collected) return; var d=Math.hypot(r.x-state.pos.x,r.z-state.pos.z); if(d<scanRange()){ if(!r.scanned) found++; r.scanned=true; r.marker.visible=true; } });
@@ -3722,7 +3860,7 @@ function updateSurface(dt){
     var d=Math.hypot(r.x-p.x,r.z-p.z);
     if(r.scanned) crys.push({bearing:bearingTo(r.x-p.x,r.z-p.z), color:S.biome.crystal, d:d, label:''});
     if(d<2.6 && Math.abs(p.y-1.7-S.heightAt(r.x,r.z))<3){
-      r.collected=true; r.group.visible=false;
+      r.collected=true; r.group.visible=false; SND.good();
       var el=S.biome.element, yv=1+lvl('mine'); state.inv[el]=(state.inv[el]||0)+yv; renderInv(); save();
       toast('+'+yv+' '+el+' · SELL AT A STATION OR TOWN');
     }
@@ -3790,6 +3928,8 @@ function drawMap(){
   x.fillStyle='rgba(238,246,255,.8)'; x.fillRect(14,W-20,500*sc,3); x.textAlign='left'; x.fillText('500 M',14,W-28);
 }
 $('foodBtn').addEventListener('click',eatRation);
+$('sndBtn').addEventListener('click',function(){ audioStart(); setSound(!AU.on); toast(AU.on?'SOUND ON':'SOUND OFF'); });
+setSound(AU.on);
 $('restBtn').addEventListener('click',tapSleep);
 $('radarWrap').addEventListener('click',function(){ if(mapOpen) closeMap(); else openMap(); });
 $('mpClose').addEventListener('click',closeMap);
@@ -3922,6 +4062,7 @@ function frame(){
   else if(state.mode==='atmo' && S) updateAtmo(dt);
   else if(state.mode==='surface' && S) updateSurface(dt);
   if(state.mode!=='title'){ updateLaw(dt); updateNeeds(dt); }
+  audioUpdate(dt);
   state.exposure=lerp(state.exposure,state.exposureTarget,1-Math.pow(.25,dt));
   var u=finalPass.uniforms; u.exposure.value=state.exposure; u.time.value=state.t;
   if(!navSet){ navTags([]); navSet=false; }
@@ -3965,6 +4106,7 @@ $('gfxBtn').addEventListener('click',function(){
 });
 
 $('enterBtn').addEventListener('click',function(){
+  audioStart();
   if(fleetAway){ var fa=fleetAway; fleetAway=null; setTimeout(function(){ toast('WHILE YOU WERE AWAY · YOUR FLEET EARNED '+fmt(fa)+' · COLLECT AT ANY STATION','life'); },2500); }
   var t=$('title'); t.style.opacity=0; setTimeout(function(){ t.hidden=true; },900);
   $('hud').classList.add('on'); $('joywrap').classList.add('on'); $('actions').classList.add('on'); thWrap.classList.add('on'); setThrottle(.3);
@@ -3994,7 +4136,7 @@ async function boot(){
 window.__nh={enterPlanet:function(i){ enterAtmosphere(planets[i]); }, ready:function(i){ return !!surfaces[i]; }, land:land, board:board, exitAtmo:exitAtmosphere,
   warp:startWarp, dock:startDock, cam:function(){ return camera; }, station:function(){ return station; }, ship:function(){ return ship; }, state:state, getS:function(){ return S; }, sys:function(){ return SYS; }, enter:function(){ $('enterBtn').click(); },
   queue:queueSurface, terrain:planetTerrain, normalFromSurf:normalFromSurf, openMap:openMap, chunkBuilder:chunkBuilder, planets:function(){ return planets; }, offers:boardOffers, townLoc:townLoc,
-  law:{hall:function(){ return station&&station.gate; }, spawnPirates:spawnPirates, scan:customsScan, actors:function(){ return lawActors; }, heat:heatOf, sec:secOf}};
+  au:function(){ return AU; }, law:{hall:function(){ return station&&station.gate; }, spawnPirates:spawnPirates, scan:customsScan, actors:function(){ return lawActors; }, heat:heatOf, sec:secOf}};
 boot().catch(function(e){ console.error(e); $('loader').firstChild.nodeValue='Your device could not start the renderer: '+(e&&e.message||e); });
 })();
 </script>
