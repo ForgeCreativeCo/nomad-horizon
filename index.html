@@ -3068,7 +3068,7 @@ function setSound(on){
   $('sndBtn').classList.toggle('off',!on); $('sndBtn').setAttribute('aria-pressed',on?'true':'false');
 }
 document.addEventListener('visibilitychange',function(){ if(!AU.ctx) return; if(document.hidden) AU.ctx.suspend(); else AU.ctx.resume(); });
-['pointerdown','touchend','keydown'].forEach(function(ev){ window.addEventListener(ev,function(){ if(state.mode!=='title' || AU.ctx) audioStart(); },{passive:true}); });
+['pointerdown','touchend','keydown'].forEach(function(ev){ window.addEventListener(ev,function(){ audioStart(); },{passive:true}); });
 
 /* ---------- background music: a shuffled set of ambient tracks with quiet gaps between them.
    Tracks stream through <audio> elements (never fully decoded into memory) and are routed
@@ -3090,6 +3090,7 @@ function musicInit(){
   // touch both decks inside the user's tap so phones allow later playback
   MU.decks.forEach(function(d){ try{ d.el.src=MUSIC_TRACKS[0]; var p=d.el.play(); if(p && p.then) p.then(function(){ d.el.pause(); d.el.currentTime=0; }).catch(function(){}); }catch(e){} });
   MU.unlocked=true;
+  if(state.mode==='title'){ MU.order=[6]; MU.gap=.3; }
 }
 function nextTrack(){
   if(!MU.order.length){ MU.order=MUSIC_TRACKS.map(function(_,i){ return i; }).sort(function(){ return Math.random()-.5; }); if(MU.order[0]===MU.last) MU.order.push(MU.order.shift()); }
@@ -3104,11 +3105,22 @@ function startTrack(){
 }
 /* ask the service worker to keep the whole soundtrack for offline play (once; it survives updates) */
 function cacheMusic(){
-  if(!('serviceWorker' in navigator) || location.protocol==='file:') return;
+  if(MU.caching || !window.caches || location.protocol==='file:') return;
   if(navigator.connection && navigator.connection.saveData) return;
-  navigator.serviceWorker.ready.then(function(reg){ if(reg.active) reg.active.postMessage({type:'cache-music', urls:MUSIC_TRACKS}); }).catch(function(){});
+  MU.caching=true;
+  caches.open('nh-music-1').then(function(cache){
+    var fresh=0, i=0;
+    function next(){
+      if(i>=MUSIC_TRACKS.length){ if(fresh) toast('SOUNDTRACK SAVED FOR OFFLINE PLAY'); return; }
+      var key=new URL(MUSIC_TRACKS[i++],location.href).href;
+      cache.match(key).then(function(hit){
+        if(hit) return next();
+        return fetch(key).then(function(res){ if(res.ok){ fresh++; return cache.put(key,res).then(next); } }).catch(function(){});
+      });
+    }
+    next();
+  }).catch(function(){});
 }
-if('serviceWorker' in navigator){ navigator.serviceWorker.addEventListener('message',function(e){ if(e.data && e.data.type==='music-cached' && e.data.fresh>0) toast('SOUNDTRACK SAVED FOR OFFLINE PLAY'); }); }
 function setMusic(on){
   MU.on=on; try{ localStorage.setItem('nh_music',on?'1':'0'); }catch(e){}
   $('musBtn').classList.toggle('off',!on); $('musBtn').setAttribute('aria-pressed',on?'true':'false');
