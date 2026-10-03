@@ -3011,10 +3011,11 @@ function updateSpace(dt){
 var SFX_FILES={drone:'audio/cab_drone.mp3', station:'audio/station_amb.mp3', whoosh:'audio/warp_whoosh.mp3', hatchOpen:'audio/hatch_open.mp3', hatchClose:'audio/hatch_close.mp3',
   forklift:'audio/forklift.mp3', warehouse:'audio/warehouse.mp3', warpSpool:'audio/warp_spool.mp3', landing:'audio/landing.mp3',
   airbrake:'audio/airbrake.mp3', scanner:'audio/scanner.mp3', confirm:'audio/confirm.mp3', gateChains:'audio/gate_chains.mp3',
-  steps:'audio/steps.mp3', town:'audio/town_amb.mp3'};
+  steps:'audio/steps.mp3', town:'audio/town_amb.mp3', crickets:'audio/crickets.mp3', gear:'audio/gear.mp3'};
+var GEAR_CLUNK=3.95, CRICKETS_BY={frozen:0, scorched:.35, toxic:.6};
 var STEP_SLOTS=10, STEP_SLOT=.5;
 var SCAN_T=3;
-var BEDS=['drone','station','warehouse','town'];
+var BEDS=['drone','station','warehouse','town','crickets'];
 var AU={ctx:null, on:true, buf:{}, beds:{}, eng:null, zapT:0, forkT:12};
 try{ AU.on=localStorage.getItem('nh_sound')!=='0'; }catch(e){}
 function audioStart(){
@@ -3092,6 +3093,14 @@ function audioUpdate(dt){
   }
   if(termLoc && termLoc.kind==='town' && !termLoc.outpost) town=Math.max(town,.22);
   if(AU.beds.town) setAt(AU.beds.town.gain.gain,town,.6);
+  // night insects on worlds that would have them
+  var cr=0;
+  if(S && (m==='surface'||m==='atmo')){
+    var night=1-S.dayF, bf=CRICKETS_BY[S.biome.type]; if(bf==null) bf=1;
+    var gy=m==='surface'?0:Math.max(0,S.ship.position.y-Math.max(S.heightAt(S.ship.position.x,S.ship.position.z),S.waterLevel));
+    cr=night*bf*(m==='surface'?.5:.25*(1-clamp(gy/80,0,1)));
+  }
+  if(AU.beds.crickets) setAt(AU.beds.crickets.gain.gain,cr,1.2);
   if(termLoc){ wh=.5; crew=.22; }
   else if(m==='space' && state.dock && state.dock.phase!=='approach'){ wh=.32; crew=.18; }
   else if(m==='surface' && S && S.towns){ var nt=nearestTown(state.pos.x,state.pos.z); if(nt && nt.d<70){ wh=.22*(1-nt.d/70); crew=.2*(1-nt.d/70); } }
@@ -3828,6 +3837,7 @@ function land(onPad){
   var x1=onPad?T.x:sh.position.x, z1=onPad?T.z:sh.position.z;
   var y1=(onPad?T.pad.y:S.heightAt(x1,z1))+hullGear(sh);
   landingSound(onPad?LAND_T.pad:LAND_T.ground);
+  sfx('gear',.7,1,Math.max(0,GEAR_CLUNK-.4*(onPad?LAND_T.pad:LAND_T.ground)));
   state.landing={t:0, pad:onPad, town:T, x0:sh.position.x, y0:Math.max(sh.position.y,y1+4), z0:sh.position.z, x1:x1, y1:y1, z1:z1};
 }
 function disembark(){
@@ -3848,6 +3858,7 @@ function disembark(){
 function board(){
   if(!S) return; setPrompt(null); closeTerminal(); sfx('hatchClose',.7,1.15);
   var lift=sfx('landing',.6,1.12,.25); sfxFade(lift,2.6,1.2);
+  var up=sfx('gear',.45,1.15,.3); sfxFade(up,2,.8);
   state.mode='atmo'; setModeUI('atmo');
   setShipFlying(S.ship,true);
   state.vel.set(0,11,0); state.pitch=.05; state.landHint=true; stopRates(); setThrottle(.35);
