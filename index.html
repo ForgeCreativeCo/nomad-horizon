@@ -243,6 +243,7 @@ button:focus-visible{outline:2px solid var(--cyan);outline-offset:3px;}
 .need.warn{color:#ff7a5c;border-color:rgba(255,122,92,.7);animation:needpulse 1s ease-in-out infinite;}
 @keyframes needpulse{50%{background:rgba(255,122,92,.22);}}
 @media (prefers-reduced-motion:reduce){ .need.warn{animation:none;} }
+.st-row.hangar-on{border-color:rgba(127,232,255,.6);background:rgba(127,232,255,.06);}
 .co-log{font-family:var(--font-mono);font-size:.62rem;letter-spacing:.05em;color:var(--ink-dim);line-height:1.6;}
 .tag.k-fragile{color:#04121a;background:var(--cyan);} .tag.k-perishable{color:#0b1a04;background:#9dff6a;} .tag.k-hazardous{color:#fff;background:#d8402a;}
 #stationPanel{position:absolute;right:1rem;top:calc(1rem + env(safe-area-inset-top,0px));bottom:calc(1rem + env(safe-area-inset-bottom,0px));z-index:30;
@@ -987,7 +988,7 @@ function buildHull(tier, landed){
   tilts.forEach(function(p){ p.rotation.x=landed?0:-Math.PI/2; });
   return g;
 }
-function hullTier(){ return Math.min(lvl('hold'),3); }
+function hullTier(){ var top=Math.min(lvl('hold'),3), sel=state.hullSel; return (sel==null||sel>top||sel<0)?top:sel; }
 /* size helpers: everything below is in world units for the object's current scale */
 function hullGear(obj){ return obj.userData.gear*obj.scale.y; }
 function hullLen(obj){ return obj.userData.len*obj.scale.z; }
@@ -1964,21 +1965,21 @@ window.addEventListener('mouseup',function(){ setHold(false); });
 /* =========================================================================
    Game state + HUD
    ========================================================================= */
-var state={throttle:0, yawRate:0, pitchRate:0, mode:'title', yaw:Math.PI, pitch:0, vel:new THREE.Vector3(), energy:100, scan:1, credits:0, inv:{}, found:{}, sysSeed:0, up:{}, cargo:[], taken:{}, boardGen:{}, delivered:0, dock:null, mods:[], modsOwned:{}, lic:{}, fuel:null, hull:100, company:null, cleared:0, heat:{}, flares:3, food:100, rest:100, rations:2, fedT:0, restedT:0, needsOff:false, blinkT:0, sleeping:false, law:null, chase:null, arrivedT:0, pirateT:30,
+var state={throttle:0, yawRate:0, pitchRate:0, mode:'title', yaw:Math.PI, pitch:0, vel:new THREE.Vector3(), energy:100, scan:1, credits:0, inv:{}, found:{}, sysSeed:0, up:{}, cargo:[], taken:{}, boardGen:{}, delivered:0, dock:null, mods:[], modsOwned:{}, lic:{}, fuel:null, hull:100, company:null, hullSel:null, fits:{}, fuelReserve:0, cleared:0, heat:{}, flares:3, food:100, rest:100, rations:2, fedT:0, restedT:0, needsOff:false, blinkT:0, sleeping:false, law:null, chase:null, arrivedT:0, pirateT:30,
   pos:new THREE.Vector3(), vy:0, grounded:true, bob:0, fovKick:0, exposure:1, exposureTarget:1, t:0, warp:null};
 var OLD_KEYS={'CINDER REACH':'PYRITE','GLASSWATER':'CYANITE','VERDANT HOLLOW':'AMETHINE','PALE SILICATE':'AURUM'};
 try{
   var sv=JSON.parse(localStorage.getItem('nh_save')||'null');
   if(sv){
     state.credits=sv.credits||0; state.found=sv.found||{}; state.sysSeed=sv.sys||0; state.up=sv.up||{}; state.cargo=sv.cargo||[]; state.taken=sv.taken||{}; state.boardGen=sv.boardGen||{}; state.delivered=sv.delivered||0;
-    state.mods=sv.mods||[]; state.modsOwned=sv.modsOwned||{}; state.lic=sv.lic||{}; state.fuel=sv.fuel; state.hull=sv.hull==null?100:sv.hull; state.company=sv.company||null; state.cleared=sv.cleared===undefined?(sv.sys||0):sv.cleared; state.heat=sv.heat||{}; state.flares=sv.flares==null?3:sv.flares;
+    state.mods=sv.mods||[]; state.modsOwned=sv.modsOwned||{}; state.lic=sv.lic||{}; state.fuel=sv.fuel; state.hull=sv.hull==null?100:sv.hull; state.company=sv.company||null; state.hullSel=sv.hullSel==null?null:sv.hullSel; state.fits=sv.fits||{}; state.fuelReserve=sv.fuelReserve||0; state.cleared=sv.cleared===undefined?(sv.sys||0):sv.cleared; state.heat=sv.heat||{}; state.flares=sv.flares==null?3:sv.flares;
     state.food=sv.food==null?100:sv.food; state.rest=sv.rest==null?100:sv.rest; state.rations=sv.rations==null?2:sv.rations; state.fedT=sv.fedT||0; state.restedT=sv.restedT||0; state.needsOff=!!sv.needsOff;
     Object.keys(sv.inv||{}).forEach(function(k){ var nk=OLD_KEYS[k]||k; if(ELEMENTS[nk]) state.inv[nk]=(state.inv[nk]||0)+sv.inv[k]; });
   }
 }catch(e){}
 drawThrottle();
 function save(){ try{ localStorage.setItem('nh_save',JSON.stringify({credits:state.credits,inv:state.inv,found:state.found,sys:state.sysSeed,up:state.up,cargo:state.cargo,taken:state.taken,boardGen:state.boardGen,delivered:state.delivered,
-  mods:state.mods,modsOwned:state.modsOwned,lic:state.lic,fuel:state.fuel,hull:state.hull,company:state.company,cleared:state.cleared,heat:state.heat,flares:state.flares,
+  mods:state.mods,modsOwned:state.modsOwned,lic:state.lic,fuel:state.fuel,hull:state.hull,company:state.company,hullSel:state.hullSel,fits:state.fits,fuelReserve:state.fuelReserve,cleared:state.cleared,heat:state.heat,flares:state.flares,
   food:state.food,rest:state.rest,rations:state.rations,fedT:state.fedT,restedT:state.restedT,needsOff:state.needsOff})); }catch(e){} }
 
 function toast(msg, cls){ if(typeof SND!=='undefined' && state.mode!=='title' && !(typeof AU!=='undefined' && AU.hush)){ if(cls==='life') SND.good(); else SND.blip(); } var el=document.createElement('div'); el.className='toast'+(cls?' '+cls:''); el.textContent=msg; $('toastWrap').appendChild(el); setTimeout(function(){ el.remove(); },2400); }
@@ -2263,7 +2264,7 @@ var UPGRADES=[
 function lvl(id){ return (state.up && state.up[id])||0; }
 function speedMul(){ return (1+.25*lvl('pulse'))*hullFactor(); }
 function scanRange(){ return 120+45*lvl('scan'); }
-function holdCap(){ return HOLD_CAPS[Math.min(lvl('hold'),HOLD_CAPS.length-1)]; }
+function holdCap(){ return HOLD_CAPS[hullTier()]; }
 function holdUsed(){ return state.cargo.reduce(function(a,c){ return a+c.crates; },0); }
 function fmt(n){ return Math.round(n).toLocaleString(); }
 
@@ -2287,8 +2288,9 @@ var MOD_SLOTS=[1,2,2,3], FUEL_PRICE=7, REPAIR_PRICE=[6,9,13,18];
 function modSlots(){ return MOD_SLOTS[hullTier()]; }
 function hasMod(id){ return state.mods.indexOf(id)>=0; }
 function hasLic(id){ return !!state.lic[id]; }
-function fuelCap(){ return Math.round([100,120,150,180][hullTier()]*(hasMod('tank')?1.6:1)); }
-function warpFuel(ly){ return Math.ceil(ly*.22*[1,1.12,1.25,1.4][hullTier()]); }
+var HULL_TANK=[100,120,150,180], HULL_BURN=[1,1.12,1.25,1.4], HANGAR_FEEL=['nimble, snaps into turns','responsive all-rounder','heavy, takes wide turns','very heavy, swings wide and coasts'];
+function fuelCap(){ return Math.round(HULL_TANK[hullTier()]*(hasMod('tank')?1.6:1)); }
+function warpFuel(ly){ return Math.ceil(ly*.22*HULL_BURN[hullTier()]); }
 function kindNeeds(kind){
   if(kind==='perishable' && !hasMod('reefer')) return 'NEEDS REEFER BAY';
   if(kind==='hazardous'){ if(!hasLic('hazmat')) return 'NEEDS HAZMAT LICENCE'; if(!hasMod('vault')) return 'NEEDS SHIELDED VAULT'; }
@@ -2875,6 +2877,18 @@ function renderTerminal(tab){
       '<span class="gauge"><span class="bar"><i style="width:'+Math.round(state.hull)+'%;background:'+(state.hull<35?'#ff5a3c':state.hull<65?'#ffb24d':'#7fe8ff')+'"></i></span></span></span>'+
       '<span class="acts"><button class="pri" data-act="repair"'+(dmg>=1&&state.credits>=ru?'':' disabled')+'>'+(dmg>=1?'REPAIR · '+fmt(Math.min(repCost,state.credits)):'PRISTINE')+'</button></span></div>';
   } else {
+    var owned=Math.min(lvl('hold'),3);
+    if(owned>=1){
+      var used2=holdUsed();
+      h+='<div class="st-sub">YOUR HANGAR · CHOOSE WHICH FREIGHTER TO FLY'+(state.fuelReserve>=1?' · '+Math.floor(state.fuelReserve)+' FUEL IN STATION TANKS':'')+'</div>';
+      for(var ht=0;ht<=owned;ht++){
+        var cur=ht===hullTier(), fits=used2<=HOLD_CAPS[ht];
+        h+='<div class="st-row upg'+(cur?' hangar-on':'')+'"><span class="nm">'+HULL_NAMES[ht]+(cur?'<span class="tag hi">FLYING</span>':'')+'<small>'+HULL_CLASS[ht]+' · '+HANGAR_FEEL[ht]+'</small>'+
+          '<small class="fx">'+HOLD_CAPS[ht]+' crates · '+MOD_SLOTS[ht]+' module slot'+(MOD_SLOTS[ht]>1?'s':'')+' · '+HULL_TANK[ht]+' fuel tank · warp burn ×'+HULL_BURN[ht].toFixed(2)+(ht>=2?' · can haul oversize':'')+'</small></span>'+
+          '<span class="acts">'+(cur?'<span class="maxed">IN USE</span>':'<button class="pri" data-act="hullsel" data-tier="'+ht+'"'+(fits?'':' disabled')+'>'+(fits?'FLY THIS':'HOLD TOO FULL')+'</button>')+'</span></div>';
+      }
+      h+='<div class="st-sub">UPGRADES</div>';
+    }
     UPGRADES.forEach(function(u){
       var l=lvl(u.id), max=u.costs.length, next=l<max?u.costs[l]:null, pips='';
       for(var i=0;i<max;i++) pips+='<i class="'+(i<l?'on':'')+'"></i>';
@@ -2909,7 +2923,7 @@ $('stationPanel').addEventListener('click',function(e){
     var pr=priceAt(el,loc); state.inv[el]=q-n; state.credits+=n*pr; toast('SOLD '+n+' '+el+' · +'+fmt(n*pr)+' UNITS'); }
   else if(act==='buy'){ var u=UPGRADES.filter(function(x){ return x.id===t.dataset.id; })[0], l=lvl(u.id), c=u.costs[l];
     if(c==null||state.credits<c) return; state.credits-=c; state.up[u.id]=l+1;
-    if(u.id==='hold'){ swapPlayerHull(); toast('NEW HULL \u00b7 '+HULL_NAMES[hullTier()]+' \u00b7 '+holdCap()+' CRATE HOLD','life'); } else toast(u.name+' · LEVEL '+(l+1)+' INSTALLED'); }
+    if(u.id==='hold'){ state.hullSel=null; swapPlayerHull(); toast('NEW HULL \u00b7 '+HULL_NAMES[hullTier()]+' \u00b7 '+holdCap()+' CRATE HOLD','life'); } else toast(u.name+' · LEVEL '+(l+1)+' INSTALLED'); }
   else if(act==='fuel25'||act==='fuelfill'){ var fu=fuelUnit(loc), want=Math.max(0,fuelCap()-state.fuel); if(act==='fuel25') want=Math.min(25,want);
     var n2=Math.min(want,Math.floor(state.credits/fu)); if(n2<=0) return; var cst=Math.ceil(n2*fu); state.credits-=cst; state.fuel+=n2; toast('REFUELLED +'+Math.round(n2)+' · −'+fmt(cst)+' UNITS'); }
   else if(act==='repair'){ var ru=repairUnit(loc), pts=Math.min(100-state.hull,Math.floor(state.credits/ru)); if(pts<=0) return;
@@ -2939,6 +2953,16 @@ $('stationPanel').addEventListener('click',function(e){
   else if(act==='bed'){ sleep('paid',loc); }
   else if(act==='cab'){ sleep('cab',loc); }
   else if(act==='needs'){ state.needsOff=!state.needsOff; if(state.needsOff){ state.blinkT=0; } toast(state.needsOff?'RELAXED MODE · PILOT NEEDS OFF':'PILOT NEEDS ON'); }
+  else if(act==='hullsel'){ var nt=+t.dataset.tier; if(nt>Math.min(lvl('hold'),3) || holdUsed()>HOLD_CAPS[nt]) return;
+    // each hull keeps its own module fit-out, and spare fuel waits in the station tanks
+    var ot=hullTier(); state.fits=state.fits||{}; state.fits[ot]=state.mods.slice();
+    state.hullSel=nt;
+    var want=(state.fits[nt]||state.mods).filter(function(id){ return state.modsOwned[id]; }), dropped=0;
+    state.mods=want.slice(0,MOD_SLOTS[nt]); dropped=want.length-state.mods.length;
+    var cap=fuelCap(); state.fuelReserve=state.fuelReserve||0;
+    if(state.fuel>cap){ state.fuelReserve+=state.fuel-cap; state.fuel=cap; }
+    else { var top=Math.min(cap-state.fuel,state.fuelReserve); state.fuel+=top; state.fuelReserve-=top; }
+    swapPlayerHull(); toast('NOW FLYING THE '+HULL_NAMES[nt]+(dropped>0?' · '+dropped+' MODULE'+(dropped>1?'S':'')+' IN STORAGE':''),'life'); }
   else if(act==='clearrec'){ var hc=Math.ceil(heatOf(SYS.seed)*700); if(state.credits<hc) return; state.credits-=hc; setHeat(SYS.seed,0); toast('RECORD CLEARED IN '+SYS.name,'life'); }
   else if(act==='licbuy'){ var lc=LICENCES.filter(function(x){ return x.id===t.dataset.id; })[0]; if(!lc||state.credits<lc.cost) return;
     state.credits-=lc.cost; state.lic[lc.id]=1; toast(lc.name+' ISSUED','life'); }
@@ -3040,7 +3064,8 @@ function audioStart(){
   buildEngine(); musicInit(); setTimeout(cacheMusic,8000);
   Object.keys(SFX_FILES).forEach(function(k){
     fetch(SFX_FILES[k]).then(function(r){ return r.arrayBuffer(); }).then(function(ab){
-      c.decodeAudioData(ab,function(buf){ AU.buf[k]=buf; if(BEDS.indexOf(k)>=0) startBed(k); },function(){});
+      var pr=c.decodeAudioData(ab,function(buf){ AU.buf[k]=buf; if(BEDS.indexOf(k)>=0) startBed(k); },function(){});
+      if(pr && pr.catch) pr.catch(function(){});
     }).catch(function(){});
   });
 }
