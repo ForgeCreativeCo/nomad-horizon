@@ -198,6 +198,17 @@ button:focus-visible{outline:2px solid var(--cyan);outline-offset:3px;}
 .gauge{display:flex;align-items:center;gap:.5rem;margin-top:.3rem;} .gauge .bar{flex:1;width:auto;height:.4rem;} .gauge .bar i{display:block;height:100%;border-radius:99px;}
 #fuFill{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,#ffb24d,#ffd08a);} #fuFill.low{background:#ff5a3c;}
 .st-tabs button{min-width:0;padding-left:.1rem;padding-right:.1rem;}
+.st-tabs.many button{font-size:.66rem;letter-spacing:.05em;}
+.co-head{display:flex;align-items:center;justify-content:space-between;gap:.6rem;padding:.7rem .85rem;border:1px solid rgba(255,178,77,.55);border-radius:.45rem;background:rgba(255,178,77,.07);}
+.co-head .nm{font-family:var(--font-display);font-weight:700;letter-spacing:.08em;font-size:1rem;}
+.co-head small{display:block;font-family:var(--font-mono);font-size:.6rem;letter-spacing:.1em;color:var(--ink-dim);margin-top:.15rem;}
+.co-head button{font-family:var(--font-mono);font-size:.66rem;letter-spacing:.12em;color:#170c02;background:var(--amber);border:none;border-radius:.3rem;padding:.4rem .8rem;cursor:pointer;}
+.co-head button:disabled{opacity:.4;cursor:default;}
+.co-bank{font-family:var(--font-mono);color:var(--amber);font-size:1.05rem;font-variant-numeric:tabular-nums;}
+.co-input{width:100%;box-sizing:border-box;font:inherit;font-family:var(--font-display);font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--ink);
+  background:rgba(255,255,255,.05);border:1px solid var(--line);border-radius:.35rem;padding:.6rem .7rem;margin:.2rem 0 .5rem;}
+.st-row .acts.wrap{flex-wrap:wrap;justify-content:flex-end;}
+.co-log{font-family:var(--font-mono);font-size:.62rem;letter-spacing:.05em;color:var(--ink-dim);line-height:1.6;}
 .tag.k-fragile{color:#04121a;background:var(--cyan);} .tag.k-perishable{color:#0b1a04;background:#9dff6a;} .tag.k-hazardous{color:#fff;background:#d8402a;}
 #stationPanel{position:absolute;right:1rem;top:calc(1rem + env(safe-area-inset-top,0px));bottom:calc(1rem + env(safe-area-inset-bottom,0px));z-index:30;
   width:min(calc(100vw - 2rem),31rem);display:flex;flex-direction:column;gap:.6rem;padding:1rem;pointer-events:auto;background:rgba(6,11,22,.84);}
@@ -1881,7 +1892,7 @@ window.addEventListener('mousemove',function(e){ if(look.active&&look.id==='m'){
 window.addEventListener('mouseup',function(){ if(look.id==='m') look.active=false; });
 
 var keys={};
-window.addEventListener('keydown',function(e){ keys[e.code]=true;
+window.addEventListener('keydown',function(e){ if(e.target && e.target.tagName==='INPUT') return; keys[e.code]=true;
   if(e.code==='KeyE' && !$('promptBtn').hidden) $('promptBtn').click();
   if(e.code==='KeyF') doScan();
   if(e.code==='KeyM'){ if(mapOpen) closeMap(); else openMap(); } });
@@ -1905,20 +1916,20 @@ window.addEventListener('mouseup',function(){ setHold(false); });
 /* =========================================================================
    Game state + HUD
    ========================================================================= */
-var state={throttle:0, yawRate:0, pitchRate:0, mode:'title', yaw:Math.PI, pitch:0, vel:new THREE.Vector3(), energy:100, scan:1, credits:0, inv:{}, found:{}, sysSeed:0, up:{}, cargo:[], taken:{}, boardGen:{}, delivered:0, dock:null, mods:[], modsOwned:{}, lic:{}, fuel:null, hull:100,
+var state={throttle:0, yawRate:0, pitchRate:0, mode:'title', yaw:Math.PI, pitch:0, vel:new THREE.Vector3(), energy:100, scan:1, credits:0, inv:{}, found:{}, sysSeed:0, up:{}, cargo:[], taken:{}, boardGen:{}, delivered:0, dock:null, mods:[], modsOwned:{}, lic:{}, fuel:null, hull:100, company:null,
   pos:new THREE.Vector3(), vy:0, grounded:true, bob:0, fovKick:0, exposure:1, exposureTarget:1, t:0, warp:null};
 var OLD_KEYS={'CINDER REACH':'PYRITE','GLASSWATER':'CYANITE','VERDANT HOLLOW':'AMETHINE','PALE SILICATE':'AURUM'};
 try{
   var sv=JSON.parse(localStorage.getItem('nh_save')||'null');
   if(sv){
     state.credits=sv.credits||0; state.found=sv.found||{}; state.sysSeed=sv.sys||0; state.up=sv.up||{}; state.cargo=sv.cargo||[]; state.taken=sv.taken||{}; state.boardGen=sv.boardGen||{}; state.delivered=sv.delivered||0;
-    state.mods=sv.mods||[]; state.modsOwned=sv.modsOwned||{}; state.lic=sv.lic||{}; state.fuel=sv.fuel; state.hull=sv.hull==null?100:sv.hull;
+    state.mods=sv.mods||[]; state.modsOwned=sv.modsOwned||{}; state.lic=sv.lic||{}; state.fuel=sv.fuel; state.hull=sv.hull==null?100:sv.hull; state.company=sv.company||null;
     Object.keys(sv.inv||{}).forEach(function(k){ var nk=OLD_KEYS[k]||k; if(ELEMENTS[nk]) state.inv[nk]=(state.inv[nk]||0)+sv.inv[k]; });
   }
 }catch(e){}
 drawThrottle();
 function save(){ try{ localStorage.setItem('nh_save',JSON.stringify({credits:state.credits,inv:state.inv,found:state.found,sys:state.sysSeed,up:state.up,cargo:state.cargo,taken:state.taken,boardGen:state.boardGen,delivered:state.delivered,
-  mods:state.mods,modsOwned:state.modsOwned,lic:state.lic,fuel:state.fuel,hull:state.hull})); }catch(e){} }
+  mods:state.mods,modsOwned:state.modsOwned,lic:state.lic,fuel:state.fuel,hull:state.hull,company:state.company})); }catch(e){} }
 
 function toast(msg, cls){ var el=document.createElement('div'); el.className='toast'+(cls?' '+cls:''); el.textContent=msg; $('toastWrap').appendChild(el); setTimeout(function(){ el.remove(); },2400); }
 function renderInv(){
@@ -2239,6 +2250,55 @@ function wearHull(pct){ var before=state.hull; state.hull=Math.max(0,state.hull-
   if(before>=35 && state.hull<35) toast('HULL AT '+Math.round(state.hull)+'% · REPAIR AT A STATION OR TOWN'); renderInv(); }
 function hullFactor(){ return state.hull>=50?1:lerp(.7,1,state.hull/50); }
 
+/* trucking company: fleet ships run contracts on their own and pay into the company account,
+   in real time and (at half rate, up to 8 hours) while the game is closed */
+var FLEET_PRICE=[4000,9000,18000,32000], FLEET_RATE=[40,70,110,160], OFFICE_CAP=[2,4,6], OFFICE_COST=[6000,15000], FOUND_COST=5000;
+var PILOT_GRADES={rookie:{name:'ROOKIE', skill:.85, cut:.18, fee:300}, veteran:{name:'VETERAN', skill:1, cut:.22, fee:1200}, ace:{name:'ACE', skill:1.2, cut:.26, fee:3000}};
+var ROUTES={local:{name:'LOCAL RUNS', mult:1, wear:.25, len:4, risk:.05}, long:{name:'LONG HAUL', mult:1.55, wear:.5, len:10, risk:.1}};
+var PILOT_FIRST=['ARI','BEX','CORA','DMITRI','EZRA','FEN','GALE','HOLLIS','IVO','JUNO','KAI','LIOR','MARA','NIKO','ODA','PELL','QUINN','RHEA','SOLLY','TAM','UMA','VEX','WREN','YARA','ZED'];
+var fleetAway=null, coConfirm=null;
+function fleetNet(s){ if(!s.pilot || s.cond<=0) return 0; var P=PILOT_GRADES[s.pilot.grade], R=ROUTES[s.route]; return FLEET_RATE[s.tier]*R.mult*P.skill*(1-P.cut)*(.6+.4*s.cond/100); }
+function fleetStatus(s){ return s.cond<=0?'GROUNDED':!s.pilot?'NO PILOT':(s.runT<ROUTES[s.route].len*.25?'LOADING':'EN ROUTE'); }
+function fleetLog(msg){ var C=state.company; C.log.unshift(msg); if(C.log.length>8) C.log.length=8; }
+function simFleet(mins, eff, quiet){
+  var C=state.company; if(!C) return 0; var total=0;
+  C.ships.forEach(function(s){
+    var left=mins;
+    while(left>1e-6){
+      if(!s.pilot || s.cond<=0) break;
+      var R=ROUTES[s.route], step=Math.min(left,R.len-s.runT);
+      s.runT+=step; s.cond=Math.max(0,s.cond-R.wear*step); left-=step;
+      if(s.runT>=R.len-1e-6){
+        s.runT=0; s.runs++;
+        var P=PILOT_GRADES[s.pilot.grade], pay=fleetNet(s)*R.len*(.8+Math.random()*.4)*eff, roll=Math.random();
+        if(roll<R.risk/P.skill){ s.cond=Math.max(0,s.cond-15); pay*=.5; var m=s.name+' · BREAKDOWN · HULL '+Math.round(s.cond)+'%'; fleetLog(m); if(!quiet) toast('FLEET · '+m); }
+        else if(roll>1-.05*P.skill){ pay*=1.5; fleetLog(s.name+' · BONUS RUN · +'+fmt(pay)); }
+        pay=Math.round(pay); s.earned+=pay; C.bank+=pay; total+=pay;
+        if(s.cond<=0){ fleetLog(s.name+' · GROUNDED · NEEDS REPAIR'); if(!quiet) toast('FLEET · '+s.name+' GROUNDED · NEEDS REPAIR'); }
+      }
+    }
+  });
+  return total;
+}
+function fleetCatchUp(){
+  var C=state.company; if(!C) return;
+  var now=Date.now(), mins=(now-(C.last||now))/60000; C.last=now;
+  if(mins<=0) return;
+  if(mins>3){ var got=simFleet(Math.min(mins,480),.5,true); if(got>0) fleetAway=got; }
+  else simFleet(mins,1,false);
+}
+setInterval(function(){
+  if(!state.company) return;
+  fleetCatchUp();
+  if(fleetAway && state.mode!=='title'){ toast('WHILE YOU WERE AWAY · YOUR FLEET EARNED '+fmt(fleetAway)+' · COLLECT AT ANY STATION','life'); fleetAway=null; }
+  if(termLoc && stTab==='fleet' && state.company) renderTerminal();
+  save();
+},5000);
+function coInitials(name){ var w=name.split(/\s+/).filter(Boolean); return ((w[0]||'X')[0]+((w[1]||w[0]||'X')[w[1]?0:1]||'X')).toUpperCase(); }
+function pilotName(){ var r=Math.random; return PILOT_FIRST[Math.floor(r()*PILOT_FIRST.length)]+' '+genWord(rng(Math.floor(r()*1e9)+1),2).toUpperCase(); }
+function fleetTierAt(k, def){ var C=state.company; return C && C.ships[k]?C.ships[k].tier:def; }
+try{ if(state.company) fleetCatchUp(); }catch(e){ console.error(e); }
+
 /* freight locations in the current system: the station plus each town */
 function stationLoc(){ return {key:SYS.seed+':S', kind:'station', name:SYS.station.name, planet:-1, sys:SYS.seed, sysName:SYS.name}; }
 function siteLoc(sy, i, j){ var b=sy.biomes[i], st=planetTerrain(b).sites[j||0];
@@ -2475,9 +2535,9 @@ function buildStation(st, parent){
   var lane=[]; for(var li=0;li<12;li++){ var ll=new THREE.Mesh(new THREE.SphereGeometry(.4,8,6),new THREE.MeshBasicMaterial({color:new THREE.Color(.6,2.6,3.6)})); ll.position.set(BX[PLAYER_BERTH],PY+1,48+li*9); g.add(ll); lane.push(ll); }
   // berthed traffic: two parked freighters, one cycling in and out of berth 4
   var tr0=ihash((st.pos.x|0)+7,3), parked=[];
-  [0,2].forEach(function(bi,k){ if(Q.flora<1 && k>0) return; var h=buildHull((tr0+k)%4,false); h.scale.setScalar(HULL_SPACE); h.userData.flames.concat(h.userData.glows).forEach(function(f){ f.visible=false; });
+  [0,2].forEach(function(bi,k){ if(Q.flora<1 && k>0) return; var h=buildHull(fleetTierAt(k,(tr0+k)%4),false); h.scale.setScalar(HULL_SPACE); h.userData.flames.concat(h.userData.glows).forEach(function(f){ f.visible=false; });
     h.position.set(BX[bi],PY+hullGear(h)*.75+.4,28); h.rotation.y=Math.PI; g.add(h); parked.push({h:h, b:bi}); });
-  var inbound=buildHull((tr0+2)%4,false); inbound.scale.setScalar(HULL_SPACE); inbound.rotation.y=Math.PI; g.add(inbound);
+  var inbound=buildHull(fleetTierAt(2,(tr0+2)%4),false); inbound.scale.setScalar(HULL_SPACE); inbound.rotation.y=Math.PI; g.add(inbound);
   var traffic=[]; var orb=buildHull((tr0+3)%4,false); orb.scale.setScalar(.5); parent.add(orb); traffic.push({obj:orb, r:110, ph:1.2, sp:.1, tilt:.25});
   g.updateMatrixWorld(true);
   var mouthW=g.localToWorld(new THREE.Vector3(BX[PLAYER_BERTH],PY,42)), insideW=g.localToWorld(new THREE.Vector3(BX[PLAYER_BERTH],PY,28)), dirW=new THREE.Vector3(Math.sin(st.yaw),0,Math.cos(st.yaw));
@@ -2495,11 +2555,14 @@ function drawPierBoard(force){
   var dests=state.cargo.map(function(c){ return c.dest.name; }), mine=dests.length?dests[0]:'—';
   var r=rng(ihash(SYS.seed,77)), names=sysSiteLocs(SYS).map(function(l){ return l.name; }).concat(['KORVA DOCKS','VINDRA EXCHANGE']);
   var dockedHere=state.dock && state.dock.phase!=='approach';
+  var FS=state.company?state.company.ships:[];
+  function fl(k,def){ var f=FS[k]; return f && f.tier===(k<2?(P.parked[k]?P.parked[k].h.userData.tier:-1):P.inbound.userData.tier)?f:null; }
+  var f0=fl(0), f1=fl(1), f2=fl(2);
   var rows=[
-    ['1',HULL_NAMES[P.parked[0]?P.parked[0].h.userData.tier:0],names[Math.floor(r()*names.length)],'LOADING'],
+    ['1',f0?f0.name+' '+HULL_NAMES[f0.tier]:HULL_NAMES[P.parked[0]?P.parked[0].h.userData.tier:0],names[Math.floor(r()*names.length)],f0&&fleetStatus(f0)!=='LOADING'&&fleetStatus(f0)!=='EN ROUTE'?fleetStatus(f0):'LOADING'],
     ['2','YOU · '+HULL_NAMES[hullTier()],mine,dockedHere?(state.cargo.length?'LOADED':'DOCKED'):'ASSIGNED'],
-    ['3',P.parked[1]?HULL_NAMES[P.parked[1].h.userData.tier]:'—',P.parked[1]?names[Math.floor(r()*names.length)]:'—',P.parked[1]?'BOARDING':'OPEN'],
-    ['4',HULL_NAMES[P.inbound.userData.tier],'INBOUND',P.inPhase||'ON FINAL']];
+    ['3',P.parked[1]?(f1?f1.name+' '+HULL_NAMES[f1.tier]:HULL_NAMES[P.parked[1].h.userData.tier]):'—',P.parked[1]?names[Math.floor(r()*names.length)]:'—',P.parked[1]?(f1&&(fleetStatus(f1)==='GROUNDED'||fleetStatus(f1)==='NO PILOT')?fleetStatus(f1):'BOARDING'):'OPEN'],
+    ['4',f2?f2.name+' '+HULL_NAMES[f2.tier]:HULL_NAMES[P.inbound.userData.tier],'INBOUND',P.inPhase||'ON FINAL']];
   x.font='34px "Share Tech Mono", monospace';
   rows.forEach(function(row,i){ var y=150+i*86; x.fillStyle=i===1?'#132033':(i%2?'#0b1220':'#08101a'); x.fillRect(36,y-50,952,74);
     x.fillStyle=i===1?'#7fe8ff':'#eef4fb'; x.fillText('BERTH '+row[0],52,y); x.fillText(row[1].slice(0,16),250,y); x.fillText(row[2].slice(0,16),560,y);
@@ -2624,7 +2687,8 @@ function openTerminal(loc){
   closeMap(); termLoc=loc;
   $('stEye').textContent=(loc.kind==='station'?'DOCKED':'LANDED')+' · '+(loc.kind==='station'?SYS.name:loc.pname+' · '+SYS.name);
   $('stName').textContent=loc.name;
-  var tabs=loc.kind==='station'?['cargo','trade','services','upgrades']:['cargo','trade','services'];
+  var tabs=loc.kind==='station'?['cargo','trade','services','upgrades','fleet']:['cargo','trade','services'];
+  $('stTabs').classList.toggle('many',tabs.length>4); coConfirm=null;
   $('stTabs').innerHTML=tabs.map(function(t){ return '<button type="button" role="tab" data-tab="'+t+'">'+t.toUpperCase()+'</button>'; }).join('');
   $('undockBtn').textContent=loc.kind==='station'?'UNDOCK':'LEAVE TERMINAL';
   $('stationPanel').hidden=false; showFlightControls(false); setPrompt(null);
@@ -2682,6 +2746,40 @@ function renderTerminal(tab){
         '<span class="nm">'+el+tg+'<small>'+pr+' units each</small></span><span class="qty">&times;'+q+'</span>'+
         '<span class="acts"><button data-act="sell1" data-el="'+el+'"'+(q?'':' disabled')+'>SELL 1</button><button class="pri" data-act="sellall" data-el="'+el+'"'+(q?'':' disabled')+'>ALL &middot; '+fmt(q*pr)+'</button></span></div>';
     });
+  } else if(stTab==='fleet'){
+    var C=state.company;
+    if(!C){
+      h+='<p class="st-note">Start your own trucking company. Buy freighters, hire pilots and they run contracts for you, paying into the company account even while you are offline (at half rate, up to 8 hours).</p>';
+      h+='<div class="st-row upg" style="display:block"><span class="nm">COMPANY NAME</span><input id="coName" class="co-input" maxlength="22" value="HORIZON FREIGHT" autocomplete="off">'+
+        '<button class="bigact" data-act="cofound"'+(state.credits>=FOUND_COST?'':' disabled')+'>REGISTER COMPANY · '+fmt(FOUND_COST)+' UNITS</button></div>';
+    } else {
+      var cap3=OFFICE_CAP[C.office], perHr=C.ships.reduce(function(a,sh){ return a+fleetNet(sh)*60; },0);
+      h+='<div class="co-head"><div><div class="nm">'+C.name+'</div><small>'+C.ships.length+'/'+cap3+' SHIPS · ~'+fmt(perHr)+' UNITS / HR</small></div>'+
+        '<div style="text-align:right"><div class="co-bank">'+fmt(C.bank)+'</div><button class="pri" data-act="cocollect"'+(C.bank>0?'':' disabled')+' style="margin-top:.3rem">COLLECT</button></div></div>';
+      C.ships.forEach(function(sh){
+        var R=ROUTES[sh.route], st3=fleetStatus(sh), rc=Math.ceil((100-sh.cond)*REPAIR_PRICE[sh.tier]*.8), acts='';
+        if(!sh.pilot) Object.keys(PILOT_GRADES).forEach(function(g){ var P=PILOT_GRADES[g]; acts+='<button'+(g==='veteran'?' class="pri"':'')+' data-act="fhire" data-id="'+sh.id+'" data-grade="'+g+'"'+(state.credits>=P.fee?'':' disabled')+'>HIRE '+P.name+' · '+fmt(P.fee)+'</button>'; });
+        else acts+='<button data-act="froute" data-id="'+sh.id+'">'+(sh.route==='local'?'→ LONG HAUL':'→ LOCAL')+'</button>';
+        if(sh.cond<99.5) acts+='<button class="pri" data-act="frepair" data-id="'+sh.id+'"'+(state.credits>=rc?'':' disabled')+'>REPAIR · '+fmt(rc)+'</button>';
+        acts+='<button data-act="fsell" data-id="'+sh.id+'">'+(coConfirm===sh.id?'CONFIRM · +'+fmt(FLEET_PRICE[sh.tier]/2):'SELL')+'</button>';
+        h+='<div class="st-row upg"><span class="nm">'+sh.name+' · '+HULL_NAMES[sh.tier]+'<span class="tag '+(st3==='GROUNDED'||st3==='NO PILOT'?'lock':'hi')+'">'+st3+'</span>'+
+          '<small>'+(sh.pilot?'Pilot '+sh.pilot.name+' ('+PILOT_GRADES[sh.pilot.grade].name+', takes '+Math.round(PILOT_GRADES[sh.pilot.grade].cut*100)+'%)':'No pilot hired')+' · '+R.name+' · earned '+fmt(sh.earned)+'</small>'+
+          '<small class="fx">~'+fmt(fleetNet(sh)*60)+' units/hr · hull '+Math.round(sh.cond)+'%</small>'+
+          '<span class="gauge"><span class="bar"><i style="width:'+Math.round(sh.cond)+'%;background:'+(sh.cond<35?'#ff5a3c':sh.cond<65?'#ffb24d':'#7fe8ff')+'"></i></span>'+
+          '<span class="bar"><i style="width:'+Math.round(sh.runT/R.len*100)+'%;background:#9dff6a"></i></span></span></span>'+
+          '<span class="acts wrap">'+acts+'</span></div>';
+      });
+      h+='<div class="st-sub">BUY A FREIGHTER'+(C.ships.length>=cap3?' · OFFICE FULL':'')+'</div>';
+      HULL_NAMES.forEach(function(nm,ti){
+        h+='<div class="st-row upg"><span class="nm">'+nm+'<small>'+HULL_CLASS[ti]+' · grosses ~'+fmt(FLEET_RATE[ti]*60)+' units/hr on local runs</small></span>'+
+          '<span class="acts"><button class="pri" data-act="fbuy" data-tier="'+ti+'"'+(state.credits>=FLEET_PRICE[ti]&&C.ships.length<cap3?'':' disabled')+'>'+fmt(FLEET_PRICE[ti])+' UNITS</button></span></div>';
+      });
+      h+='<div class="st-sub">HEAD OFFICE</div>';
+      h+='<div class="st-row upg"><span class="nm">OFFICE LEVEL '+(C.office+1)+'<small>Room for '+cap3+' ships'+(C.office<OFFICE_COST.length?' · next level fits '+OFFICE_CAP[C.office+1]:'')+'</small></span><span class="acts">'+
+        (C.office<OFFICE_COST.length?'<button class="pri" data-act="cooffice"'+(state.credits>=OFFICE_COST[C.office]?'':' disabled')+'>'+fmt(OFFICE_COST[C.office])+' UNITS</button>':'<span class="maxed">MAXED</span>')+'</span></div>';
+      h+='<p class="st-note">Local runs are steady and gentle on hulls. Long hauls pay about 55% more but wear ships twice as fast and break down more. Better pilots earn more and break down less, but take a bigger cut.</p>';
+      if(C.log.length) h+='<div class="st-sub">COMPANY LOG</div><div class="co-log">'+C.log.join('<br>')+'</div>';
+    }
   } else if(stTab==='services'){
     var R=serviceRates(loc), cap2=fuelCap(), need2=Math.max(0,cap2-state.fuel), fu=fuelUnit(loc), fillCost=Math.ceil(need2*fu);
     var dmg=100-state.hull, ru=repairUnit(loc), repCost=Math.ceil(dmg*ru);
@@ -2737,6 +2835,21 @@ $('stationPanel').addEventListener('click',function(e){
     toast(md.name+(fitted?' FITTED':' BOUGHT · NO FREE SLOT, KEPT IN STORAGE'),'life'); }
   else if(act==='modon'){ if(state.mods.length<modSlots() && !hasMod(t.dataset.id)) state.mods.push(t.dataset.id); }
   else if(act==='modoff'){ state.mods=state.mods.filter(function(x){ return x!==t.dataset.id; }); state.fuel=Math.min(state.fuel,fuelCap()); }
+  else if(act==='cofound'){ if(state.credits<FOUND_COST) return; var nm=(($('coName')||{}).value||'').toUpperCase().replace(/[^A-Z0-9 '&.-]/g,'').trim().slice(0,22)||'HORIZON FREIGHT';
+    state.credits-=FOUND_COST; state.company={name:nm, office:0, bank:0, ships:[], log:[], seq:1, last:Date.now()}; toast(nm+' REGISTERED','life'); }
+  else if(act==='cocollect'){ var C=state.company; if(!C||!C.bank) return; state.credits+=C.bank; toast('COLLECTED '+fmt(C.bank)+' UNITS FROM '+C.name,'life'); C.bank=0; }
+  else if(act==='cooffice'){ var C2=state.company, oc=OFFICE_COST[C2.office]; if(oc==null||state.credits<oc) return; state.credits-=oc; C2.office++; toast('HEAD OFFICE EXPANDED · ROOM FOR '+OFFICE_CAP[C2.office]+' SHIPS','life'); }
+  else if(act==='fbuy'){ var C3=state.company, ti=+t.dataset.tier; if(!C3||C3.ships.length>=OFFICE_CAP[C3.office]||state.credits<FLEET_PRICE[ti]) return;
+    state.credits-=FLEET_PRICE[ti]; var sid=coInitials(C3.name)+'-'+('0'+(C3.seq++)).slice(-2);
+    C3.ships.push({id:sid, name:sid, tier:ti, pilot:null, route:'local', cond:100, runT:0, runs:0, earned:0}); fleetLog(sid+' · '+HULL_NAMES[ti]+' JOINS THE FLEET'); toast(sid+' · '+HULL_NAMES[ti]+' BOUGHT · HIRE A PILOT TO START IT','life'); }
+  else if(act&&act.charAt(0)==='f'&&t.dataset.id&&state.company){
+    var C4=state.company, sh=C4.ships.filter(function(x){ return x.id===t.dataset.id; })[0]; if(!sh) return;
+    if(act==='fhire'){ var P=PILOT_GRADES[t.dataset.grade]; if(!P||state.credits<P.fee) return; state.credits-=P.fee; sh.pilot={name:pilotName(), grade:t.dataset.grade}; fleetLog(sh.name+' · HIRED '+sh.pilot.name+' ('+P.name+')'); toast(sh.pilot.name+' IS FLYING '+sh.name,'life'); }
+    else if(act==='froute'){ sh.route=sh.route==='local'?'long':'local'; sh.runT=0; }
+    else if(act==='frepair'){ var rc2=Math.ceil((100-sh.cond)*REPAIR_PRICE[sh.tier]*.8); if(state.credits<rc2) return; state.credits-=rc2; sh.cond=100; toast(sh.name+' REPAIRED'); }
+    else if(act==='fsell'){ if(coConfirm!==sh.id){ coConfirm=sh.id; renderTerminal(); return; }
+      coConfirm=null; state.credits+=FLEET_PRICE[sh.tier]/2; C4.ships=C4.ships.filter(function(x){ return x!==sh; }); fleetLog(sh.name+' · SOLD'); toast(sh.name+' SOLD · +'+fmt(FLEET_PRICE[sh.tier]/2)+' UNITS'); }
+  }
   else if(act==='licbuy'){ var lc=LICENCES.filter(function(x){ return x.id===t.dataset.id; })[0]; if(!lc||state.credits<lc.cost) return;
     state.credits-=lc.cost; state.lic[lc.id]=1; toast(lc.name+' ISSUED','life'); }
   else if(act==='accept'){ var o=boardOffers(loc).filter(function(x){ return x.id===t.dataset.id; })[0];
@@ -3308,6 +3421,7 @@ $('gfxBtn').addEventListener('click',function(){
 });
 
 $('enterBtn').addEventListener('click',function(){
+  if(fleetAway){ var fa=fleetAway; fleetAway=null; setTimeout(function(){ toast('WHILE YOU WERE AWAY · YOUR FLEET EARNED '+fmt(fa)+' · COLLECT AT ANY STATION','life'); },2500); }
   var t=$('title'); t.style.opacity=0; setTimeout(function(){ t.hidden=true; },900);
   $('hud').classList.add('on'); $('joywrap').classList.add('on'); $('actions').classList.add('on'); thWrap.classList.add('on'); setThrottle(.3);
   state.mode='space'; setModeUI('space');
