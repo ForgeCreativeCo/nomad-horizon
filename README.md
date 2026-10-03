@@ -45,6 +45,8 @@ Each freighter hull has its own turn rate and weight: the Skiff snaps into turns
 - **Seamless flight:** fly from space through the atmosphere to the ground and back with no loading screens.
 - **Freight contracts:** take standard, fragile, perishable and hazardous loads between the station and towns in each system; your hold has limited crate slots.
 - **Freighter progression:** start in the Skiff light courier (4 crates) and trade up through the Mule (6), Longhaul tractor-trailer (9) and Atlas heavy lifter (12) at any station; each hull handles heavier than the last.
+- **Cargo modules and licences:** fit a reefer bay (perishables), shock racks (fragile cargo takes less damage), a shielded vault (hazardous, with a hazmat licence) or an aux fuel tank. Bigger hulls have more module slots. An oversize permit unlocks 3–4 crate loads on Longhaul and Atlas hulls.
+- **Fuel and wear:** warps burn fuel (longer jumps and bigger hulls burn more). Bumps, atmosphere entries and jumps wear the hull, and a hull under 50% flies slower. Refuel and repair at any terminal; fuel depots sell the cheapest fuel.
 - **Space stations:** dock by autopilot in a hangar bay; trade, upgrade your ship and pick up contracts.
 - **Open planet surfaces:** each planet is about 3 × 3 km, streamed in tiles as you fly (full detail nearby, simpler tiles further out). Where you dive in from orbit decides where you arrive.
 - **Settlements:** 1–2 habitable planets per system, each with 2–4 towns (landing pad, cargo terminal, residents); every other planet has 1–2 outposts (mining camps, research outposts, fuel depots). Short-hop contracts run between towns on the same planet.
