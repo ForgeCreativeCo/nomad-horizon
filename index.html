@@ -249,6 +249,24 @@ button:focus-visible{outline:2px solid var(--cyan);outline-offset:3px;}
 .wp-meta{grid-column:2 / 4;font-family:var(--font-mono);font-size:.6rem;letter-spacing:.06em;color:var(--ink-dim);}
 #wpClose{align-self:center;margin-top:.2rem;font-family:var(--font-mono);font-size:.68rem;letter-spacing:.16em;color:var(--ink-dim);
   background:none;border:1px solid var(--line);border-radius:99px;padding:.55rem 1.4rem;cursor:pointer;}
+#radarWrap{pointer-events:auto;cursor:pointer;-webkit-tap-highlight-color:transparent;}
+#radarWrap .maptap{display:none;margin-top:.15rem;text-align:center;font-family:var(--font-mono);font-size:.5rem;letter-spacing:.2em;color:var(--ink-dim);}
+#radarWrap.planet .maptap{display:block;}
+#mapPanel{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:30;width:min(94vw,30rem);max-height:92%;overflow:auto;
+  padding:.9rem;pointer-events:auto;display:grid;grid-template-columns:1fr;gap:.55rem;background:rgba(6,11,22,.9);}
+body.mapopen #joywrap,body.mapopen #actions,body.mapopen #throttle{visibility:hidden;}
+#mapCv{width:100%;aspect-ratio:1/1;border-radius:.4rem;border:1px solid var(--line);display:block;background:#05080d;}
+#mpList{display:flex;flex-direction:column;gap:.4rem;min-width:0;}
+#mpList .wp-row{padding:.55rem .7rem;}
+.mp-ico{width:.8rem;height:.8rem;grid-row:span 2;clip-path:polygon(50% 0,100% 45%,82% 45%,82% 100%,18% 100%,18% 45%,0 45%);}
+.wp-row.wpt{border-color:rgba(127,232,255,.8);}
+#mpClose{justify-self:center;font-family:var(--font-mono);font-size:.68rem;letter-spacing:.16em;color:var(--ink-dim);
+  background:none;border:1px solid var(--line);border-radius:99px;padding:.55rem 1.4rem;cursor:pointer;}
+@media (orientation:landscape) and (max-height:620px){
+  #mapPanel{width:min(96vw,48rem);grid-template-columns:auto minmax(0,1fr);align-items:start;}
+  #mapPanel .wp-head{grid-column:1 / -1;}
+  #mapCv{width:auto;height:min(72vh,24rem);grid-row:2 / span 2;}
+  #mpList{overflow:auto;max-height:min(60vh,19rem);} }
 @media (max-height:430px){#fps{display:none;} #actions .actbtn{width:4.3rem;height:4.3rem;} #actions .actbtn.primary{width:5.2rem;height:5.2rem;}}
 @media (prefers-reduced-motion:reduce){#locBanner.show{animation-duration:3s;}}
 </style>
@@ -270,7 +288,7 @@ button:focus-visible{outline:2px solid var(--cyan);outline-offset:3px;}
     <div id="compassWrap" class="panel"><canvas id="compass" width="520" height="40"></canvas></div>
     <button id="pitchBtn" class="panel" type="button" aria-pressed="true">PITCH <b id="pitchName">INV</b></button>
     <button id="gfxBtn" class="panel" type="button">GFX <b id="gfxName">HIGH</b></button>
-    <div id="radarWrap"><canvas id="radar" width="200" height="200"></canvas><div id="radarCap"></div></div>
+    <div id="radarWrap" role="button" aria-label="Open planet map"><canvas id="radar" width="200" height="200"></canvas><div id="radarCap"></div><div class="maptap">TAP · MAP</div></div>
     <div id="fps"></div>
     <div id="navTags"></div>
     <div id="shipTag" hidden><span class="dia"></span><span class="lbl">SHIP <b id="shipTagDist">0m</b></span></div>
@@ -290,6 +308,12 @@ button:focus-visible{outline:2px solid var(--cyan);outline-offset:3px;}
       <div class="wp-title">Choose a destination</div>
       <div id="wpList"></div>
       <button id="wpClose" type="button">CANCEL</button>
+    </div>
+    <div id="mapPanel" class="panel" hidden>
+      <div class="wp-head">PLANET MAP &middot; <span id="mpPlanet"></span></div>
+      <canvas id="mapCv" width="512" height="512"></canvas>
+      <div id="mpList"></div>
+      <button id="mpClose" type="button">CLOSE</button>
     </div>
     <div id="locBanner"><div class="eyebrow" id="locEye">ENTERING ATMOSPHERE</div><div class="name" id="locName">—</div><div class="rule"></div><div class="meta" id="locMeta"></div></div>
   </div>
@@ -1070,16 +1094,212 @@ var sliceT=0;
 function sliceReset(){ sliceT=performance.now(); }
 function yieldMaybe(){ if(performance.now()-sliceT<9) return null; return new Promise(function(r){ setTimeout(function(){ sliceT=performance.now(); r(); },0); }); }
 
-var GRID_N=200, GRID_S=760;
+/* =========================================================================
+   Planet surfaces: a ~3 km open world streamed in 256 m tiles.
+   Near tiles are full detail with rocks, flora and crystals; the next ring
+   is a cheap low-detail mesh. Towns and outposts sit at fixed spots.
+   ========================================================================= */
+var WORLD_E=1450, SITE_E=1150, CS=256, CN_HI=64, CN_LO=16, FLAT_R=90, WATER_W=2400;
 function makeHeightFn(b, seed){
   var off=(seed%1000)*1.37+11;
   return function(x,z){
+    var cont=(fbm((x+off*3)*.0011,(z-off)*.0011,3)-.5)*b.hill*6;
     var hills=(fbm((x+off)*.0085,(z+off)*.0085,5)-.48)*b.hill*2.6;
-    var r=Math.sqrt(x*x+z*z);
-    var m=sstep(70,260,r+(vnoise(x*.01+off,z*.01)-.5)*80);
-    var rid=ridged((x-off)*.0058,(z+off)*.0058,5);
-    return hills + m*Math.pow(rid,1.6)*b.mount + (vnoise(x*.06+off,z*.06)-.5)*1.2;
+    var m=sstep(.5,.64,fbm((x-off*2)*.0017+3.1,(z+off)*.0017,3)+(vnoise(x*.01+off,z*.01)-.5)*.1);
+    var h=cont+hills+(vnoise(x*.06+off,z*.06)-.5)*1.2;
+    if(m>0) h+=m*Math.pow(ridged((x-off)*.0058,(z+off)*.0058,5),1.6)*b.mount;
+    return h;
   };
+}
+var OUTPOST_TYPES=[{label:'MINING CAMP', suf:' CAMP'},{label:'RESEARCH OUTPOST', suf:' RESEARCH'},{label:'FUEL DEPOT', suf:' FUEL DEPOT'}];
+/* height field + settlement sites for a planet (deterministic, cached, no GPU work) */
+function planetTerrain(b){
+  if(b._ter) return b._ter;
+  var H=makeHeightFn(b,b.seed), samp=[], i, j, k;
+  for(j=0;j<16;j++) for(i=0;i<16;i++) samp.push(H(-1300+i*173.3+37,-1300+j*173.3+11));
+  samp.sort(function(a,c){ return a-c; });
+  var lift=-samp[Math.floor((b.water?(b.type==='ocean'?.42:.22):.5)*samp.length)];
+  var r=rng(ihash(b.seed,5150)), hab=!!b.town, n=hab?2+Math.floor(r()*3):1+(r()<.5?1:0), sites=[], sep=hab?850:950;
+  for(var t=0;t<320 && sites.length<n;t++){
+    if(t===200) sep=600;
+    var x=(r()*2-1)*SITE_E, z=(r()*2-1)*SITE_E, ok=true;
+    for(k=0;k<sites.length;k++) if(Math.hypot(sites[k].x-x,sites[k].z-z)<sep) ok=false;
+    if(!ok) continue;
+    var h=H(x,z)+lift, lo=h, hi=h;
+    if(b.water && h<2.5) continue;
+    for(k=0;k<6;k++){ var a=k/6*TAU, hk=H(x+Math.cos(a)*45,z+Math.sin(a)*45)+lift; lo=Math.min(lo,hk); hi=Math.max(hi,hk); }
+    if(hi-lo>3+b.hill*.5 || (b.water && lo<.8)) continue;
+    sites.push({x:x, z:z, hs:b.water?Math.max(h,2.4):h});
+  }
+  if(!sites.length){ var h0=H(0,0)+lift; sites.push({x:0, z:0, hs:b.water?Math.max(h0,2.4):h0}); }
+  sites.forEach(function(s,j2){
+    s.j=j2; s.outpost=!hab;
+    if(hab){ s.label='TOWN'; s.name=j2===0?b.town.name:townName(ihash(b.seed,300+j2)); }
+    else { var rr=rng(ihash(b.seed,700+j2)), ty=OUTPOST_TYPES[Math.floor(rr()*OUTPOST_TYPES.length)]; s.label=ty.label; s.name=genWord(rr,2).toUpperCase()+ty.suf; }
+  });
+  b._ter={H:H, lift:lift, sites:sites};
+  return b._ter;
+}
+function siteHeight(T,x,z){
+  var h=T.H(x,z)+T.lift, s=T.sites, k, dx, dz, d2;
+  for(k=0;k<s.length;k++){ dx=x-s[k].x; dz=z-s[k].z; d2=dx*dx+dz*dz; if(d2<FLAT_R*FLAT_R) h=lerp(h,s[k].hs,1-sstep(TOWN_R-2,FLAT_R,Math.sqrt(d2))); }
+  return h;
+}
+function nearSite(T,x,z,r){ var s=T.sites; for(var k=0;k<s.length;k++){ var dx=x-s[k].x, dz=z-s[k].z; if(dx*dx+dz*dz<r*r) return true; } return false; }
+/* where on the surface you arrive, from the direction you dive into the planet (and back) */
+function surfFromNormal(n){ var lon=Math.atan2(n.x,n.z), lat=Math.asin(clamp(n.y,-1,1)); return {x:lon/Math.PI*WORLD_E, z:-lat/(Math.PI/2)*WORLD_E}; }
+function normalFromSurf(x,z){ var lon=x/WORLD_E*Math.PI, lat=-z/WORLD_E*Math.PI/2; return new THREE.Vector3(Math.sin(lon)*Math.cos(lat),Math.sin(lat),Math.cos(lon)*Math.cos(lat)); }
+
+function chunkHeight(c,x,z){
+  var N=c.N, W=N+1, fx=(x-c.x0)/c.step, fz=(z-c.z0)/c.step;
+  var ix=clamp(Math.floor(fx),0,N-1), iz=clamp(Math.floor(fz),0,N-1), tx=clamp(fx-ix,0,1), tz=clamp(fz-iz,0,1), h=c.hts;
+  var h00=h[iz*W+ix], h10=h[iz*W+ix+1], h01=h[(iz+1)*W+ix], h11=h[(iz+1)*W+ix+1];
+  if(tx+tz<=1) return h00+(h10-h00)*tx+(h01-h00)*tz;
+  return h11+(h01-h11)*(1-tx)+(h10-h11)*(1-tz);
+}
+/* a geometry that shares another's GPU buffers but has its own bounds, so instanced props cull per tile */
+function sharedGeo(base, sphere){
+  var g=new THREE.BufferGeometry(); g.index=base.index;
+  for(var k in base.attributes) g.attributes[k]=base.attributes[k];
+  g.boundingSphere=sphere; g.userData.shared=true; return g;
+}
+var CHUNK_C=new THREE.Color();
+function* chunkBuilder(s, ci, cj, N){
+  var b=s.biome, T=s.ter, A=s.assets, step=CS/N, x0=ci*CS, z0=cj*CS, W=N+3, hb=new Float32Array(W*W), i, j, k, t;
+  for(j=0;j<W;j++){ for(i=0;i<W;i++) hb[j*W+i]=siteHeight(T,x0+(i-1)*step,z0+(j-1)*step); if((j&7)===7) yield 0; }
+  var V=(N+1)*(N+1), P=4*N, NV=V+P, hi=N===CN_HI, wet=!!b.water, sites=T.sites;
+  var pos=new Float32Array(NV*3), nrm=new Float32Array(NV*3), col=new Float32Array(NV*3), uv=new Float32Array(NV*2), hts=new Float32Array(V);
+  var tmp=CHUNK_C, C=A.cols, peakH=b.mount*.55, tw=48/CS, hsum=0;
+  for(j=0;j<=N;j++){
+    for(i=0;i<=N;i++){
+      var o=j*(N+1)+i, x=x0+i*step, z=z0+j*step, h=hb[(j+1)*W+i+1];
+      hts[o]=h; hsum+=h; pos[o*3]=x; pos[o*3+1]=h; pos[o*3+2]=z;
+      var gx=hb[(j+1)*W+i+2]-hb[(j+1)*W+i], gz=hb[(j+2)*W+i+1]-hb[j*W+i+1], ny=2*step, nl=Math.sqrt(gx*gx+ny*ny+gz*gz);
+      nrm[o*3]=-gx/nl; nrm[o*3+1]=ny/nl; nrm[o*3+2]=-gz/nl;
+      uv[o*2]=i*step*tw; uv[o*2+1]=j*step*tw;
+      var slope=1-ny/nl;
+      tmp.copy(C.flat).lerp(C.flat2, fbm(x*.03+5,z*.03,3));
+      if(wet) tmp.lerp(C.sand, 1-sstep(.6,2.2,h));
+      tmp.lerp(C.rock, sstep(.14,.32,slope));
+      tmp.lerp(C.peak, sstep(peakH*.85,peakH*1.15,h+fbm(x*.05,z*.05,2)*10)*(1-sstep(.35,.6,slope)*.5));
+      for(k=0;k<sites.length;k++){ var sd=Math.hypot(x-sites[k].x,z-sites[k].z); if(sd<50) tmp.lerp(C.town,(1-sstep(26,50,sd))*.7); }
+      tmp.multiplyScalar(.82+fbm(x*.012+9,z*.012,3)*.36);
+      col[o*3]=tmp.r; col[o*3+1]=tmp.g; col[o*3+2]=tmp.b;
+    }
+    if((j&7)===7) yield 0;
+  }
+  // skirt: a short curtain round the edge hides cracks between detail levels
+  var per=new Array(P), pi=0;
+  for(i=0;i<N;i++) per[pi++]=i;
+  for(j=0;j<N;j++) per[pi++]=j*(N+1)+N;
+  for(i=N;i>0;i--) per[pi++]=N*(N+1)+i;
+  for(j=N;j>0;j--) per[pi++]=j*(N+1);
+  var drop=hi?5:12;
+  for(k=0;k<P;k++){ var sv=per[k], dv=V+k;
+    pos[dv*3]=pos[sv*3]; pos[dv*3+1]=pos[sv*3+1]-drop; pos[dv*3+2]=pos[sv*3+2];
+    nrm[dv*3]=nrm[sv*3]; nrm[dv*3+1]=nrm[sv*3+1]; nrm[dv*3+2]=nrm[sv*3+2];
+    col[dv*3]=col[sv*3]; col[dv*3+1]=col[sv*3+1]; col[dv*3+2]=col[sv*3+2];
+    uv[dv*2]=uv[sv*2]; uv[dv*2+1]=uv[sv*2+1]; }
+  var idx=new Uint16Array(N*N*6+P*12), wi=0;
+  for(j=0;j<N;j++) for(i=0;i<N;i++){ var a=j*(N+1)+i, bb=(j+1)*(N+1)+i, c1=a+1, dd=bb+1; idx[wi++]=a; idx[wi++]=bb; idx[wi++]=c1; idx[wi++]=c1; idx[wi++]=bb; idx[wi++]=dd; }
+  for(k=0;k<P;k++){ var pa=per[k], pb=per[(k+1)%P], sa=V+k, sb=V+(k+1)%P;
+    idx[wi++]=pa; idx[wi++]=pb; idx[wi++]=sa; idx[wi++]=sa; idx[wi++]=pb; idx[wi++]=sb;
+    idx[wi++]=pa; idx[wi++]=sa; idx[wi++]=pb; idx[wi++]=sa; idx[wi++]=sb; idx[wi++]=pb; }
+  var geo=new THREE.BufferGeometry();
+  geo.setAttribute('position',new THREE.BufferAttribute(pos,3)); geo.setAttribute('normal',new THREE.BufferAttribute(nrm,3));
+  geo.setAttribute('color',new THREE.BufferAttribute(col,3)); geo.setAttribute('uv',new THREE.BufferAttribute(uv,2));
+  geo.setIndex(new THREE.BufferAttribute(idx,1)); geo.computeBoundingSphere();
+  var grp=new THREE.Group(), mesh=new THREE.Mesh(geo,A.terrainMat); mesh.receiveShadow=true; mesh.castShadow=hi && Q.shadows>0; grp.add(mesh);
+  var c={key:ci+','+cj, ci:ci, cj:cj, N:N, x0:x0, z0:z0, step:step, hts:hts, group:grp, mesh:mesh, ims:[], res:[]};
+  if(!hi) return c;
+  yield 0;
+
+  // props, seeded per tile so they come back identical when the tile reloads
+  var sph=new THREE.Sphere(new THREE.Vector3(x0+CS/2,hsum/V,z0+CS/2),CS*.72+60);
+  var R=rng(ihash(ihash(b.seed,ci*7919+cj*104729+5),31)), dm=A.dummy, wl=wet?.6:-1e9;
+  function hAt(x,z){ return chunkHeight(c,x,z); }
+  function okAt(x,z,ms){ if(nearSite(T,x,z,TOWN_R+8)) return false; if(hAt(x,z)<wl) return false;
+    var dx=hAt(x+1.2,z)-hAt(x-1.2,z), dz=hAt(x,z+1.2)-hAt(x,z-1.2); return Math.sqrt(dx*dx+dz*dz)/2.4<ms; }
+  function rp(){ return 2+R()*(CS-4); }
+  function addIM(im){ im.castShadow=Q.shadows>0; im.receiveShadow=true; grp.add(im); c.ims.push(im); return im; }
+  var RC=Math.round(44*Math.max(.5,Q.flora)), rocks=addIM(new THREE.InstancedMesh(sharedGeo(A.rockGeo,sph),A.rockMat,RC)), n=0;
+  for(t=0;t<RC*3 && n<RC;t++){
+    var rx=x0+rp(), rz=z0+rp(); if(!okAt(rx,rz,.9)) continue;
+    var sz=.4+Math.pow(R(),3)*6.5;
+    dm.position.set(rx,hAt(rx,rz)-sz*.25,rz); dm.rotation.set((R()-.5)*.5,R()*TAU,(R()-.5)*.5); dm.scale.set(sz*(.8+R()*.6),sz*(.6+R()*.7),sz*(.8+R()*.6));
+    dm.updateMatrix(); rocks.setMatrixAt(n++,dm.matrix);
+  }
+  rocks.count=n;
+  yield 0;
+  var TC=Math.round(18*Q.flora*b.flora);
+  if(TC>0){
+    var trunks=addIM(new THREE.InstancedMesh(sharedGeo(A.trunkGeo,sph),A.trunkMat,TC));
+    var caps=addIM(new THREE.InstancedMesh(sharedGeo(A.capGeo,sph),A.capMat,TC));
+    var bulbs=addIM(new THREE.InstancedMesh(sharedGeo(A.bulbGeo,sph),A.bulbMat,TC*5)); bulbs.castShadow=false;
+    var tp=0, bp=0;
+    for(t=0;t<TC*5 && tp<TC;t++){
+      var fx=x0+rp(), fz=z0+rp(); if(!okAt(fx,fz,.35)) continue;
+      var th=3+R()*6, cw=1.6+R()*1.8, gy=hAt(fx,fz)-.2;
+      dm.position.set(fx,gy,fz); dm.rotation.set(0,R()*TAU,0); dm.scale.set(1+th*.05,th,1+th*.05); dm.updateMatrix(); trunks.setMatrixAt(tp,dm.matrix);
+      var lean=Math.sin(th*2.4)*.18*th, topX=fx+Math.cos(dm.rotation.y)*lean, topZ=fz-Math.sin(dm.rotation.y)*lean;
+      dm.position.set(topX,gy+th,topZ); dm.rotation.set((R()-.5)*.2,R()*TAU,(R()-.5)*.2); dm.scale.set(cw,cw,cw); dm.updateMatrix(); caps.setMatrixAt(tp,dm.matrix);
+      for(var bi=0;bi<5;bi++){ var ba=R()*TAU, bd=cw*(.5+R()*.4); dm.position.set(topX+Math.cos(ba)*bd,gy+th-.15-R()*.5,topZ+Math.sin(ba)*bd); dm.rotation.set(0,0,0); var bs=.7+R()*.8; dm.scale.set(bs,bs*1.3,bs); dm.updateMatrix(); bulbs.setMatrixAt(bp++,dm.matrix); }
+      tp++;
+    }
+    trunks.count=tp; caps.count=tp; bulbs.count=bp;
+  }
+  // crystal deposits (remembered per planet, so collected ones stay gone)
+  var made=0;
+  for(t=0;t<24 && made<3;t++){
+    var cx=x0+rp(), cz=z0+rp(); if(!okAt(cx,cz,.5)) continue;
+    var key=c.key+':'+(made++), cg=new THREE.Group(); cg.position.set(cx,hAt(cx,cz),cz);
+    var cn=3+Math.floor(R()*4);
+    for(var q=0;q<cn;q++){ var cm=new THREE.Mesh(A.crysGeo,A.crysMat), sc2=.6+R()*.9; cm.scale.set(sc2,sc2,sc2);
+      cm.position.set((R()-.5)*1.1,.4*sc2,(R()-.5)*1.1); cm.rotation.set((R()-.5)*.8,R()*TAU,(R()-.5)*.8); cm.castShadow=true; cm.userData.crystal=true; cg.add(cm); }
+    var pool=new THREE.Mesh(A.poolGeo,A.poolMat); pool.rotation.x=-Math.PI/2; pool.position.y=.15; cg.add(pool);
+    var mk=new THREE.Sprite(A.markerMat); mk.scale.set(2.2,2.2,1); mk.position.y=4; cg.add(mk);
+    var ph=R()*TAU, rm=s.resMem[key];
+    if(!rm) rm=s.resMem[key]={key:key, x:cx, z:cz, scanned:false, collected:false, phase:ph};
+    if(rm.collected) continue;
+    rm.group=cg; rm.marker=mk; mk.visible=rm.scanned; grp.add(cg); c.res.push(rm);
+  }
+  return c;
+}
+function installChunk(s,c){
+  var old=s.chunks[c.key]; if(old) dropChunk(s,old);
+  s.chunks[c.key]=c; s.scene.add(c.group);
+  c.res.forEach(function(r){ s.resources.push(r); });
+}
+function dropChunk(s,c){
+  s.scene.remove(c.group); c.mesh.geometry.dispose();
+  c.ims.forEach(function(im){ im.dispose(); });
+  if(c.res.length) s.resources=s.resources.filter(function(r){ return c.res.indexOf(r)<0; });
+  if(s.chunks[c.key]===c) delete s.chunks[c.key];
+  if(s.lastC===c) s.lastC=null;
+}
+/* keep full-detail tiles under you and a low-detail ring beyond, building a little each frame */
+function updateChunks(s, fx, fz, sync){
+  var fci=Math.floor(fx/CS), fcj=Math.floor(fz/CS), k, c;
+  for(k in s.chunks){ c=s.chunks[k]; if(Math.max(Math.abs(c.ci-fci),Math.abs(c.cj-fcj))>3) dropChunk(s,c); }
+  if(s.job && Math.max(Math.abs(s.job.ci-fci),Math.abs(s.job.cj-fcj))>2) s.job=null;
+  var t0=performance.now();
+  for(;;){
+    if(!s.job){
+      var best=null, bd=1e9;
+      for(var dj=-2;dj<=2;dj++) for(var di=-2;di<=2;di++){
+        var ci=fci+di, cj=fcj+dj, ring=Math.max(Math.abs(di),Math.abs(dj)), need=ring<=1?CN_HI:CN_LO, have=s.chunks[ci+','+cj];
+        if(have && have.N>=need) continue;
+        // holes first (as quick low-detail tiles), then detail upgrades, nearest first
+        var build=(!have && !sync)?CN_LO:need, score=(have?100:0)+di*di+dj*dj;
+        if(score<bd){ bd=score; best=[ci,cj,build]; }
+      }
+      if(!best) break;
+      s.job={ci:best[0], cj:best[1], it:chunkBuilder(s,best[0],best[1],best[2])};
+    }
+    var r=s.job.it.next();
+    if(r.done){ installChunk(s,r.value); s.job=null; }
+    if(!sync && performance.now()-t0>3.5) break;
+  }
 }
 
 var surfaces={}, S=null;
@@ -1126,133 +1346,52 @@ async function buildSurface(idx){
   skyBody.userData.dir=new THREE.Vector3(Math.sin(b.sunAz+2.2)*.75,.42,Math.cos(b.sunAz+2.2)*.75).normalize();
   sbMesh.rotation.y=1.2; scene.add(skyBody);
 
-  // terrain heights (time-sliced per row)
-  var H=makeHeightFn(b,b.seed);
-  var N=GRID_N, step=GRID_S/N, half=GRID_S/2, NV=(N+1)*(N+1);
-  var heights=new Float32Array(NV), i, j, q;
-  for(j=0;j<=N;j++){ for(i=0;i<=N;i++) heights[j*(N+1)+i]=H(-half+i*step,-half+j*step); if((w=yieldMaybe())) await w; }
-  var h0=heights[(N/2)*(N+1)+N/2], waterLevel=0, lift=b.water?((b.type==='ocean'?1.2:3.2)-h0):-h0;
-  for(q=0;q<NV;q++) heights[q]+=lift;
-  var townHs=null;
-  if(b.town){
-    townHs=heights[(N/2)*(N+1)+N/2]; if(b.water) townHs=Math.max(townHs,waterLevel+2.4);
-    for(j=0;j<=N;j++) for(i=0;i<=N;i++){ var xx=-half+i*step, zz=-half+j*step, rr=Math.hypot(xx,zz); if(rr<80){ var o2=j*(N+1)+i; heights[o2]=lerp(heights[o2],townHs,1-sstep(TOWN_R-2,80,rr)); } }
-  }
-  var pos=new Float32Array(NV*3), uvs=new Float32Array(NV*2), cols=new Float32Array(NV*3);
-  for(j=0;j<=N;j++) for(i=0;i<=N;i++){ var o=j*(N+1)+i; pos[o*3]=-half+i*step; pos[o*3+1]=heights[o]; pos[o*3+2]=-half+j*step; uvs[o*2]=i/N; uvs[o*2+1]=j/N; }
-  var idxArr=new Uint32Array(N*N*6), wi=0;
-  for(j=0;j<N;j++) for(i=0;i<N;i++){ var a=j*(N+1)+i, bb=(j+1)*(N+1)+i, c=a+1, dd=bb+1; idxArr[wi++]=a; idxArr[wi++]=bb; idxArr[wi++]=c; idxArr[wi++]=c; idxArr[wi++]=bb; idxArr[wi++]=dd; }
-  var tg=new THREE.BufferGeometry();
-  tg.setAttribute('position',new THREE.BufferAttribute(pos,3)); tg.setAttribute('uv',new THREE.BufferAttribute(uvs,2)); tg.setIndex(new THREE.BufferAttribute(idxArr,1));
-  tg.computeVertexNormals();
-  if((w=yieldMaybe())) await w;
-  var nrm=tg.attributes.normal.array;
-  var cFlat=lin(b.flat), cFlat2=lin(b.flat2), cRock=lin(b.rock), cPeak=lin(b.peak), cSand=lin(b.sand), tmp=new THREE.Color();
-  var peakH=b.mount*.55, cTown=lin(b.sand).multiplyScalar(.62);
-  for(q=0;q<NV;q++){
-    var x=pos[q*3], y=pos[q*3+1], z=pos[q*3+2], slope=1-nrm[q*3+1];
-    tmp.copy(cFlat).lerp(cFlat2, fbm(x*.03+5,z*.03,3));
-    if(b.water) tmp.lerp(cSand, 1-sstep(waterLevel+.6,waterLevel+2.2,y));
-    tmp.lerp(cRock, sstep(.14,.32,slope));
-    tmp.lerp(cPeak, sstep(peakH*.85,peakH*1.15,y+fbm(x*.05,z*.05,2)*10)*(1-sstep(.35,.6,slope)*.5));
-    if(b.town) tmp.lerp(cTown,(1-sstep(26,50,Math.hypot(x,z)))*.7);
-    tmp.multiplyScalar(.82+fbm(x*.012+9,z*.012,3)*.36);
-    cols[q*3]=tmp.r; cols[q*3+1]=tmp.g; cols[q*3+2]=tmp.b;
-    if((q&511)===0 && (w=yieldMaybe())) await w;
-  }
-  tg.setAttribute('color',new THREE.BufferAttribute(cols,3));
-  var dA=detailAlbedo.clone(); dA.userData={}; dA.needsUpdate=true; dA.repeat.set(140,140);
-  var dN=detailNormal.clone(); dN.userData={}; dN.needsUpdate=true; dN.repeat.set(140,140);
-  var terrain=new THREE.Mesh(tg,new THREE.MeshStandardMaterial({vertexColors:true, map:dA, normalMap:dN, normalScale:new THREE.Vector2(.9,.9), roughness:.93, metalness:0, envMapIntensity:.8}));
-  terrain.receiveShadow=true; terrain.castShadow=Q.shadows>0; scene.add(terrain);
-
-  function heightAt(x,z){
-    var fx=(x+half)/step, fz=(z+half)/step;
-    var ix=clamp(Math.floor(fx),0,N-1), iz=clamp(Math.floor(fz),0,N-1);
-    var tx=clamp(fx-ix,0,1), tz=clamp(fz-iz,0,1);
-    var h00=heights[iz*(N+1)+ix], h10=heights[iz*(N+1)+ix+1], h01=heights[(iz+1)*(N+1)+ix], h11=heights[(iz+1)*(N+1)+ix+1];
-    if(tx+tz<=1) return h00+(h10-h00)*tx+(h01-h00)*tz;
-    return h11+(h01-h11)*(1-tx)+(h10-h11)*(1-tz);
-  }
-  function slopeAt(x,z){ var e=1.2; var dx=heightAt(x+e,z)-heightAt(x-e,z), dz=heightAt(x,z+e)-heightAt(x,z-e); return Math.sqrt(dx*dx+dz*dz)/(2*e); }
-
-  var water=null;
-  if(b.water){
-    var wn=waterNormal.clone(); wn.userData={}; wn.needsUpdate=true; wn.repeat.set(60,60);
-    water=new THREE.Mesh(new THREE.PlaneGeometry(GRID_S*3,GRID_S*3,1,1), new THREE.MeshStandardMaterial({color:lin(b.water), roughness:.06, metalness:.05,
-      normalMap:wn, normalScale:new THREE.Vector2(.35,.35), transparent:true, opacity:.88, envMapIntensity:1.6}));
-    water.rotation.x=-Math.PI/2; water.position.y=waterLevel; water.receiveShadow=true; scene.add(water);
-  }
-  if((w=yieldMaybe())) await w;
-
-  var town=b.town?buildTown(scene,b,townHs):null;
-  if((w=yieldMaybe())) await w;
-  var R=rng(ihash(b.seed,1000+idx));
-  function placeable(x,z,maxSlope){ if(b.town && Math.hypot(x,z)<TOWN_R+8) return false; var hh=heightAt(x,z); if(b.water && hh<waterLevel+.6) return false; return slopeAt(x,z)<maxSlope; }
-
-  // rocks
-  var rgeo=new THREE.IcosahedronGeometry(1,3), rp=rgeo.attributes.position, vv=new THREE.Vector3(), k;
+  // streamed terrain: materials and meshes shared by every tile
+  var ter=planetTerrain(b), waterLevel=0, k;
+  var dA=detailAlbedo.clone(); dA.userData={}; dA.needsUpdate=true; dA.repeat.set(1,1);
+  var dN=detailNormal.clone(); dN.userData={}; dN.needsUpdate=true; dN.repeat.set(1,1);
+  var terrainMat=new THREE.MeshStandardMaterial({vertexColors:true, map:dA, normalMap:dN, normalScale:new THREE.Vector2(.9,.9), roughness:.93, metalness:0, envMapIntensity:.8});
+  var rgeo=new THREE.IcosahedronGeometry(1,3), rp=rgeo.attributes.position, vv=new THREE.Vector3();
   for(k=0;k<rp.count;k++){ vv.fromBufferAttribute(rp,k); var nn=.7+fbm(vv.x*1.3+idx,vv.y*1.3+vv.z*1.1,4)*.6; vv.multiplyScalar(nn); rp.setXYZ(k,vv.x,vv.y*.7,vv.z); }
   rgeo.computeVertexNormals();
   var rA=detailAlbedo.clone(); rA.userData={}; rA.needsUpdate=true; rA.repeat.set(3,3);
   var rN=detailNormal.clone(); rN.userData={}; rN.needsUpdate=true; rN.repeat.set(3,3);
   var rockMat=new THREE.MeshStandardMaterial({color:lin(b.rock).multiplyScalar(1.6), map:rA, normalMap:rN, roughness:.88, metalness:.02});
-  var RC=Math.round(240*Math.max(.5,Q.flora)), rocks=new THREE.InstancedMesh(rgeo,rockMat,RC), dm=new THREE.Object3D(), placed=0, t;
-  for(t=0;t<RC*4 && placed<RC;t++){
-    var ang=R()*TAU, rr=10+Math.pow(R(),.7)*310, rx=Math.cos(ang)*rr, rz=Math.sin(ang)*rr;
-    if(!placeable(rx,rz,.9)) continue;
-    var s=.4+Math.pow(R(),3)*(rr>60?7:3.5);
-    dm.position.set(rx,heightAt(rx,rz)-s*.25,rz); dm.rotation.set((R()-.5)*.5,R()*TAU,(R()-.5)*.5); dm.scale.set(s*(.8+R()*.6),s*(.6+R()*.7),s*(.8+R()*.6));
-    dm.updateMatrix(); rocks.setMatrixAt(placed++,dm.matrix);
-  }
-  rocks.count=placed; rocks.castShadow=true; rocks.receiveShadow=true; scene.add(rocks);
-  if((w=yieldMaybe())) await w;
-
-  // alien flora
-  var TC=Math.round(80*Q.flora*b.flora);
   var trunkGeo=new THREE.CylinderGeometry(.18,.42,1,10,4); trunkGeo.translate(0,.5,0);
   var tpos=trunkGeo.attributes.position; for(k=0;k<tpos.count;k++){ var ty=tpos.getY(k); tpos.setX(k,tpos.getX(k)+Math.sin(ty*2.4)*.18*ty); }
   trunkGeo.computeVertexNormals();
   var capGeo=new THREE.SphereGeometry(1,24,12,0,TAU,0,Math.PI*.5); capGeo.scale(1,.42,1);
-  var trunks=new THREE.InstancedMesh(trunkGeo,new THREE.MeshStandardMaterial({color:lin(b.trunk), roughness:.8, normalMap:rN}),Math.max(1,TC));
-  var caps=new THREE.InstancedMesh(capGeo,new THREE.MeshStandardMaterial({color:lin(b.cap), roughness:.55, emissive:lin(b.cap), emissiveIntensity:.18, side:THREE.DoubleSide}),Math.max(1,TC));
-  var bulbs=new THREE.InstancedMesh(new THREE.SphereGeometry(.16,12,8),new THREE.MeshBasicMaterial({color:lin(b.bulb).multiplyScalar(5)}),Math.max(1,TC*5));
-  var tp=0, bp=0;
-  for(t=0;t<TC*5 && tp<TC;t++){
-    var a2=R()*TAU, r2=12+Math.pow(R(),.8)*300, fx=Math.cos(a2)*r2, fz=Math.sin(a2)*r2;
-    if(!placeable(fx,fz,.35)) continue;
-    var th=3+R()*6, cw=1.6+R()*1.8, gy=heightAt(fx,fz)-.2;
-    dm.position.set(fx,gy,fz); dm.rotation.set(0,R()*TAU,0); dm.scale.set(1+th*.05,th,1+th*.05); dm.updateMatrix(); trunks.setMatrixAt(tp,dm.matrix);
-    var lean=Math.sin(th*2.4)*.18*th, topX=fx+Math.cos(dm.rotation.y)*lean, topZ=fz-Math.sin(dm.rotation.y)*lean;
-    dm.position.set(topX,gy+th,topZ); dm.rotation.set((R()-.5)*.2,R()*TAU,(R()-.5)*.2); dm.scale.set(cw,cw,cw); dm.updateMatrix(); caps.setMatrixAt(tp,dm.matrix);
-    for(var bi=0;bi<5;bi++){ var ba=R()*TAU, bd=cw*(.5+R()*.4); dm.position.set(topX+Math.cos(ba)*bd,gy+th-.15-R()*.5,topZ+Math.sin(ba)*bd); dm.rotation.set(0,0,0); var bs=.7+R()*.8; dm.scale.set(bs,bs*1.3,bs); dm.updateMatrix(); bulbs.setMatrixAt(bp++,dm.matrix); }
-    tp++;
+  var crysCol=lin(b.crystal), crysGeo=new THREE.OctahedronGeometry(.5,0); crysGeo.scale(.6,2.2,.6);
+  var assets={terrainMat:terrainMat, rockGeo:rgeo, rockMat:rockMat,
+    trunkGeo:trunkGeo, trunkMat:new THREE.MeshStandardMaterial({color:lin(b.trunk), roughness:.8, normalMap:rN}),
+    capGeo:capGeo, capMat:new THREE.MeshStandardMaterial({color:lin(b.cap), roughness:.55, emissive:lin(b.cap), emissiveIntensity:.18, side:THREE.DoubleSide}),
+    bulbGeo:new THREE.SphereGeometry(.16,12,8), bulbMat:new THREE.MeshBasicMaterial({color:lin(b.bulb).multiplyScalar(5)}),
+    crysGeo:crysGeo, crysMat:new THREE.MeshStandardMaterial({color:crysCol, emissive:crysCol, emissiveIntensity:2.2, roughness:.12, metalness:.4, envMapIntensity:2}),
+    poolGeo:new THREE.PlaneGeometry(9,9), poolMat:new THREE.MeshBasicMaterial({map:glowTex, color:crysCol.clone().multiplyScalar(1.4), transparent:true, blending:THREE.AdditiveBlending, depthWrite:false}),
+    markerMat:new THREE.SpriteMaterial({map:glowTex, color:crysCol.clone().multiplyScalar(3), blending:THREE.AdditiveBlending, depthWrite:false, depthTest:false, transparent:true}),
+    dummy:new THREE.Object3D(),
+    cols:{flat:lin(b.flat), flat2:lin(b.flat2), rock:lin(b.rock), peak:lin(b.peak), sand:lin(b.sand), town:lin(b.sand).multiplyScalar(.62)}};
+  var chunks={};
+  function heightAt(x,z){
+    var c=surf.lastC;
+    if(!c || x<c.x0 || z<c.z0 || x>=c.x0+CS || z>=c.z0+CS){ c=chunks[Math.floor(x/CS)+','+Math.floor(z/CS)]; if(c && c.N===CN_HI) surf.lastC=c; }
+    if(c && c.N===CN_HI) return chunkHeight(c,x,z);
+    return siteHeight(ter,x,z);
   }
-  trunks.count=tp; caps.count=tp; bulbs.count=bp;
-  trunks.castShadow=caps.castShadow=true; trunks.receiveShadow=caps.receiveShadow=true;
-  scene.add(trunks); scene.add(caps); scene.add(bulbs);
+  function slopeAt(x,z){ var e=1.2; var dx=heightAt(x+e,z)-heightAt(x-e,z), dz=heightAt(x,z+e)-heightAt(x,z-e); return Math.sqrt(dx*dx+dz*dz)/(2*e); }
+
+  var water=null;
+  if(b.water){
+    var wn=waterNormal.clone(); wn.userData={}; wn.needsUpdate=true; wn.repeat.set(63,63);
+    water=new THREE.Mesh(new THREE.PlaneGeometry(WATER_W,WATER_W,1,1), new THREE.MeshStandardMaterial({color:lin(b.water), roughness:.06, metalness:.05,
+      normalMap:wn, normalScale:new THREE.Vector2(.35,.35), transparent:true, opacity:.88, envMapIntensity:1.6}));
+    water.rotation.x=-Math.PI/2; water.position.y=waterLevel; water.receiveShadow=true; scene.add(water);
+  }
   if((w=yieldMaybe())) await w;
 
-  // crystal deposits, spread across the whole landing region
-  var crysCol=lin(b.crystal);
-  var crysMat=new THREE.MeshStandardMaterial({color:crysCol, emissive:crysCol, emissiveIntensity:2.2, roughness:.12, metalness:.4, envMapIntensity:2});
-  var crysGeo=new THREE.OctahedronGeometry(.5,0); crysGeo.scale(.6,2.2,.6);
-  var poolMat=new THREE.MeshBasicMaterial({map:glowTex, color:crysCol.clone().multiplyScalar(1.4), transparent:true, blending:THREE.AdditiveBlending, depthWrite:false});
-  var markerMat=new THREE.SpriteMaterial({map:glowTex, color:crysCol.clone().multiplyScalar(3), blending:THREE.AdditiveBlending, depthWrite:false, depthTest:false, transparent:true});
-  var poolGeo=new THREE.PlaneGeometry(9,9), resources=[];
-  for(t=0;t<500 && resources.length<26;t++){
-    var ca=R()*TAU, cd=14+R()*290, cx=Math.cos(ca)*cd, cz=Math.sin(ca)*cd;
-    if(!placeable(cx,cz,.5)) continue;
-    var grp=new THREE.Group(), cy=heightAt(cx,cz); grp.position.set(cx,cy,cz);
-    var cn=3+Math.floor(R()*4);
-    for(var ci=0;ci<cn;ci++){ var cm=new THREE.Mesh(crysGeo,crysMat); var sc2=.6+R()*.9; cm.scale.set(sc2,sc2,sc2);
-      cm.position.set((R()-.5)*1.1,.4*sc2,(R()-.5)*1.1); cm.rotation.set((R()-.5)*.8,R()*TAU,(R()-.5)*.8); cm.castShadow=true; cm.userData.crystal=true; grp.add(cm); }
-    var pool=new THREE.Mesh(poolGeo,poolMat); pool.rotation.x=-Math.PI/2; pool.position.y=.15; grp.add(pool);
-    var mk=new THREE.Sprite(markerMat); mk.scale.set(2.2,2.2,1); mk.position.y=4; mk.visible=false; grp.add(mk);
-    scene.add(grp);
-    resources.push({group:grp, marker:mk, x:cx, z:cz, scanned:false, collected:false, phase:R()*TAU});
-  }
-
+  // towns (habitable worlds) or outposts (everywhere else)
+  var towns=ter.sites.map(function(site){ var T=buildTown(scene,b,site); T.key=SYS.seed+':T'+idx+(site.j?'.'+site.j:''); return T; });
+  if((w=yieldMaybe())) await w;
   // wind-blown grass
   var bladeGeo=new THREE.BufferGeometry(), bw=.035, bh=.75;
   var bpos=new Float32Array([-bw,0,0, bw,0,0, -bw*.7,.4*bh,0, bw*.7,.4*bh,0, -bw*.35,.75*bh,0, bw*.35,.75*bh,0, 0,bh,0]);
@@ -1292,13 +1431,41 @@ async function buildSurface(idx){
 
   var surf={idx:idx, biome:b, scene:scene, sky:sky, skyMat:skyMat, sun:sun, hemi:hemi, lamp:lamp, sunDir:sunDir, day:D, C:C, dayF:1,
     skyBody:skyBody, sbAtmo:sbAtmo, sbRing:sbRing, sbRingBase:sbRing?sbRing.material.uniforms.color.value.clone():null,
-    heightAt:heightAt, slopeAt:slopeAt, waterLevel:b.water?waterLevel:-1e9, water:water, resources:resources,
+    heightAt:heightAt, slopeAt:slopeAt, waterLevel:b.water?waterLevel:-1e9, water:water, resources:[], resMem:{},
+    ter:ter, chunks:chunks, job:null, lastC:null, assets:assets,
     grass:grass, grassU:grassUniforms, grassCenter:new THREE.Vector2(1e9,1e9), motes:motes, ship:parked, beacon:beacon,
-    baseFog:b.fog, bound:230, envRT:envRT, envMats:[], fauna:[], species:[], town:town};
+    baseFog:b.fog, bound:WORLD_E, envRT:envRT, envMats:[], fauna:[], species:[], towns:towns};
+  // one full tile up front so every terrain/prop shader is compiled before you arrive
+  var it=chunkBuilder(surf,0,0,CN_HI), st;
+  while(!(st=it.next()).done){ if((w=yieldMaybe())) await w; }
+  installChunk(surf,st.value);
+  surf.map=await bakePlanetMap(b, ter);
   if((w=yieldMaybe())) await w;
   spawnFauna(surf);
   scene.traverse(function(o){ var m=o.material; if(m && m.isMeshStandardMaterial && surf.envMats.indexOf(m)<0){ m.userData.envBase=m.envMapIntensity; surf.envMats.push(m); } });
+  [terrainMat,rockMat,assets.trunkMat,assets.capMat,assets.crysMat].forEach(function(m){ if(surf.envMats.indexOf(m)<0){ m.userData.envBase=m.envMapIntensity; surf.envMats.push(m); } });
   return surf;
+}
+/* low-res shaded relief for the planet map */
+async function bakePlanetMap(b, ter){
+  var MP=160, c=document.createElement('canvas'); c.width=c.height=MP;
+  var x=c.getContext('2d'), img=x.createImageData(MP,MP), hm=new Float32Array(MP*MP), i, j, w, cell=2*WORLD_E/MP;
+  for(j=0;j<MP;j++){ for(i=0;i<MP;i++) hm[j*MP+i]=siteHeight(ter,-WORLD_E+(i+.5)*cell,-WORLD_E+(j+.5)*cell); if((w=yieldMaybe())) await w; }
+  var cF=new THREE.Color(b.flat), cF2=new THREE.Color(b.flat2), cR=new THREE.Color(b.rock), cP=new THREE.Color(b.peak), cS=new THREE.Color(b.sand);
+  var cW=new THREE.Color(b.water||'#000'), cD=cW.clone().multiplyScalar(.45), t=new THREE.Color(), peakH=b.mount*.55;
+  for(j=0;j<MP;j++) for(i=0;i<MP;i++){
+    var h=hm[j*MP+i], hl=hm[j*MP+Math.max(0,i-1)], hu=hm[Math.max(0,j-1)*MP+i], o=(j*MP+i)*4;
+    if(b.water && h<0){ t.copy(cW).lerp(cD,sstep(0,-18,h)); }
+    else {
+      var sl=Math.hypot(h-hl,h-hu)/cell;
+      t.copy(cF).lerp(cF2,.5).lerp(cR,sstep(.15,.5,sl)*.8).lerp(cP,sstep(peakH,peakH*1.35,h)*.85);
+      if(b.water) t.lerp(cS,1-sstep(.4,2.5,h));
+      t.multiplyScalar(clamp(1+((h-hl)+(h-hu))*.022,.7,1.25));
+    }
+    img.data[o]=clamp(t.r*255,0,255); img.data[o+1]=clamp(t.g*255,0,255); img.data[o+2]=clamp(t.b*255,0,255); img.data[o+3]=255;
+  }
+  x.putImageData(img,0,0);
+  return c;
 }
 /* =========================================================================
    Settlements (habitable planets only)
@@ -1319,8 +1486,8 @@ function padTexture(){
 var TOWN_SUF=[' LANDING',' CROSSING',"'S REST",' DEPOT',' HAVEN',' POINT',' JUNCTION'];
 function townName(seed){ var r=rng(ihash(seed,8080)); return genWord(r,2).toUpperCase()+TOWN_SUF[Math.floor(r()*TOWN_SUF.length)]; }
 
-function buildTown(scene, b, hs){
-  var T=stationTextures(), R=rng(ihash(b.seed,2626)), g=new THREE.Group(); scene.add(g);
+function buildTown(scene, b, site){
+  var hs=site.hs, op=site.outpost, T=stationTextures(), R=rng(ihash(b.seed,2626+site.j*131)), g=new THREE.Group(); g.position.set(site.x,0,site.z); scene.add(g);
   var hull=new THREE.MeshStandardMaterial({color:0xd8dbe0, map:texRep(T.plate,2,2), metalness:.3, roughness:.55});
   var winMat=new THREE.MeshStandardMaterial({color:0xc8ccd2, map:texRep(T.plate,2,1), emissive:0xffffff, emissiveMap:T.win, emissiveIntensity:.4, metalness:.3, roughness:.55});
   var dark=new THREE.MeshStandardMaterial({color:0x2c3038, metalness:.7, roughness:.45});
@@ -1342,9 +1509,9 @@ function buildTown(scene, b, hs){
   var occupied=[{x:0,z:0,r:13},{x:kx,z:0,r:2.5},{x:-24,z:-24,r:5}], doors=[];
   function free(x,z,r){ for(var o=0;o<occupied.length;o++){ var q=occupied[o]; if(Math.hypot(x-q.x,z-q.z)<q.r+r+2) return false; } return true; }
   var placed=0;
-  for(var t=0;t<120 && placed<15;t++){
-    var ang=R()*TAU, rad=18+R()*26, x=Math.cos(ang)*rad, z=Math.sin(ang)*rad, w=R(), face=Math.atan2(-x,-z);
-    var type=w<.42?'hab':w<.64?'dome':w<.8?'tank':'stack', size=type==='hab'?6:type==='dome'?6:4;
+  for(var t=0;t<120 && placed<(op?7:15);t++){
+    var ang=R()*TAU, rad=18+R()*(op?14:26), x=Math.cos(ang)*rad, z=Math.sin(ang)*rad, w=R(), face=Math.atan2(-x,-z);
+    var type=op?(w<.2?'hab':w<.4?'dome':w<.75?'tank':'stack'):(w<.42?'hab':w<.64?'dome':w<.8?'tank':'stack'), size=type==='hab'?6:type==='dome'?6:4;
     if(!free(x,z,size)) continue;
     occupied.push({x:x,z:z,r:size}); placed++;
     var bg=new THREE.Group(); bg.position.set(x,hs,z); bg.rotation.y=face; g.add(bg);
@@ -1386,7 +1553,7 @@ function buildTown(scene, b, hs){
   var visorMat=new THREE.MeshBasicMaterial({color:new THREE.Color(.5,2,2.6)});
   if(!doors.length) doors.push(new THREE.Vector2(16,8));
   doors.push(new THREE.Vector2(kx+1.5,1.5), new THREE.Vector2(-6,11), new THREE.Vector2(8,-11));
-  for(var n=0;n<7;n++){
+  for(var n=0;n<(op?3:7);n++){
     var ng=new THREE.Group(), sm=new THREE.MeshStandardMaterial({color:suits[n%suits.length], roughness:.7});
     var bm=new THREE.Mesh(bodyGeo,sm); bm.position.y=.85; bm.castShadow=true; ng.add(bm);
     var hm=new THREE.Mesh(headGeo,sm); hm.position.y=1.58; ng.add(hm);
@@ -1397,23 +1564,25 @@ function buildTown(scene, b, hs){
   }
   // amber locator column, seen from the air
   var beacon=new THREE.Mesh(new THREE.CylinderGeometry(1,1,1,20,1,true), new THREE.ShaderMaterial({
-    uniforms:{color:{value:new THREE.Color(3.2,1.8,.4)}, time:{value:0}, fade:{value:1}},
+    uniforms:{color:{value:op?new THREE.Color(1.1,2.6,.9):new THREE.Color(3.2,1.8,.4)}, time:{value:0}, fade:{value:1}},
     vertexShader:'varying vec2 vUv; void main(){ vUv=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }',
     fragmentShader:'uniform vec3 color; uniform float time, fade; varying vec2 vUv; void main(){ float y=vUv.y; float a=pow(1.0-y,1.6)*(0.75+0.25*sin(time*2.0-y*40.0)); gl_FragColor=vec4(color*a*fade,1.0); }',
     transparent:true, blending:THREE.AdditiveBlending, depthWrite:false, side:THREE.DoubleSide}));
-  beacon.geometry.translate(0,.5,0); beacon.frustumCulled=false; beacon.position.set(0,hs,0); g.add(beacon);
-  return {name:b.town.name, group:g, pad:new THREE.Vector3(0,hs+.7,0), kiosk:new THREE.Vector3(kx,hs,0), hs:hs,
+  beacon.geometry.translate(0,.5,0); beacon.frustumCulled=false; beacon.position.set(site.x,hs,site.z); scene.add(beacon);
+  return {name:site.name, label:site.label, outpost:op, j:site.j, x:site.x, z:site.z, group:g,
+    pad:new THREE.Vector3(site.x,hs+.7,site.z), kiosk:new THREE.Vector3(site.x+kx,hs,site.z), hs:hs,
     lampMat:lampMat, lampBase:lampBase, padLampMat:padLampMat, winMat:winMat, red:red, npcs:npcs, doors:doors, beacon:beacon};
 }
 function updateTown(dt){
-  var T=S.town; if(!T) return;
-  var night=1-S.dayF, t=state.t;
+  var night=1-S.dayF, t=state.t, cx=camera.position.x, cz=camera.position.z;
+  S.towns.forEach(function(T){
+  var d=Math.hypot(cx-T.x,cz-T.z), w=Math.max(.5,d*.006);
+  T.beacon.scale.set(w,380,w); T.beacon.material.uniforms.fade.value=sstep(45,110,d); T.beacon.material.uniforms.time.value=t;
+  T.group.visible=d<950; if(!T.group.visible) return;
   T.lampMat.color.copy(T.lampBase).multiplyScalar(lerp(.7,4.2,night));
   T.winMat.emissiveIntensity=lerp(.35,2.4,night);
   T.padLampMat.color.setRGB(1.6,1,.3).multiplyScalar(((t*1.2)%1)<.5?1.6:.4);
   T.red.material.color.setRGB(4,.3,.2).multiplyScalar(((t*.7)%1)<.15?1:.08);
-  var d=Math.hypot(camera.position.x,camera.position.z), w=Math.max(.5,d*.006);
-  T.beacon.scale.set(w,380,w); T.beacon.material.uniforms.fade.value=sstep(45,110,d); T.beacon.material.uniforms.time.value=t;
   T.npcs.forEach(function(p){
     if(p.wait>0){ p.wait-=dt; return; }
     var dx=p.target.x-p.pos.x, dz=p.target.y-p.pos.y, dd=Math.hypot(dx,dz);
@@ -1421,7 +1590,15 @@ function updateTown(dt){
     p.pos.x+=dx/dd*p.speed*dt; p.pos.y+=dz/dd*p.speed*dt; p.ph+=dt*p.speed*6;
     p.obj.position.set(p.pos.x,T.hs+Math.abs(Math.sin(p.ph))*.06,p.pos.y); p.obj.rotation.y=Math.atan2(dx,dz);
   });
+  });
 }
+function nearestTown(x,z){
+  var best=null, bd=1e9; if(!S || !S.towns) return null;
+  S.towns.forEach(function(T){ var d=Math.hypot(x-T.x,z-T.z); if(d<bd){ bd=d; best=T; } });
+  return best?{T:best, d:bd}:null;
+}
+function townDest(T){ return activeDests().filter(function(d){ return d.loc.key===T.key; })[0]||null; }
+function townColor(T, dest){ return dest?'#ffb24d':T.outpost?'#b8f08a':'#e8d2a8'; }
 
 function disposeSurface(s){ if(!s) return; disposeObject(s.scene); if(s.envRT) s.envRT.dispose(); }
 
@@ -1437,12 +1614,13 @@ function updateGrass(force, focus){
   var cell=.7, per=Math.max(1,Math.round(2.4*S.biome.grassDensity));
   var cx0=Math.floor((p.x-radius)/cell), cx1=Math.floor((p.x+radius)/cell), cz0=Math.floor((p.z-radius)/cell), cz1=Math.floor((p.z+radius)/cell);
   var m=new THREE.Matrix4(), qt=new THREE.Quaternion(), sc=new THREE.Vector3(), ps=new THREE.Vector3(), eu=new THREE.Euler(), n=0, r2=radius*radius;
+  var nearTowns=S.ter.sites.filter(function(st){ return Math.hypot(st.x-p.x,st.z-p.z)<radius+50; }), nearTownsT={sites:nearTowns};
   for(var ci=cx0;ci<=cx1 && n<cnt;ci++) for(var cj=cz0;cj<=cz1 && n<cnt;cj++){
     for(var k=0;k<per && n<cnt;k++){
       var x=(ci+hashCell(ci,cj,k))*cell, z=(cj+hashCell(cj,ci,k+7))*cell;
       var dx=x-p.x, dz=z-p.z, d2=dx*dx+dz*dz; if(d2>r2) continue;
       var patch=vnoise(x*.08+3,z*.08); if(patch<.32) continue;
-      if(S.town && dx*0===0 && x*x+z*z<46*46) continue;
+      if(nearTowns.length && nearSite(nearTownsT,x,z,46)) continue;
       var y=S.heightAt(x,z); if(y<S.waterLevel+.5) continue;
       if(S.slopeAt(x,z)>.55) continue;
       var edge=1-sstep(r2*.55,r2,d2);
@@ -1577,10 +1755,11 @@ function buildCreature(sp){
   }
   return {root:root, legs:legs, wings:wings, tents:tents, head:head};
 }
-function faunaSpotOk(s,x,z){ return Math.hypot(x,z)<335 && !(s.town && Math.hypot(x,z)<TOWN_R+4) && s.heightAt(x,z)>s.waterLevel+.4 && s.slopeAt(x,z)<.65; }
+function inWorld(x,z,m){ return Math.abs(x)<WORLD_E-(m||0) && Math.abs(z)<WORLD_E-(m||0); }
+function faunaSpotOk(s,x,z){ return inWorld(x,z,15) && !nearSite(s.ter,x,z,TOWN_R+4) && s.heightAt(x,z)>s.waterLevel+.4 && s.slopeAt(x,z)<.65; }
 function placeCreature(s,c,cx,cz,spread,R){
   var air=c.sp.type==='flyer'||c.sp.type==='floater';
-  for(var t=0;t<16;t++){ var x=cx+(R()-.5)*2*spread, z=cz+(R()-.5)*2*spread; if(Math.hypot(x,z)<335 && (air||faunaSpotOk(s,x,z))){ c.pos.set(x,s.heightAt(x,z),z); c.home.set(x,z); return; } }
+  for(var t=0;t<16;t++){ var x=cx+(R()-.5)*2*spread, z=cz+(R()-.5)*2*spread; if(inWorld(x,z,15) && (air||faunaSpotOk(s,x,z))){ c.pos.set(x,s.heightAt(x,z),z); c.home.set(x,z); return; } }
   c.pos.set(cx,s.heightAt(cx,cz),cz); c.home.set(cx,cz);
 }
 function spawnFauna(s){
@@ -1608,7 +1787,7 @@ function updateFauna(dt, focus, viewYaw, onFoot){
   S.fauna.forEach(function(c){
     var sp=c.sp, dx=c.pos.x-focus.x, dz=c.pos.z-focus.z, d=Math.hypot(dx,dz);
     if(d>240){
-      if(!sp.re || t-sp.re.t>2){ var a=viewYaw+Math.PI+(R()-.5)*2.4, rr=80+R()*70; sp.re={t:t, x:clamp(focus.x+Math.sin(a)*rr,-320,320), z:clamp(focus.z+Math.cos(a)*rr,-320,320)}; }
+      if(!sp.re || t-sp.re.t>2){ var a=viewYaw+Math.PI+(R()-.5)*2.4, rr=80+R()*70; sp.re={t:t, x:clamp(focus.x+Math.sin(a)*rr,-WORLD_E+30,WORLD_E-30), z:clamp(focus.z+Math.cos(a)*rr,-WORLD_E+30,WORLD_E-30)}; }
       placeCreature(S,c,sp.re.x,sp.re.z,16,R); c.mode='idle'; c.timer=R()*3;
       dx=c.pos.x-focus.x; dz=c.pos.z-focus.z; d=Math.hypot(dx,dz);
     }
@@ -1697,7 +1876,8 @@ window.addEventListener('mouseup',function(){ if(look.id==='m') look.active=fals
 var keys={};
 window.addEventListener('keydown',function(e){ keys[e.code]=true;
   if(e.code==='KeyE' && !$('promptBtn').hidden) $('promptBtn').click();
-  if(e.code==='KeyF') doScan(); });
+  if(e.code==='KeyF') doScan();
+  if(e.code==='KeyM'){ if(mapOpen) closeMap(); else openMap(); } });
 window.addEventListener('keyup',function(e){ keys[e.code]=false; });
 
 var thWrap=$('throttle'), thTrack=$('thTrack'), thKnob=$('thKnob'), thFill=$('thFill'), thRev=$('thRev'), thVal=$('thVal'), thPtr=null;
@@ -1839,6 +2019,7 @@ function setModeUI(mode){
   $('enLabel').textContent=foot?'JETPACK':'PULSE'; btnA.textContent=foot?'JET':'BOOST'; $('btnScan').hidden=!foot;
   $('btnWarp').hidden=mode!=='space';
   if(mode!=='space') $('warpPanel').hidden=true;
+  $('radarWrap').classList.toggle('planet',mode!=='space'); if(mode==='space') closeMap();
   thWrap.hidden=foot; $('joyCap').textContent=foot?'MOVE':'STEER';
 }
 function setShipFlying(obj, flying){
@@ -1864,8 +2045,10 @@ function enterAtmosphere(p){
   state.entryNormal=ship.position.clone().sub(p.mesh.position).normalize();
   setDayFromElevation(S, state.entryNormal.dot(V3.copy(SPACE_SUN).sub(p.mesh.position).normalize()));
   state.mode='atmo'; setScene(S.scene); setModeUI('atmo');
-  var fx=Math.sin(state.yaw), fz=Math.cos(state.yaw);
-  S.ship.position.set(-fx*170,215,-fz*170);
+  var fx=Math.sin(state.yaw), fz=Math.cos(state.yaw), spot=surfFromNormal(state.entryNormal), lim=WORLD_E-260;
+  var tx=clamp(spot.x,-lim,lim), tz=clamp(spot.z,-lim,lim);
+  S.ship.position.set(tx-fx*170,215,tz-fz*170);
+  updateChunks(S, tx-fx*60, tz-fz*60, true);
   state.pitch=-.3;
   state.vel.set(fx,-.35,fz).normalize().multiplyScalar(clamp(state.vel.length()*.7,18,45));
   setShipFlying(S.ship,true);
@@ -1880,7 +2063,7 @@ function enterAtmosphere(p){
   showBanner('ENTERING ATMOSPHERE', S.biome.name, S.biome.meta);
 }
 function exitAtmosphere(){
-  var p=planets[S.idx], n=state.entryNormal||new THREE.Vector3(0,0,1);
+  var p=planets[S.idx], n=normalFromSurf(S.ship.position.x,S.ship.position.z); state.entryNormal=n;
   ship.position.copy(p.mesh.position).addScaledVector(n,p.radius*1.95);
   state.yaw=Math.atan2(n.x,n.z); state.pitch=Math.asin(clamp(n.y,-1,1))*.6; state.camYaw=null; state.camPitch=null;
   state.vel.copy(n).multiplyScalar(32);
@@ -2010,8 +2193,19 @@ function fmt(n){ return Math.round(n).toLocaleString(); }
 
 /* freight locations in the current system: the station plus each town */
 function stationLoc(){ return {key:SYS.seed+':S', kind:'station', name:SYS.station.name, planet:-1, sys:SYS.seed, sysName:SYS.name}; }
-function townLoc(i){ var b=SYS.biomes[i]; return {key:SYS.seed+':T'+i, kind:'town', name:b.town.name, planet:i, pname:b.name, sys:SYS.seed, sysName:SYS.name}; }
-function locations(){ var L=[stationLoc()]; SYS.biomes.forEach(function(b,i){ if(b.town) L.push(townLoc(i)); }); return L; }
+function siteLoc(sy, i, j){ var b=sy.biomes[i], st=planetTerrain(b).sites[j||0];
+  return {key:sy.seed+':T'+i+(j?'.'+j:''), kind:'town', name:st.name, planet:i, site:j||0, outpost:st.outpost, pname:b.name, sys:sy.seed, sysName:sy.name}; }
+function townLoc(i, j){ return siteLoc(SYS, i, j); }
+function sysSiteLocs(sy){ var L=[]; sy.biomes.forEach(function(b,i){ planetTerrain(b).sites.forEach(function(st,j){ L.push(siteLoc(sy,i,j)); }); }); return L; }
+function locations(){ return [stationLoc()].concat(sysSiteLocs(SYS)); }
+/* route length for pay: surface hops between two sites on one planet use the ground distance */
+function locDist(a, b){
+  if(a.kind==='town' && b.kind==='town' && a.planet===b.planet){
+    var st=planetTerrain(SYS.biomes[a.planet]).sites, p=st[a.site||0], q=st[b.site||0];
+    return 150+Math.hypot(p.x-q.x,p.z-q.z)*.6;
+  }
+  return locPos(a).distanceTo(locPos(b));
+}
 function locPos(loc){ return loc.kind==='station'?SYS.station.pos:SYS.planets[loc.planet].pos; }
 function priceAt(el, loc){
   var d=(SYS.station && SYS.station.demand[el])||1;
@@ -2032,18 +2226,17 @@ var KIND_TAG={standard:'', fragile:'FRAGILE', perishable:'PERISHABLE', hazardous
 var sysCache={};
 function sysInfo(seed){ if(!sysCache[seed]) sysCache[seed]=genSystem(seed); return sysCache[seed]; }
 function remoteLoc(seed, r){
-  var sy=sysInfo(seed), opts=[{key:seed+':S', kind:'station', name:sy.station.name, planet:-1, sys:seed, sysName:sy.name}];
-  sy.biomes.forEach(function(b,i){ if(b.town) opts.push({key:seed+':T'+i, kind:'town', name:b.town.name, planet:i, pname:b.name, sys:seed, sysName:sy.name}); });
+  var sy=sysInfo(seed), opts=[{key:seed+':S', kind:'station', name:sy.station.name, planet:-1, sys:seed, sysName:sy.name}].concat(sysSiteLocs(sy));
   return opts[Math.floor(r()*opts.length)];
 }
 function boardOffers(loc){
-  var g=state.boardGen[loc.key]||0, r=rng(ihash(ihash(SYS.seed+11,loc.planet+20),g*31+7));
+  var g=state.boardGen[loc.key]||0, r=rng(ihash(ihash(SYS.seed+11,loc.planet+20+(loc.site||0)*100),g*31+7));
   var others=locations().filter(function(l){ return l.key!==loc.key; }), out=[], nbs=neighbourSeeds(SYS.seed,3);
   if(!others.length) return out;
   for(var k=0;k<4;k++){
     var remote=r()<.3, dest, dist, ly=0;
     if(remote){ var ns=nbs[Math.floor(r()*nbs.length)]; dest=remoteLoc(ns,r); ly=lightYears(SYS.seed,ns); }
-    else { dest=others[Math.floor(r()*others.length)]; dist=locPos(loc).distanceTo(locPos(dest)); }
+    else { dest=others[Math.floor(r()*others.length)]; dist=locDist(loc,dest); }
     var w=r(), kind=w<.42?'standard':w<.64?'fragile':w<.84?'perishable':'hazardous';
     var names=CARGO_NAMES[kind], crates=r()<.35?2:1;
     var base=remote?(600+ly*5.5):(210+dist*.55);
@@ -2248,7 +2441,7 @@ function drawPierBoard(force){
   x.fillStyle='#ffb24d'; x.font='bold 46px "Share Tech Mono", monospace'; x.textAlign='left'; x.fillText('DEPARTURES · FREIGHT',36,66);
   x.fillStyle='#7fe8ff'; x.fillRect(36,88,952,3);
   var dests=state.cargo.map(function(c){ return c.dest.name; }), mine=dests.length?dests[0]:'—';
-  var r=rng(ihash(SYS.seed,77)), names=SYS.biomes.filter(function(b){ return b.town; }).map(function(b){ return b.town.name; }).concat(['KORVA DOCKS','VINDRA EXCHANGE']);
+  var r=rng(ihash(SYS.seed,77)), names=sysSiteLocs(SYS).map(function(l){ return l.name; }).concat(['KORVA DOCKS','VINDRA EXCHANGE']);
   var dockedHere=state.dock && state.dock.phase!=='approach';
   var rows=[
     ['1',HULL_NAMES[P.parked[0]?P.parked[0].h.userData.tier:0],names[Math.floor(r()*names.length)],'LOADING'],
@@ -2376,7 +2569,7 @@ function updateDock(dt){
 
 var stTab='cargo', termLoc=null;
 function openTerminal(loc){
-  termLoc=loc;
+  closeMap(); termLoc=loc;
   $('stEye').textContent=(loc.kind==='station'?'DOCKED':'LANDED')+' · '+(loc.kind==='station'?SYS.name:loc.pname+' · '+SYS.name);
   $('stName').textContent=loc.name;
   var tabs=loc.kind==='station'?['cargo','trade','upgrades']:['cargo','trade'];
@@ -2493,7 +2686,7 @@ function updateSpace(dt){
         ship.position.sub(best.mesh.position).setLength(best.radius*1.3).add(best.mesh.position); altVeil=1;
         if(state.t-holdToast>3){ holdToast=state.t; toast('CHARTING SURFACE… HOLD COURSE'); }
       }
-      if(bd<r*1.8 && approachHint!==best.index){ approachHint=best.index; toast(best.biome.name+(best.biome.town?' · TOWN: '+best.biome.town.name:'')+' · KEEP FLYING IN TO DESCEND'); }
+      if(bd<r*1.8 && approachHint!==best.index){ approachHint=best.index; var nst=planetTerrain(best.biome).sites.length; toast(best.biome.name+' · '+nst+' '+(best.biome.town?'TOWN':'OUTPOST')+(nst>1?'S':'')+' · AIM WHERE YOU WANT TO LAND'); }
     }
     if(bd>r*3) approachHint=-1;
   }
@@ -2596,7 +2789,8 @@ function updateWorld(dt, focus){
   S.sun.position.copy(focus).addScaledVector(S.sunDir,200); S.sun.target.position.copy(focus); S.sun.target.updateMatrixWorld();
   S.grassU.uTime.value=state.t;
   if(S.water){ var wn=S.water.material.normalMap; S.water.position.x=camera.position.x; S.water.position.z=camera.position.z;
-    wn.offset.set(state.t*.006+camera.position.x/(GRID_S*3)*60, state.t*.004-camera.position.z/(GRID_S*3)*60); }
+    wn.offset.set(state.t*.006+camera.position.x/WATER_W*63, state.t*.004-camera.position.z/WATER_W*63); }
+  updateChunks(S, focus.x, focus.z, false);
   state.cloudPunch=Math.max(0,(state.cloudPunch||0)-dt*.45);
   S.scene.fog.density=S.baseFog*(1+state.cloudPunch*state.cloudPunch*7);
   var mp=S.motes.geometry.attributes.position.array, mb=S.motes.userData.base, B=60, c=camera.position;
@@ -2611,14 +2805,14 @@ function updateWorld(dt, focus){
     r.group.children.forEach(function(ch,ci){ if(ch.userData.crystal) ch.position.y=ch.scale.y*.4+Math.sin(state.t*1.4+r.phase+ci)*.06; });
     r.marker.position.y=4+Math.sin(state.t*2+r.phase)*.3;
   });
-  if(S.town) updateTown(dt);
+  updateTown(dt);
   setSun(V3.copy(camera.position).addScaledVector(S.sunDir,1000), sstep(-.04,.06,S.sunDir.y));
 }
 function surfaceRadarItems(includeShip, focus){
   var items=[];
   S.fauna.forEach(function(c){ if(c.root.visible && Math.hypot(c.pos.x-focus.x,c.pos.z-focus.z)<170) items.push({x:c.pos.x, z:c.pos.z, color:state.found[c.sp.key]?c.sp.accent:'rgba(238,246,255,.75)', kind:'life'}); });
   S.resources.forEach(function(r){ if(r.scanned && !r.collected) items.push({x:r.x, z:r.z, color:S.biome.crystal, kind:'dot'}); });
-  if(S.town) items.push({x:0, z:0, color:activeDests().some(function(d){ return d.loc.kind==='town' && d.loc.planet===S.idx; })?'#ffb24d':'#e8d2a8', kind:'town'});
+  S.towns.forEach(function(T){ items.push({x:T.x, z:T.z, color:townColor(T,townDest(T)), kind:'town'}); });
   if(includeShip) items.push({x:S.ship.position.x, z:S.ship.position.z, color:'#7fe8ff', kind:'ship'});
   return items;
 }
@@ -2632,11 +2826,10 @@ function aimLamp(from, dir, k){
    ========================================================================= */
 function destMarkersSurface(from){
   var m=[];
-  if(S.town){
-    var isDest=activeDests().some(function(d){ return d.loc.kind==='town' && d.loc.planet===S.idx; });
-    var dt=Math.hypot(from.x,from.z);
-    m.push({bearing:bearingTo(-from.x,-from.z), color:isDest?'#ffb24d':'#e8d2a8', label:(isDest?'DROP · ':'')+(dt<2000?Math.round(dt)+'m':'')});
-  }
+  S.towns.forEach(function(T){
+    var isDest=!!townDest(T), dt=Math.hypot(T.x-from.x,T.z-from.z);
+    m.push({bearing:bearingTo(T.x-from.x,T.z-from.z), color:state.waypoint===T.key&&!isDest?'#7fe8ff':townColor(T,isDest), label:(isDest?'DROP · ':'')+(dt>=1000?(dt/1000).toFixed(1)+'km':Math.round(dt)+'m')});
+  });
   return m;
 }
 function updateAtmo(dt){
@@ -2657,7 +2850,8 @@ function updateAtmo(dt){
     f=flyShip(dt, sh, 1.5, 26*speedMul(), 62*speedMul());
     var g=Math.max(S.heightAt(sh.position.x,sh.position.z), S.waterLevel)+hullGear(sh)+.35;
     if(sh.position.y<g){ var hitV=-state.vel.y; sh.position.y=g; if(state.vel.y<0) state.vel.y*=-.1; cargoImpact(hitV); }
-    var hd=Math.hypot(sh.position.x,sh.position.z); if(hd>340){ sh.position.x*=340/hd; sh.position.z*=340/hd; }
+    if(!inWorld(sh.position.x,sh.position.z)){ sh.position.x=clamp(sh.position.x,-WORLD_E,WORLD_E); sh.position.z=clamp(sh.position.z,-WORLD_E,WORLD_E);
+      if(state.t-(state.edgeToast||0)>4){ state.edgeToast=state.t; toast('EDGE OF CHARTED SURFACE · CLIMB OUT TO LEAVE'); } }
     var cg=S.heightAt(camera.position.x,camera.position.z)+1.2; if(camera.position.y<cg) camera.position.y=cg;
     camera.lookAt(f.aim); camera.rotateZ(f.roll);
   }
@@ -2672,12 +2866,12 @@ function updateAtmo(dt){
   setVeil(Math.max(altVeil,veilHold), S.biome.horizon, altVeil*(1-altVeil)*4*climb);
   if(!state.landing && sh.position.y>300){ exitAtmosphere(); return; }
 
-  var spd=state.vel.length(), padD=S.town?Math.hypot(sh.position.x,sh.position.z):1e9;
+  var spd=state.vel.length(), nt=nearestTown(sh.position.x,sh.position.z), padD=nt?nt.d:1e9;
   if(!state.landing){
-    if(S.town && padD<34 && alt<45 && spd<24) setPrompt('LAND ON PAD',S.town.name,function(){ land(true); });
+    if(nt && padD<34 && alt<45 && spd<24) setPrompt('LAND ON PAD',nt.T.name,function(){ land(true); });
     else if(alt<14 && spd<18 && S.slopeAt(sh.position.x,sh.position.z)<.6 && S.heightAt(sh.position.x,sh.position.z)>S.waterLevel+.4) setPrompt('LAND','SET DOWN HERE',function(){ land(false); });
     else setPrompt(null);
-    if(alt>=14 && alt<60 && !state.landHint){ state.landHint=true; toast(S.town?'TOWN PAD MARKED ON RADAR · SLOW DOWN NEAR IT TO LAND':'SLOW DOWN NEAR THE GROUND TO LAND'); }
+    if(alt>=14 && alt<60 && !state.landHint){ state.landHint=true; toast(S.biome.town?'TOWN PADS MARKED ON RADAR · TAP RADAR FOR THE MAP':'OUTPOST PADS MARKED ON RADAR · TAP RADAR FOR THE MAP'); }
   }
   drawCompass(destMarkersSurface(sh.position).concat(S.resources.filter(function(r){ return r.scanned && !r.collected; }).map(function(r){ return {bearing:bearingTo(r.x-sh.position.x,r.z-sh.position.z), color:S.biome.crystal, label:''}; })));
   drawRadar(sh.position, state.yaw, 260, surfaceRadarItems(false, sh.position), 'ALT '+Math.round(alt)+'m');
@@ -2688,22 +2882,23 @@ function land(onPad){
   if(state.landing) return;
   var sh=S.ship; setPrompt(null);
   state.vel.set(0,0,0);
-  var x1=onPad?0:sh.position.x, z1=onPad?0:sh.position.z;
-  var y1=(onPad?S.town.pad.y:S.heightAt(x1,z1))+hullGear(sh);
-  state.landing={t:0, pad:!!onPad, x0:sh.position.x, y0:Math.max(sh.position.y,y1+4), z0:sh.position.z, x1:x1, y1:y1, z1:z1};
+  var nt=onPad?nearestTown(sh.position.x,sh.position.z):null, T=nt?nt.T:null; onPad=!!T;
+  var x1=onPad?T.x:sh.position.x, z1=onPad?T.z:sh.position.z;
+  var y1=(onPad?T.pad.y:S.heightAt(x1,z1))+hullGear(sh);
+  state.landing={t:0, pad:onPad, town:T, x0:sh.position.x, y0:Math.max(sh.position.y,y1+4), z0:sh.position.z, x1:x1, y1:y1, z1:z1};
 }
 function disembark(){
-  var sh=S.ship, onPad=state.landing && state.landing.pad; state.landing=null;
+  var sh=S.ship, padT=state.landing && state.landing.pad?state.landing.town:null, onPad=!!padT; state.landing=null;
   setShipFlying(sh,false);
   var right=new THREE.Vector3(-Math.cos(state.yaw),0,Math.sin(state.yaw));
   var off=hullBeam(sh)/2+2.5, px=sh.position.x+right.x*off, pz=sh.position.z+right.z*off;
-  var gy=onPad?S.town.pad.y:Math.max(S.heightAt(px,pz),S.waterLevel-.6);
+  var gy=onPad?padT.pad.y:Math.max(S.heightAt(px,pz),S.waterLevel-.6);
   state.pos.set(px, gy+1.7, pz); state.vy=0; state.grounded=true; state.pitch=-.05;
   state.camFrom={p:camera.position.clone(), q:camera.quaternion.clone(), t:1};
   state.mode='surface'; setModeUI('surface');
   camera.fov=68; camera.updateProjectionMatrix(); finalPass.uniforms.boost.value=0; state.fovKick=0;
   updateGrass(true);
-  if(onPad){ setTimeout(function(){ if(state.mode==='surface' && S && S.town) openTerminal(townLoc(S.idx)); },900); }
+  if(onPad){ setTimeout(function(){ if(state.mode==='surface' && S) openTerminal(townLoc(S.idx,padT.j)); },900); }
   else if(!state.landedHere){ state.landedHere=true; toast('SHIP PARKED · FOLLOW THE BEACON OR RADAR TO RETURN'); }
 }
 function board(){
@@ -2741,9 +2936,9 @@ function updateSurface(dt){
   var mx=(-inp.y*fx + inp.x*rx)*speed, mz=(-inp.y*fz + inp.x*rz)*speed;
   var p=state.pos;
   p.x+=mx*dt; p.z+=mz*dt;
-  var d0=Math.hypot(p.x,p.z); if(d0>320){ p.x*=320/d0; p.z*=320/d0; }
-  var gh=Math.max(S.heightAt(p.x,p.z), S.waterLevel-.6);
-  if(S.town && Math.hypot(p.x,p.z)<10.2) gh=Math.max(gh,S.town.pad.y);
+  p.x=clamp(p.x,-WORLD_E,WORLD_E); p.z=clamp(p.z,-WORLD_E,WORLD_E);
+  var gh=Math.max(S.heightAt(p.x,p.z), S.waterLevel-.6), nt=nearestTown(p.x,p.z);
+  if(nt && nt.d<10.2) gh=Math.max(gh,nt.T.pad.y);
   var ground=gh+1.7;
   var jet=inp.hold && state.energy>1;
   if(jet){ state.vy=Math.min(state.vy+dt*(26+3*lvl('jet')),9+1.5*lvl('jet')); state.energy=Math.max(0,state.energy-dt*22*(1-.25*lvl('jet'))); state.grounded=false; }
@@ -2792,11 +2987,63 @@ function updateSurface(dt){
   shipTag(dShip>boardR && !termLoc ? {pos:V3.copy(sp).add(new THREE.Vector3(0,hullTop(S.ship)+1.2,0)), dist:dShip} : null);
 
   if(termLoc) setPrompt(null);
-  else if(S.town && Math.hypot(p.x-S.town.kiosk.x,p.z-S.town.kiosk.z)<4.5 && !state.terminalCool) setPrompt('CARGO TERMINAL',S.town.name,function(){ openTerminal(townLoc(S.idx)); });
+  else if(nt && Math.hypot(p.x-nt.T.kiosk.x,p.z-nt.T.kiosk.z)<4.5 && !state.terminalCool) setPrompt('CARGO TERMINAL',nt.T.name,function(){ openTerminal(townLoc(S.idx,nt.T.j)); });
   else if(dShip<boardR) setPrompt('BOARD SHIP','TAKE OFF',board);
   else setPrompt(null);
   veilHold=Math.max(0,veilHold-dt*.7); setVeil(veilHold,null,0);
 }
+
+/* =========================================================================
+   Planet map: towns, outposts, drops, you and your ship (tap the radar or press M)
+   ========================================================================= */
+var mapOpen=false, mapTimer=0;
+function mapFocus(){ return state.mode==='surface'?state.pos:S.ship.position; }
+function openMap(){
+  if(!S || !S.map || (state.mode!=='atmo' && state.mode!=='surface') || termLoc) return;
+  mapOpen=true; $('mapPanel').hidden=false; document.body.classList.add('mapopen'); joyEnd(); setHold(false); $('mpPlanet').textContent=S.biome.name;
+  renderMapList(); drawMap();
+  clearInterval(mapTimer); mapTimer=setInterval(function(){ if(!mapOpen) return; if(!S || state.mode==='space'){ closeMap(); return; } drawMap(); },250);
+}
+function closeMap(){ mapOpen=false; clearInterval(mapTimer); $('mapPanel').hidden=true; document.body.classList.remove('mapopen'); }
+function fmtDist(d){ return d>=1000?(d/1000).toFixed(1)+' KM':Math.round(d)+' M'; }
+function renderMapList(){
+  var f=mapFocus(), list=$('mpList'); list.innerHTML='';
+  S.towns.map(function(T){ return {T:T, d:Math.hypot(T.x-f.x,T.z-f.z), dest:townDest(T)}; })
+    .sort(function(a,b){ return (b.dest?1:0)-(a.dest?1:0) || a.d-b.d; })
+    .forEach(function(o){
+      var T=o.T, row=document.createElement('button'), col=townColor(T,o.dest);
+      row.type='button'; row.className='wp-row'+(o.dest?' drop':'')+(state.waypoint===T.key?' wpt':'');
+      row.innerHTML='<span class="mp-ico" style="background:'+col+'"></span><span class="wp-name">'+T.name+'</span><span class="wp-dist">'+fmtDist(o.d)+'</span>'+
+        (o.dest?'<span class="wp-drop">▸ DROP · '+o.dest.crates+' CRATE'+(o.dest.crates>1?'S':'')+'</span>':'')+
+        '<span class="wp-meta">'+T.label+(state.waypoint===T.key?' · WAYPOINT SET':' · TAP TO SET WAYPOINT')+'</span>';
+      row.addEventListener('click',function(){ state.waypoint=state.waypoint===T.key?null:T.key; toast(state.waypoint?'WAYPOINT · '+T.name:'WAYPOINT CLEARED'); renderMapList(); drawMap(); });
+      list.appendChild(row);
+    });
+}
+function drawMap(){
+  var cv=$('mapCv'), x=cv.getContext('2d'), W=cv.width, sc=W/(2*WORLD_E), f=mapFocus();
+  function X(v){ return (v+WORLD_E)*sc; }
+  x.imageSmoothingEnabled=true; x.drawImage(S.map,0,0,W,W);
+  x.fillStyle='rgba(4,8,16,.18)'; x.fillRect(0,0,W,W);
+  x.strokeStyle='rgba(150,210,255,.13)'; x.lineWidth=1;
+  for(var g=-1000;g<=1000;g+=500){ x.beginPath(); x.moveTo(X(g),0); x.lineTo(X(g),W); x.moveTo(0,X(g)); x.lineTo(W,X(g)); x.stroke(); }
+  x.font='600 15px "Share Tech Mono", monospace'; x.textAlign='center';
+  S.resources.forEach(function(r){ if(!r.scanned || r.collected) return; x.fillStyle=S.biome.crystal; x.save(); x.translate(X(r.x),X(r.z)); x.rotate(Math.PI/4); x.fillRect(-3,-3,6,6); x.restore(); });
+  S.towns.forEach(function(T){
+    var px=X(T.x), py=X(T.z), dest=townDest(T), col=townColor(T,dest);
+    if(state.waypoint===T.key){ x.strokeStyle='#7fe8ff'; x.lineWidth=2; x.beginPath(); x.arc(px,py,17,0,TAU); x.stroke(); }
+    if(dest){ x.strokeStyle='rgba(255,178,77,'+(.5+.5*Math.sin(state.t*5))+')'; x.lineWidth=2; x.beginPath(); x.arc(px,py,13,0,TAU); x.stroke(); }
+    x.save(); x.translate(px,py); x.fillStyle=col; x.shadowColor='rgba(0,0,0,.8)'; x.shadowBlur=6;
+    x.beginPath(); x.moveTo(0,-10); x.lineTo(9,-1); x.lineTo(6,-1); x.lineTo(6,8); x.lineTo(-6,8); x.lineTo(-6,-1); x.lineTo(-9,-1); x.closePath(); x.fill();
+    x.fillStyle='#eef6ff'; x.fillText(T.name,0,26); x.restore();
+  });
+  if(state.mode==='surface'){ var sp=S.ship.position; x.fillStyle='#7fe8ff'; x.shadowColor='#7fe8ff'; x.shadowBlur=10; x.beginPath(); x.arc(X(sp.x),X(sp.z),5,0,TAU); x.fill(); x.shadowBlur=0; }
+  x.save(); x.translate(X(f.x),X(f.z)); x.rotate(Math.PI-state.yaw); x.fillStyle='#eef6ff'; x.shadowColor='rgba(0,0,0,.9)'; x.shadowBlur=6;
+  x.beginPath(); x.moveTo(0,-11); x.lineTo(8,8); x.lineTo(0,3); x.lineTo(-8,8); x.closePath(); x.fill(); x.restore();
+  x.fillStyle='rgba(238,246,255,.8)'; x.fillRect(14,W-20,500*sc,3); x.textAlign='left'; x.fillText('500 M',14,W-28);
+}
+$('radarWrap').addEventListener('click',function(){ if(mapOpen) closeMap(); else openMap(); });
+$('mpClose').addEventListener('click',closeMap);
 
 /* =========================================================================
    Radar (heading-up) + on-screen ship tag
@@ -2870,15 +3117,21 @@ function spaceNav(){
   return activeDests().map(function(d){
     var pos, dist;
     if(d.loc.kind==='station'){ pos=station.center.clone().add(new THREE.Vector3(0,64,0)); dist=ship.position.distanceTo(station.center); }
-    else { var p=planets[d.loc.planet]; pos=p.mesh.position.clone().add(new THREE.Vector3(0,p.radius*1.3,0)); dist=Math.max(0,ship.position.distanceTo(p.mesh.position)-p.radius); }
+    else { var p=planets[d.loc.planet], st=planetTerrain(p.biome).sites[d.loc.site||0];
+      pos=st?p.mesh.position.clone().addScaledVector(normalFromSurf(st.x,st.z),p.radius*1.08):p.mesh.position.clone().add(new THREE.Vector3(0,p.radius*1.3,0));
+      dist=Math.max(0,ship.position.distanceTo(p.mesh.position)-p.radius); }
     return {pos:pos, name:'▸ '+d.loc.name, sub:d.crates+' CRATE'+(d.crates>1?'S':'')+' · '+Math.round(dist)+' KM', drop:true};
   });
 }
 function surfaceNav(from){
-  if(!S || !S.town || termLoc) return [];
-  var d=Math.hypot(from.x,from.z); if(d<28) return [];
-  var dest=activeDests().filter(function(x){ return x.loc.kind==='town' && x.loc.planet===S.idx; })[0];
-  return [{pos:new THREE.Vector3(0,S.town.pad.y+14,0), name:(dest?'▸ ':'')+S.town.name, sub:(dest?dest.crates+' CRATE'+(dest.crates>1?'S':'')+' · ':'')+Math.round(d)+' M', drop:!!dest}];
+  if(!S || termLoc) return [];
+  var out=[];
+  S.towns.forEach(function(T){
+    var d=Math.hypot(T.x-from.x,T.z-from.z), dest=townDest(T);
+    if(d<28 || (!dest && d>900 && state.waypoint!==T.key)) return;
+    out.push({pos:V3.set(T.x,T.pad.y+14,T.z).clone(), name:(dest?'▸ ':'')+T.name, sub:(dest?dest.crates+' CRATE'+(dest.crates>1?'S':'')+' · ':'')+(d>=1000?(d/1000).toFixed(1)+' KM':Math.round(d)+' M'), drop:!!dest});
+  });
+  return out;
 }
 function shipTag(info){
   if(!info){ if(!tagEl.hidden) tagEl.hidden=true; return; }
@@ -2988,7 +3241,8 @@ async function boot(){
   frame();
 }
 window.__nh={enterPlanet:function(i){ enterAtmosphere(planets[i]); }, ready:function(i){ return !!surfaces[i]; }, land:land, board:board, exitAtmo:exitAtmosphere,
-  warp:startWarp, dock:startDock, cam:function(){ return camera; }, station:function(){ return station; }, ship:function(){ return ship; }, state:state, getS:function(){ return S; }, sys:function(){ return SYS; }, enter:function(){ $('enterBtn').click(); }};
+  warp:startWarp, dock:startDock, cam:function(){ return camera; }, station:function(){ return station; }, ship:function(){ return ship; }, state:state, getS:function(){ return S; }, sys:function(){ return SYS; }, enter:function(){ $('enterBtn').click(); },
+  queue:queueSurface, terrain:planetTerrain, normalFromSurf:normalFromSurf, openMap:openMap, chunkBuilder:chunkBuilder, planets:function(){ return planets; }, offers:boardOffers, townLoc:townLoc};
 boot().catch(function(e){ console.error(e); $('loader').firstChild.nodeValue='Your device could not start the renderer: '+(e&&e.message||e); });
 })();
 </script>

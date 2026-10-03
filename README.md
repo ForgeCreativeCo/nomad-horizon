@@ -36,6 +36,7 @@ The installed app opens full screen in landscape and works offline after the fir
 | Jetpack | JET button | Space or Shift |
 | Scan | SCAN button | F |
 | Terminal, board ship | On-screen prompt | E |
+| Planet map | Tap the radar | M |
 
 Each freighter hull has its own turn rate and weight: the Skiff snaps into turns, the Atlas swings wide and coasts out of them.
 
@@ -45,7 +46,9 @@ Each freighter hull has its own turn rate and weight: the Skiff snaps into turns
 - **Freight contracts:** take standard, fragile, perishable and hazardous loads between the station and towns in each system; your hold has limited crate slots.
 - **Freighter progression:** start in the Skiff light courier (4 crates) and trade up through the Mule (6), Longhaul tractor-trailer (9) and Atlas heavy lifter (12) at any station; each hull handles heavier than the last.
 - **Space stations:** dock by autopilot in a hangar bay; trade, upgrade your ship and pick up contracts.
-- **Settlements:** 1–2 habitable planets per system, each with a named town, landing pad, cargo terminal and residents.
+- **Open planet surfaces:** each planet is about 3 × 3 km, streamed in tiles as you fly (full detail nearby, simpler tiles further out). Where you dive in from orbit decides where you arrive.
+- **Settlements:** 1–2 habitable planets per system, each with 2–4 towns (landing pad, cargo terminal, residents); every other planet has 1–2 outposts (mining camps, research outposts, fuel depots). Short-hop contracts run between towns on the same planet.
+- **Planet map:** tap the radar (or press M) for a relief map with every town and outpost, your drops, your ship and a waypoint you can set.
 - **Procedural galaxy:** warp to seeded star systems with their own star, nebula and planet types (lush, ocean, desert, frozen, scorched, toxic, exotic).
 - **Living worlds:** day/night cycle, wildlife that grazes and flees, crystal deposits to mine and sell.
 - **Unreal-style rendering:** HDR pipeline with bloom, ACES tonemapping, lens flares, god rays, image-based lighting, shadows, wind-blown grass and eye adaptation.
