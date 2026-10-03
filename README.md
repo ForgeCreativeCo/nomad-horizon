@@ -66,4 +66,4 @@ Progress (units, cargo, upgrades, current system) is saved in the browser's loca
 
 ## Sound credits
 
-Recorded clips in `audio/` (trimmed, looped and re-encoded for the game) by dragon-studio, freesound_community, wolff-sfx, placidplace and forza1903, from Pixabay under the Pixabay Content License. Everything else is synthesised in code.
+Recorded clips in `audio/` (trimmed, looped and re-encoded for the game) by dragon-studio, freesound_community, wolff-sfx, placidplace, forza1903 and u_xg7ssi08yr, from Pixabay under the Pixabay Content License. Everything else is synthesised in code.

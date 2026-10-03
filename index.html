@@ -296,6 +296,7 @@ button:focus-visible{outline:2px solid var(--cyan);outline-offset:3px;}
 .wp-dist{font-family:var(--font-mono);font-size:.66rem;color:var(--ink-dim);font-variant-numeric:tabular-nums;}
 .wp-row.drop{border-color:rgba(255,178,77,.75);background:rgba(255,178,77,.08);}
 .wp-drop{grid-column:2 / 4;font-family:var(--font-mono);font-size:.6rem;letter-spacing:.1em;color:var(--amber);}
+#btnWarp.spooling{color:#04121a;background:radial-gradient(circle,#d8f8ff,var(--cyan));box-shadow:0 0 24px rgba(127,232,255,.8);font-variant-numeric:tabular-nums;}
 #btnWarp.has-drop::after{content:"";position:absolute;top:.5rem;right:.55rem;width:.6rem;height:.6rem;border-radius:50%;background:var(--amber);box-shadow:0 0 10px var(--amber);}
 .st-row .nm small.fx .xs{color:var(--amber);}
 .wp-meta{grid-column:2 / 4;font-family:var(--font-mono);font-size:.6rem;letter-spacing:.06em;color:var(--ink-dim);}
@@ -3008,7 +3009,7 @@ function updateSpace(dt){
    interface tones made live with Web Audio so they follow the throttle.
    ========================================================================= */
 var SFX_FILES={drone:'audio/cab_drone.mp3', station:'audio/station_amb.mp3', whoosh:'audio/warp_whoosh.mp3', hatchOpen:'audio/hatch_open.mp3', hatchClose:'audio/hatch_close.mp3',
-  forklift:'audio/forklift.mp3', warehouse:'audio/warehouse.mp3'};
+  forklift:'audio/forklift.mp3', warehouse:'audio/warehouse.mp3', warpSpool:'audio/warp_spool.mp3'};
 var BEDS=['drone','station','warehouse'];
 var AU={ctx:null, on:true, buf:{}, beds:{}, eng:null, zapT:0, forkT:12};
 try{ AU.on=localStorage.getItem('nh_sound')!=='0'; }catch(e){}
@@ -3069,7 +3070,8 @@ function audioUpdate(dt){
     drone=docked?.32:.55;
     var sd=station?ship.position.distanceTo(station.center):1e9; stn=docked?.6:clamp(1-sd/260,0,1)*.35;
     if(state.warp){ var W=state.warp, k=W.t<1.5?W.t/1.5:(W.t<1.5+W.cruise?1:Math.max(0,1-(W.t-1.5-W.cruise)/2)); thrust=.25+.5*k; tf=250+k*1400; tone=.08+.1*k; of=46+k*40; }
-    else if(!docked){ thrust=.04+.22*thr+(boosting?.28:0); tf=180+spd*10+(boosting?500:0); tone=.03+.07*thr+(boosting?.05:0); of=40+spd*.45; }
+    else if(!docked){ thrust=.04+.22*thr+(boosting?.28:0); tf=180+spd*10+(boosting?500:0); tone=.03+.07*thr+(boosting?.05:0); of=40+spd*.45;
+      if(state.spool){ var sk=Math.min(1,state.spool.t/SPOOL_T); thrust+=.15*sk; tf+=700*sk; tone+=.05*sk; of+=34*sk; } }
     else { thrust=.02; tone=.015; }
   } else if(m==='atmo'){
     drone=.38; thrust=.05+.22*thr+(boosting?.28:0); tf=200+spd*9+(boosting?500:0); tone=.03+.07*thr; of=42+spd*.4;
@@ -3098,7 +3100,7 @@ function audioUpdate(dt){
 function sfx(name, vol, rate){
   if(!AU.ctx || !AU.buf[name] || !AU.on) return;
   var c=AU.ctx, s=c.createBufferSource(), g=c.createGain(); s.buffer=AU.buf[name]; s.playbackRate.value=rate||1; g.gain.value=vol==null?1:vol;
-  s.connect(g); g.connect(AU.sfx); s.start();
+  s.connect(g); g.connect(AU.sfx); s.start(); return {s:s, g:g};
 }
 function tones(freqs, step, type, vol, len){
   if(!AU.ctx || !AU.on) return;
@@ -3295,6 +3297,7 @@ function hideLaw(){ state.law=null; $('lawPanel').hidden=true; }
 
 /* ---------- customs scan ---------- */
 function customsScan(source, then){
+  if(state.spool) cancelSpool('WARP ABORTED · CUSTOMS HOLD');
   var sec=secOf(SYS.seed), harsh=source==='patrol'?1.25:source==='chase'?1.6:1, heat=heatOf(SYS.seed), found=[];
   contrabandAboard().forEach(function(c){
     var p=CB_GRADES[c.grade].detect*Math.max(sec.scan,.5)*harsh*(hasMod('hidden')?.45:1)*(1+heat*.12);
@@ -3624,14 +3627,37 @@ function openWarp(){
   $('wpCur').textContent=SYS.name+' · FUEL '+Math.floor(state.fuel)+'/'+fuelCap();
   warpPanel.hidden=false;
 }
-$('btnWarp').addEventListener('click',function(){ if(!warpPanel.hidden) warpPanel.hidden=true; else openWarp(); });
+$('btnWarp').addEventListener('click',function(){ if(state.spool){ cancelSpool('WARP ABORTED'); return; } if(!warpPanel.hidden) warpPanel.hidden=true; else openWarp(); });
 $('wpX').addEventListener('click',function(){ warpPanel.hidden=true; });
 window.addEventListener('keydown',function(e){ if(e.code==='Escape'){ warpPanel.hidden=true; if(mapOpen) closeMap(); } });
 $('wpClose').addEventListener('click',function(){ warpPanel.hidden=true; });
+/* the drive spools for 3.5 s before the jump (you keep flying, and anyone chasing you keeps closing) */
+var SPOOL_T=3.5;
 function startWarp(seed){
   var ly=lightYears(SYS.seed,seed), fuel=warpFuel(ly);
   if(state.fuel<fuel && state.mode==='space'){ toast('NOT ENOUGH FUEL · NEED '+fuel+', HAVE '+Math.floor(state.fuel)+' · REFUEL AT A STATION, TOWN OR FUEL DEPOT'); return; }
-  warpPanel.hidden=true; sfx('whoosh',1);
+  if(state.spool || state.warp) return;
+  warpPanel.hidden=true;
+  state.spool={t:0, seed:seed, snd:sfx('warpSpool',.95)};
+  $('btnWarp').classList.add('spooling'); toast('WARP DRIVE SPOOLING · TAP WARP TO ABORT');
+}
+function cancelSpool(msg){
+  var sp=state.spool; if(!sp) return; state.spool=null;
+  if(sp.snd && AU.ctx){ try{ sp.snd.g.gain.setTargetAtTime(0,AU.ctx.currentTime,.08); sp.snd.s.stop(AU.ctx.currentTime+.5); }catch(e){} }
+  $('btnWarp').classList.remove('spooling'); $('btnWarp').textContent='WARP';
+  if(msg) toast(msg);
+}
+function updateSpool(dt){
+  var sp=state.spool; if(!sp) return;
+  if(state.mode!=='space' || state.dock || state.warp){ cancelSpool('WARP ABORTED'); return; }
+  sp.t+=dt; var k=sp.t/SPOOL_T;
+  $('btnWarp').textContent=Math.max(0,SPOOL_T-sp.t).toFixed(1);
+  state.fovKick=Math.max(state.fovKick,k*k*9);
+  if(sp.t>=SPOOL_T){ state.spool=null; $('btnWarp').classList.remove('spooling'); $('btnWarp').textContent='WARP'; beginWarp(sp.seed); }
+}
+function beginWarp(seed){
+  var ly=lightYears(SYS.seed,seed), fuel=warpFuel(ly);
+  sfx('whoosh',.85);
   state.fuel=Math.max(0,state.fuel-fuel); wearHull(2+ly/100); if(needsOn()) state.rest=Math.max(0,state.rest-3); save(); state.warp={t:0, seed:seed, swapped:false, ly:ly, cruise:clamp(ly/75,.6,5.4), prog:0};
   setPrompt(null); toast('WARP DRIVE ENGAGED');
 }
@@ -4071,7 +4097,7 @@ function frame(){
   else if(state.mode==='space') updateSpace(dt);
   else if(state.mode==='atmo' && S) updateAtmo(dt);
   else if(state.mode==='surface' && S) updateSurface(dt);
-  if(state.mode!=='title'){ updateLaw(dt); updateNeeds(dt); }
+  if(state.mode!=='title'){ updateLaw(dt); updateNeeds(dt); updateSpool(dt); }
   audioUpdate(dt);
   state.exposure=lerp(state.exposure,state.exposureTarget,1-Math.pow(.25,dt));
   var u=finalPass.uniforms; u.exposure.value=state.exposure; u.time.value=state.t;
