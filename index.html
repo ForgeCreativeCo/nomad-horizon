@@ -2749,7 +2749,7 @@ function renderTerminal(tab){
     for(var i=0;i<cap;i++) h+='<i class="'+(i<used?'on':'')+'"></i>';
     h+='</span><b>'+used+'/'+cap+'</b></div>';
     var blocked=here.filter(function(c){ return c.kind!=='contraband' && !isCleared(); });
-    if(blocked.length) h+='<p class="st-note" style="color:var(--amber)">Customs clearance needed: '+blocked.length+' legal load'+(blocked.length>1?'s':'')+' can’t be signed for until you check in at the customs gate outside '+SYS.station.name+'.</p>';
+    if(blocked.length) h+='<p class="st-note" style="color:var(--amber)">Customs clearance needed: '+blocked.length+' legal load'+(blocked.length>1?'s':'')+' can’t be signed for until you check in: drive through the customs hall straight ahead of the warp-in point, or dock at '+SYS.station.name+'.</p>';
     here=here.filter(function(c){ return blocked.indexOf(c)<0; });
     if(here.length){
       var sum=here.reduce(function(a,c){ return a+cargoPay(c).pay; },0);
@@ -3021,7 +3021,7 @@ function customsScan(source, then){
   });
   var wanted=heat>=3, late=!isCleared() && (source==='patrol'||source==='chase');
   if(!found.length && !wanted){
-    var lateFine=late?250:0; state.credits-=lateFine; state.cleared=SYS.seed; setHeat(SYS.seed,Math.min(heat,2));
+    var lateFine=late?250:0; state.credits-=lateFine; state.cleared=SYS.seed; state.clearedT=state.t; setHeat(SYS.seed,Math.min(heat,2));
     toast('CUSTOMS · CLEARED'+(lateFine?' · −250 LATE CHECK-IN FINE':' · '+SYS.name),'life'); renderInv(); save();
     if(then) then(); return;
   }
@@ -3036,8 +3036,8 @@ function customsScan(source, then){
       if(Math.random()<odds){ state.cleared=SYS.seed; setHeat(SYS.seed,Math.min(heat,1)); toast('THE OFFICER LOOKS THE OTHER WAY · CLEARED','life'); }
       else { toast('BRIBE REFUSED · PENALTIES INCREASED'); customsPenalty(found,Math.round(fine*1.5),worst,2); }
       if(then) then(); }}];
-  if(source==='gate'||source==='patrol') btns.push({label:'RUN', cls:'run', fn:function(){ goWanted(); }});
-  showLaw({type:'customs', eye:(source==='dock'?'STATION CUSTOMS':source==='gate'?'CUSTOMS GATE':'PATROL INSPECTION')+' · '+SYS.name, title:found.length?'Contraband found':'Wanted in this system',
+  if(source==='gate'||source==='patrol') btns.push({label:'RUN', cls:'run', fn:function(){ goWanted(); if(then) then(); }});
+  showLaw({type:'customs', eye:(source==='dock'?'STATION CUSTOMS':source==='gate'?'CUSTOMS HALL':'PATROL INSPECTION')+' · '+SYS.name, title:found.length?'Contraband found':'Wanted in this system',
     body:body, buttons:btns, tone:'bad', noTimeout:true});
 }
 function customsPenalty(found, fine, worst, heatAdd){
@@ -3054,29 +3054,99 @@ function customsPenalty(found, fine, worst, heatAdd){
 }
 function goWanted(){ setHeat(SYS.seed,5); toast('YOU RAN · WANTED IN '+SYS.name+' · LOSE THE PATROLS'); renderInv(); save(); }
 
-/* ---------- the customs gate on the station approach ---------- */
+/* ---------- the drive-through customs hall, straight ahead of the warp-in point ---------- */
+var HALL={W:34, H:22, L:48, T:4};
+function hallSignTex(){
+  var c=document.createElement('canvas'); c.width=512; c.height=128; var x=c.getContext('2d');
+  x.fillStyle='#0b1018'; x.fillRect(0,0,512,128); x.strokeStyle='#ffb24d'; x.lineWidth=6; x.strokeRect(6,6,500,116);
+  x.fillStyle='#ffb24d'; x.font='bold 54px "Share Tech Mono", monospace'; x.textAlign='center'; x.textBaseline='middle'; x.fillText('CUSTOMS',256,50);
+  x.fillStyle='#93a8c4'; x.font='22px "Share Tech Mono", monospace'; x.fillText('DRIVE THROUGH · STOP ON THE SCALE',256,98);
+  var t=new THREE.CanvasTexture(c); t.encoding=THREE.sRGBEncoding; return t;
+}
+function hazardTex(){
+  var c=document.createElement('canvas'); c.width=256; c.height=64; var x=c.getContext('2d'); x.fillStyle='#1b1d21'; x.fillRect(0,0,256,64); x.fillStyle='#ffb000';
+  for(var i=-64;i<320;i+=32){ x.beginPath(); x.moveTo(i,0); x.lineTo(i+16,0); x.lineTo(i+16-64,64); x.lineTo(i-64,64); x.closePath(); x.fill(); }
+  var t=new THREE.CanvasTexture(c); t.encoding=THREE.sRGBEncoding; t.wrapS=t.wrapT=THREE.RepeatWrapping; return t;
+}
 function buildCustomsGate(parent){
-  if(!station) return;
-  var pos=station.mouthW.clone().addScaledVector(station.dirW,175), g=new THREE.Group(); g.position.copy(pos);
-  g.lookAt(V3.copy(pos).add(station.dirW)); parent.add(g);
-  var mat=new THREE.MeshBasicMaterial({color:new THREE.Color(2.4,1.4,.3)});
-  var ring=new THREE.Mesh(new THREE.TorusGeometry(27,1.1,10,72),mat); g.add(ring);
-  var frame=new THREE.Mesh(new THREE.TorusGeometry(29.5,.6,8,72),new THREE.MeshStandardMaterial({color:0x3a3f48, metalness:.8, roughness:.4})); g.add(frame);
-  var veil=new THREE.Mesh(new THREE.CircleGeometry(26,48),new THREE.MeshBasicMaterial({color:new THREE.Color(.25,.6,.9), transparent:true, opacity:.08, blending:THREE.AdditiveBlending, depthWrite:false, side:THREE.DoubleSide})); g.add(veil);
-  var lamps=[]; for(var i=0;i<8;i++){ var a=i/8*TAU, l=new THREE.Mesh(new THREE.SphereGeometry(.9,10,8),new THREE.MeshBasicMaterial({color:new THREE.Color(3,2,.5)})); l.position.set(Math.cos(a)*29.5,Math.sin(a)*29.5,0); g.add(l); lamps.push(l); }
-  station.gate={group:g, pos:pos, dir:station.dirW.clone(), r:26, mat:mat, veil:veil, lamps:lamps, side:0};
+  if(!station || !SYS) return;
+  var arr=SYS.arrival.clone(), near=planets.reduce(function(a,p){ return (!a||p.mesh.position.distanceTo(arr)<a.mesh.position.distanceTo(arr))?p:a; },null);
+  var dir=near.mesh.position.clone().sub(arr); dir.y=0; dir.normalize();
+  var dist=150, pos=new THREE.Vector3();
+  for(var k=0;k<20;k++){ pos.copy(arr).addScaledVector(dir,dist); if(pos.distanceTo(station.center)>105) break; dist+=20; }
+  var g=new THREE.Group(); g.position.copy(pos); g.lookAt(V3.copy(pos).add(dir)); parent.add(g);
+  var T=stationTextures(), W=HALL.W, H=HALL.H, L=HALL.L, th=HALL.T, W2=W/2, H2=H/2, L2=L/2;
+  var hull=new THREE.MeshStandardMaterial({color:0xc9ced6, map:texRep(T.plate,3,2), metalness:.45, roughness:.5});
+  var dark=new THREE.MeshStandardMaterial({color:0x2c3038, metalness:.8, roughness:.45});
+  var winM=new THREE.MeshStandardMaterial({color:0x111820, emissive:0xffffff, emissiveMap:texRep(T.win,6,1), emissiveIntensity:1.3, metalness:.3, roughness:.5});
+  function box(w,h,d,m,x,y,z){ var b=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),m); b.position.set(x,y,z); g.add(b); return b; }
+  function bulb(col,r,x,y,z){ var m=new THREE.Mesh(new THREE.SphereGeometry(r,12,8),new THREE.MeshBasicMaterial({color:col.clone()})); m.position.set(x,y,z); g.add(m); return m; }
+  box(W+2*th,th,L,hull,0,H2+th/2,0); box(W+2*th+2,1,L+2,dark,0,H2+th+.5,0);
+  box(W+2*th,th,L,dark,0,-H2-th/2,0);
+  box(th,H,L,hull,-(W2+th/2),0,0); box(th,H,L,hull,W2+th/2,0,0);
+  [-1,1].forEach(function(s){ box(.3,4,L-8,winM,s*(W2-.1),3,0); box(.3,3,L-10,winM,s*(W2+th+.1),2,0); });
+  var scaleM=new THREE.MeshStandardMaterial({map:hazardTex(), roughness:.6, metalness:.3}); scaleM.map.repeat.set(4,1);
+  var plate=new THREE.Mesh(new THREE.PlaneGeometry(W-4,14),scaleM); plate.rotation.x=-Math.PI/2; plate.position.set(0,-H2+.06,4); g.add(plate);
+  var arches=[], archMat=new THREE.MeshBasicMaterial({color:new THREE.Color(.5,2.2,3.2)});
+  [-L2,4,L2].forEach(function(z,i){ var a=new THREE.Mesh(new THREE.TorusGeometry(W2-.6,.55,8,40,Math.PI),i===1?archMat:dark); a.position.set(0,-H2,z); g.add(a); if(i===1) arches.push(a); });
+  var RED=new THREE.Color(3.4,.35,.25), GRN=new THREE.Color(.4,3,.8);
+  var lights={inR:bulb(RED,1.1,-4,H2-2,-L2-.7), inG:bulb(GRN,1.1,4,H2-2,-L2-.7), outR:bulb(RED,1.1,-4,H2-2,L2+.7), outG:bulb(GRN,1.1,4,H2-2,L2+.7)};
+  var sign=new THREE.Mesh(new THREE.PlaneGeometry(26,6.5),new THREE.MeshBasicMaterial({map:hallSignTex(), side:THREE.DoubleSide})); sign.position.set(0,H2+th+4.5,-L2-.5); sign.rotation.y=Math.PI; g.add(sign);
+  box(1,4,1,dark,-9,H2+th+2,-L2-.5); box(1,4,1,dark,9,H2+th+2,-L2-.5);
+  var cut=buildHull(0,false); cut.scale.setScalar(.55); cut.userData.flames.concat(cut.userData.glows).forEach(function(f){ f.visible=false; }); cut.userData.legs.forEach(function(l){ l.visible=true; });
+  cut.position.set(-7,H2+th+1+hullGear(cut),8); cut.rotation.y=.5; lightBar(cut,[new THREE.Color(.4,.9,4),new THREE.Color(4,.4,.4)]); g.add(cut);
+  var mast=new THREE.Mesh(new THREE.CylinderGeometry(.35,.6,14,8),dark); mast.position.set(W2+2,H2+th+7,L2-6); g.add(mast);
+  var mastLamp=bulb(RED,.7,W2+2,H2+th+14.4,L2-6);
+  g.updateMatrixWorld(true);
+  station.gate={group:g, pos:g.localToWorld(new THREE.Vector3(0,0,-L2)), center:pos.clone(), dir:dir, yaw:Math.atan2(dir.x,dir.z), lights:lights, arches:arches, archMat:archMat, cutter:cut, mastLamp:mastLamp,
+    boxes:[{c:new THREE.Vector3(0,H2+th/2,0), e:new THREE.Vector3(W2+th,th/2,L2)},{c:new THREE.Vector3(0,-H2-th/2,0), e:new THREE.Vector3(W2+th,th/2,L2)},
+      {c:new THREE.Vector3(-(W2+th/2),0,0), e:new THREE.Vector3(th/2,H2,L2)},{c:new THREE.Vector3(W2+th/2,0,0), e:new THREE.Vector3(th/2,H2,L2)}]};
+}
+var HQ=new THREE.Vector3(), HD=new THREE.Vector3(), HL=new THREE.Vector3();
+function hallCollide(G){
+  var lp=G.group.worldToLocal(HL.copy(ship.position)), r=Math.max(2.5,Math.max(hullBeam(ship),hullTop(ship))*.42), hit=false;
+  G.boxes.forEach(function(b){
+    HQ.set(clamp(lp.x,b.c.x-b.e.x,b.c.x+b.e.x),clamp(lp.y,b.c.y-b.e.y,b.c.y+b.e.y),clamp(lp.z,b.c.z-b.e.z,b.c.z+b.e.z));
+    HD.copy(lp).sub(HQ); var d=HD.length();
+    if(d<r){ hit=true;
+      if(d>1e-4) lp.copy(HQ).addScaledVector(HD.multiplyScalar(1/d),r);
+      else { var dx=b.e.x-Math.abs(lp.x-b.c.x), dy=b.e.y-Math.abs(lp.y-b.c.y); if(dx<dy) lp.x=b.c.x+Math.sign(lp.x-b.c.x||1)*(b.e.x+r); else lp.y=b.c.y+Math.sign(lp.y-b.c.y||1)*(b.e.y+r); } }
+  });
+  if(hit){ var v=state.vel.length(); ship.position.copy(G.group.localToWorld(lp)); if(v>8){ cargoImpact(v*.5); } state.vel.multiplyScalar(.5); }
+  return G.group.worldToLocal(HL.copy(ship.position));
+}
+function releaseScale(){
+  var G=station&&station.gate, ran=isWanted(); state.scale=null;
+  if(!G) return;
+  stopRates(); setThrottle(ran?1:.4); state.vel.copy(G.dir).multiplyScalar(ran?45:18);
+  if(!ran) toast('EXIT IS GREEN · SAFE TRAVELS','life');
 }
 function updateGate(dt){
   var G=station&&station.gate; if(!G) return;
-  var sec=secOf(SYS.seed), need=sec.customs && (!isCleared()||isWanted()), t=state.t;
+  var sec=secOf(SYS.seed), need=sec.customs && (!isCleared()||isWanted()), t=state.t, sc=state.scale;
   G.group.visible=sec.customs;
-  if(!sec.customs) return;
-  if(need) G.mat.color.setRGB(2.4,1.4,.3); else G.mat.color.setRGB(.4,2.4,.9);
-  G.lamps.forEach(function(l,i){ l.material.color.setRGB(need?3:.5,need?2:3,need?.5:1).multiplyScalar(((t*1.5+i/8)%1)<.5?1:.25); });
-  G.veil.material.opacity=.06+.04*Math.sin(t*3);
-  var rel=V3.copy(ship.position).sub(G.pos), along=rel.dot(G.dir), radial=rel.addScaledVector(G.dir,-along).length(), side=along>0?1:-1;
-  if(G.side && side!==G.side && radial<G.r && need && !state.law && !state.dock && !state.warp){ toast('CUSTOMS SCAN…'); customsScan('gate'); }
-  G.side=side;
+  if(!sec.customs){ state.scale=null; return; }
+  var blink=((t*2)%1)<.5, L=G.lights, held=!!sc || (state.law && state.law.type==='customs' && state.dock==null && sc);
+  L.inG.material.color.setRGB(.4,3,.8).multiplyScalar(need&&!blink?.25:1); L.inR.material.color.setRGB(3.4,.35,.25).multiplyScalar(.12);
+  L.outR.material.color.setRGB(3.4,.35,.25).multiplyScalar(held?(blink?1:.5):.12); L.outG.material.color.setRGB(.4,3,.8).multiplyScalar(held?.12:1);
+  G.archMat.color.setRGB(.5,2.2,3.2).multiplyScalar(sc&&sc.phase==='scan'?(1.2+Math.sin(t*18)*.8):.35);
+  G.mastLamp.material.color.setRGB(3.4,.35,.25).multiplyScalar(((t*.7)%1)<.15?1:.08);
+  (G.cutter.userData.bar||[]).forEach(function(sp,i){ sp.material.opacity=((t*3+i*.5)%1)<.5?1:.15; });
+  if(state.mode!=='space' || state.dock || state.warp) return;
+  var lp=hallCollide(G), W2=HALL.W/2, H2=HALL.H/2, L2=HALL.L/2;
+  var inside=Math.abs(lp.x)<W2 && Math.abs(lp.y)<H2 && Math.abs(lp.z)<L2;
+  if(!sc && inside && need && lp.z>-L2+6 && lp.z<4 && !state.law){
+    state.scale={t:0, phase:'brake'}; stopRates(); setThrottle(0); toast('ON THE SCALE · HOLD STILL FOR THE SCAN');
+  }
+  if(sc){
+    sc.t+=dt;
+    var tgt=G.group.localToWorld(HQ.set(0,-H2+hullGear(ship)*.8+3,4));
+    ship.position.lerp(tgt,1-Math.pow(.03,dt)); state.vel.multiplyScalar(Math.pow(.01,dt)); setThrottle(0); stopRates();
+    state.yaw=angLerp(state.yaw,G.yaw,dt*3); state.pitch*=Math.pow(.05,dt);
+    if(sc.phase==='brake' && sc.t>1.1){ sc.phase='scan'; sc.t=0; }
+    else if(sc.phase==='scan' && sc.t>1.8){ sc.phase='wait'; sc.t=0; customsScan('gate',releaseScale); }
+    else if(sc.phase==='wait' && !state.law && sc.t>.5) releaseScale();
+  }
 }
 
 /* ---------- patrol cutters ---------- */
@@ -3086,7 +3156,7 @@ function lightBar(obj, cols){
     sp.scale.set(5,5,1); sp.position.set((i-.5)*3.2,2.4,0); obj.add(sp); obj.userData.bar=(obj.userData.bar||[]).concat([sp]); });
 }
 function initLaw(){
-  lawActors=[]; hideLaw(); state.chase=null; state.pirateT=state.t+25;
+  lawActors=[]; hideLaw(); state.chase=null; state.scale=null; state.pirateT=state.t+25;
   if(!SYS || !station) return;
   buildCustomsGate(sysGroup);
   var sec=secOf(SYS.seed);
@@ -3168,7 +3238,7 @@ function updateLaw(dt){
     else if(left<=0){ var lw=state.law; hideLaw(); lw.onTimeout(); }
   }
   if(state.mode!=='space') return;
-  var sec=secOf(SYS.seed), suspect=!state.law && free && ((!isCleared() && state.t-(state.arrivedT||0)>120) || isWanted());
+  var sec=secOf(SYS.seed), suspect=!state.law && !state.scale && free && ((!isCleared() && state.t-(state.arrivedT||0)>120) || isWanted());
   var sd=station?ship.position.distanceTo(station.center):1e9, firing=false;
   lawActors.forEach(function(a){
     var d=a.obj.position.distanceTo(ship.position);
@@ -3179,7 +3249,7 @@ function updateLaw(dt){
         var dd=steerActor(a,tgt,a.mode==='return'?60:26,dt); if(a.mode==='return' && dd<40) a.mode='patrol';
         if(free && !a.cool && d<260 && !state.law){
           if(suspect) hailPatrol(a);
-          else if(contrabandAboard().length && d<140){ a.cool=90; if(Math.random()<.3) hailPatrol(a); }
+          else if(contrabandAboard().length && d<140 && state.t-(state.clearedT||-1e9)>90){ a.cool=90; if(Math.random()<.3) hailPatrol(a); }
         }
       } else if(a.mode==='hail'){ steerActor(a,V2.copy(ship.position).addScaledVector(V3.copy(a.obj.position).sub(ship.position).normalize(),40).clone(),70,dt); }
       else if(a.mode==='chase'){
@@ -3223,7 +3293,7 @@ function pirateDisable(){
 function lawNav(){
   var out=[];
   if(station && station.gate && secOf(SYS.seed).customs && (!isCleared()||isWanted()) && !state.dock){
-    var d=ship.position.distanceTo(station.gate.pos); if(d>40) out.push({pos:station.gate.pos.clone().add(new THREE.Vector3(0,34,0)), name:'CUSTOMS GATE', sub:Math.round(d)+' KM · CHECK IN', drop:false});
+    var d=ship.position.distanceTo(station.gate.pos); if(d>40) out.push({pos:station.gate.pos.clone().add(new THREE.Vector3(0,22,0)), name:'CUSTOMS HALL', sub:Math.round(d)+' KM · DRIVE THROUGH', drop:false});
   }
   return out;
 }
@@ -3303,7 +3373,7 @@ function updateWarp(dt){
   setVeil(white,'#e4f4ff',0);
   if(t>=1.6 && !W.swapped){ W.swapped=true; loadSystem(W.seed); state.exposure=2.5;
     var minF=Math.min.apply(null,neighbourSeeds(SYS.seed,3+lvl('warp')).map(function(sd){ return warpFuel(lightYears(SYS.seed,sd)); }));
-    var sc=secOf(SYS.seed); setTimeout(function(){ toast(sc.customs?'SECURITY '+sc.name+' · CHECK IN AT THE CUSTOMS GATE BY THE STATION':'LAWLESS SPACE · NO CUSTOMS · WATCH FOR RAIDERS'); },1800);
+    var sc=secOf(SYS.seed); setTimeout(function(){ toast(sc.customs?'SECURITY '+sc.name+' · DRIVE THROUGH THE CUSTOMS HALL STRAIGHT AHEAD':'LAWLESS SPACE · NO CUSTOMS · WATCH FOR RAIDERS'); },1800);
     if(state.fuel<minF) setTimeout(function(){ toast('LOW FUEL · '+Math.floor(state.fuel)+' LEFT · REFUEL BEFORE YOUR NEXT JUMP'); },3500); }
   spaceAmbient(dt);
   updateDust(-.06,clamp(spd/200,0,1)*(1-sstep(2.8,3.6,t)));
@@ -3786,7 +3856,7 @@ async function boot(){
 window.__nh={enterPlanet:function(i){ enterAtmosphere(planets[i]); }, ready:function(i){ return !!surfaces[i]; }, land:land, board:board, exitAtmo:exitAtmosphere,
   warp:startWarp, dock:startDock, cam:function(){ return camera; }, station:function(){ return station; }, ship:function(){ return ship; }, state:state, getS:function(){ return S; }, sys:function(){ return SYS; }, enter:function(){ $('enterBtn').click(); },
   queue:queueSurface, terrain:planetTerrain, normalFromSurf:normalFromSurf, openMap:openMap, chunkBuilder:chunkBuilder, planets:function(){ return planets; }, offers:boardOffers, townLoc:townLoc,
-  law:{spawnPirates:spawnPirates, scan:customsScan, actors:function(){ return lawActors; }, heat:heatOf, sec:secOf}};
+  law:{hall:function(){ return station&&station.gate; }, spawnPirates:spawnPirates, scan:customsScan, actors:function(){ return lawActors; }, heat:heatOf, sec:secOf}};
 boot().catch(function(e){ console.error(e); $('loader').firstChild.nodeValue='Your device could not start the renderer: '+(e&&e.message||e); });
 })();
 </script>
