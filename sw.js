@@ -1,6 +1,6 @@
 /* Nomad Horizon service worker: offline play + fast reloads.
    Bump VERSION on every release so installed copies pick up the new game. */
-const VERSION = 'nh-2026-10-03-quiet-air';
+const VERSION = 'nh-2026-10-03-music';
 const THREE_BASE = 'https://cdn.jsdelivr.net/npm/three@0.128.0/';
 const CORE = [
   './', './index.html', './manifest.webmanifest',
@@ -54,6 +54,9 @@ self.addEventListener('fetch', (e) => {
     );
     return;
   }
+
+  // Music streams with range requests straight from the network (too big to keep offline).
+  if (url.origin === location.origin && url.pathname.indexOf('/audio/music/') >= 0) return;
 
   // Everything else from this site (icons, manifest): cached copy now, refresh in the background.
   if (url.origin === location.origin) {

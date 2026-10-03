@@ -53,6 +53,7 @@ Each freighter hull has its own turn rate and weight: the Skiff snaps into turns
 - **Security levels and pirates:** each system is High, Medium, Low or Lawless security (shown in the warp menu). The lower the security, the fewer patrols, the more raiders and the better black-market pay. Raiders demand a ransom or a crate; run for the station defence grid, an atmosphere or a warp. A deflector shield and decoy flares help. You never lose your ship for good.
 - **Pilot needs:** your pilot gets hungry and tired while you play (never while the game is closed). Eat a hot meal at a diner or cantina, carry ration packs (tap the fork on the HUD), and sleep at a motel, a station bunk or in your cab when landed. Sleeping jumps the clock 8 hours, so perishable deadlines keep running. Running on empty slows energy and scans; exhaustion dims the screen, dulls handling and causes microsleeps, and customs fines you for flying over your hours. Galley and sleeper cab modules help on long hauls, fleet pilots take rest breaks, and a relaxed mode in Services turns it all off.
 - **Sound:** a cockpit drone, station ambience, warehouse room tone and forklifts at the loading docks, town-square bustle, night crickets and gravel footsteps on foot, landing gear, warp spool-ups, whooshes, landing burns, re-entry roar and hatch sounds from recorded clips, plus an engine, wind and jetpack that follow your throttle and speed, and interface, customs, patrol and raider cues made live with Web Audio. Toggle with the speaker button by the radar.
+- **Music:** seven ambient space soundscapes, shuffled with quiet gaps between them, mixed under the game and ducked when danger or sleep takes over. Toggle with the note button under the speaker.
 - **Space stations:** dock by autopilot in a hangar bay; trade, upgrade your ship and pick up contracts.
 - **Open planet surfaces:** each planet is about 3 × 3 km, streamed in tiles as you fly (full detail nearby, simpler tiles further out). Where you dive in from orbit decides where you arrive.
 - **Settlements:** 1–2 habitable planets per system, each with 2–4 towns (landing pad, cargo terminal, residents); every other planet has 1–2 outposts (mining camps, research outposts, fuel depots). Short-hop contracts run between towns on the same planet.
@@ -65,5 +66,7 @@ Each freighter hull has its own turn rate and weight: the Skiff snaps into turns
 Progress (units, cargo, upgrades, current system) is saved in the browser's local storage.
 
 ## Sound credits
+
+Music in `audio/music/`: ambient soundscapes 001, 002, 003, 005, 006 and 007 by audiopapkin, and "Space Music Ambient" by freesound_community, from Pixabay under the Pixabay Content License (loudness-matched and re-encoded).
 
 Recorded clips in `audio/` (trimmed, looped and re-encoded for the game) by dragon-studio, freesound_community, wolff-sfx, placidplace, forza1903, u_xg7ssi08yr, miraclei, daviddumaisaudio, arunangshubanerjee and 49053354, from Pixabay under the Pixabay Content License. Everything else is synthesised in code.

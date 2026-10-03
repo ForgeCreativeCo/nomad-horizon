@@ -71,7 +71,11 @@ canvas#scene{position:absolute;inset:0;width:100%;height:100%;display:block;}
   display:flex;align-items:center;justify-content:center;color:var(--cyan);cursor:pointer;}
 #sndBtn svg{width:1.05rem;height:1.05rem;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;}
 #sndBtn .x{display:none;} #sndBtn.off{color:var(--ink-dim);} #sndBtn.off .w{display:none;} #sndBtn.off .x{display:inline;}
-@media (max-width:560px){ #sndBtn{right:7.2rem;} }
+#musBtn{position:absolute;right:8.7rem;top:calc(6rem + env(safe-area-inset-top,0px));pointer-events:auto;width:2.2rem;height:2.2rem;padding:0;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;color:var(--cyan);cursor:pointer;}
+#musBtn svg{width:1rem;height:1rem;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;}
+#musBtn .x{display:none;} #musBtn.off{color:var(--ink-dim);} #musBtn.off .x{display:inline;}
+@media (max-width:560px){ #sndBtn{right:7.2rem;} #musBtn{right:7.2rem;top:calc(5.8rem + env(safe-area-inset-top,0px));} }
 #radarWrap{position:absolute;right:.75rem;top:calc(3.3rem + env(safe-area-inset-top,0px));width:7.4rem;}
 #radar{width:7.4rem;height:7.4rem;display:block;border-radius:50%;border:1px solid var(--line);
   box-shadow:0 0 18px rgba(0,0,0,.35);}
@@ -346,6 +350,7 @@ body.mapopen #joywrap,body.mapopen #actions,body.mapopen #throttle{visibility:hi
     <button id="pitchBtn" class="panel" type="button" aria-pressed="true">PITCH <b id="pitchName">INV</b></button>
     <button id="gfxBtn" class="panel" type="button">GFX <b id="gfxName">HIGH</b></button>
     <button id="sndBtn" class="panel" type="button" aria-pressed="true" aria-label="Sound on or off"><svg viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9z"/><path class="w" d="M16 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12"/><path class="x" d="M16 9l5 6M21 9l-5 6"/></svg></button>
+    <button id="musBtn" class="panel" type="button" aria-pressed="true" aria-label="Music on or off"><svg viewBox="0 0 24 24"><path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/><path class="x" d="M3 3l18 18"/></svg></button>
     <div id="radarWrap" role="button" aria-label="Open planet map"><canvas id="radar" width="200" height="200"></canvas><div id="radarCap"></div><div class="maptap">TAP · MAP</div></div>
     <div id="fps"></div>
     <div id="navTags"></div>
@@ -3032,7 +3037,7 @@ function audioStart(){
   for(i=0;i<d.length;i++){ var w=Math.random()*2-1; last=(last+.02*w)/1.02; d[i]=last*3.2+w*.08; }   // mostly brown noise
   AU.noise=nb;
   var wb=c.createBuffer(1,c.sampleRate,c.sampleRate), wd=wb.getChannelData(0); for(i=0;i<wd.length;i++) wd[i]=Math.random()*2-1; AU.white=wb;
-  buildEngine();
+  buildEngine(); musicInit();
   Object.keys(SFX_FILES).forEach(function(k){
     fetch(SFX_FILES[k]).then(function(r){ return r.arrayBuffer(); }).then(function(ab){
       c.decodeAudioData(ab,function(buf){ AU.buf[k]=buf; if(BEDS.indexOf(k)>=0) startBed(k); },function(){});
@@ -3064,6 +3069,58 @@ function setSound(on){
 }
 document.addEventListener('visibilitychange',function(){ if(!AU.ctx) return; if(document.hidden) AU.ctx.suspend(); else AU.ctx.resume(); });
 ['pointerdown','touchend','keydown'].forEach(function(ev){ window.addEventListener(ev,function(){ if(state.mode!=='title' || AU.ctx) audioStart(); },{passive:true}); });
+
+/* ---------- background music: a shuffled set of ambient tracks with quiet gaps between them.
+   Tracks stream through <audio> elements (never fully decoded into memory) and are routed
+   through the mixer so they fade, duck and muffle with everything else. ---------- */
+var MUSIC_TRACKS=['audio/music/track1.mp3','audio/music/track2.mp3','audio/music/track3.mp3','audio/music/track4.mp3','audio/music/track5.mp3','audio/music/track6.mp3','audio/music/track7.mp3'];
+var MU={on:true, decks:[], bus:null, order:[], last:-1, gap:8, live:null, unlocked:false};
+try{ MU.on=localStorage.getItem('nh_music')!=='0'; }catch(e){}
+function musicInit(){
+  if(MU.bus || !AU.ctx) return;
+  var c=AU.ctx; MU.bus=c.createGain(); MU.bus.gain.value=0; MU.bus.connect(AU.muffle);
+  for(var i=0;i<2;i++){
+    var el=new Audio(); el.preload='none'; el.crossOrigin='anonymous'; el.setAttribute('playsinline','');
+    var g=c.createGain(); g.gain.value=0;
+    try{ c.createMediaElementSource(el).connect(g); g.connect(MU.bus); }catch(e){ continue; }
+    var d={el:el, g:g, fading:false};
+    el.addEventListener('ended',function(){ if(MU.live && MU.live.el===this){ MU.live=null; MU.gap=25+Math.random()*45; } });
+    MU.decks.push(d);
+  }
+  // touch both decks inside the user's tap so phones allow later playback
+  MU.decks.forEach(function(d){ try{ d.el.src=MUSIC_TRACKS[0]; var p=d.el.play(); if(p && p.then) p.then(function(){ d.el.pause(); d.el.currentTime=0; }).catch(function(){}); }catch(e){} });
+  MU.unlocked=true;
+}
+function nextTrack(){
+  if(!MU.order.length){ MU.order=MUSIC_TRACKS.map(function(_,i){ return i; }).sort(function(){ return Math.random()-.5; }); if(MU.order[0]===MU.last) MU.order.push(MU.order.shift()); }
+  MU.last=MU.order.shift(); return MU.last;
+}
+function startTrack(){
+  var d=MU.decks.filter(function(x){ return !MU.live || x!==MU.live; })[0]; if(!d) return;
+  var k=nextTrack(); d.el.src=MUSIC_TRACKS[k]; d.el.currentTime=0; d.fading=false;
+  var p=d.el.play(); if(p && p.catch) p.catch(function(){ MU.live=null; MU.gap=10; });
+  d.g.gain.cancelScheduledValues(AU.ctx.currentTime); d.g.gain.setValueAtTime(0,AU.ctx.currentTime); d.g.gain.linearRampToValueAtTime(1,AU.ctx.currentTime+5);
+  MU.live=d;
+}
+function setMusic(on){
+  MU.on=on; try{ localStorage.setItem('nh_music',on?'1':'0'); }catch(e){}
+  $('musBtn').classList.toggle('off',!on); $('musBtn').setAttribute('aria-pressed',on?'true':'false');
+  if(!on && MU.live){ var d=MU.live; MU.live=null; MU.gap=6; setAt(d.g.gain,0,.4); setTimeout(function(){ if(MU.live!==d) d.el.pause(); },1500); }
+}
+function musicUpdate(dt, m){
+  if(!MU.bus) return;
+  // how loud the score sits in each situation (ducks under danger and sleep)
+  var v=m==='title'?.5:m==='space'?(state.warp?.7:.55):m==='atmo'?.4:.32;
+  if(termLoc || (state.dock && state.dock.phase!=='approach')) v=.3;
+  if(state.law || state.chase || (typeof pirateActive==='function' && pirateActive()) || state.scale) v*=.3;
+  if(state.sleeping) v*=.4;
+  setAt(MU.bus.gain,MU.on?v*.75:0,.8);
+  if(!MU.on || !MU.unlocked) return;
+  if(MU.live){
+    var el=MU.live.el; if(el.duration && el.duration-el.currentTime<6 && !MU.live.fading){ MU.live.fading=true; setAt(MU.live.g.gain,0,1.8); }
+  } else { MU.gap-=dt; if(MU.gap<=0) startTrack(); }
+}
+document.addEventListener('visibilitychange',function(){ MU.decks.forEach(function(d){ if(document.hidden) d.el.pause(); else if(MU.live===d && MU.on) d.el.play().catch(function(){}); }); });
 
 /* every frame: beds, engine and wind follow what the ship is doing */
 function audioUpdate(dt){
@@ -3116,6 +3173,7 @@ function audioUpdate(dt){
   setAt(E.wind.gain,wind,.3); setAt(E.windF.frequency,wf,.3); setAt(E.jet.gain,jet,.08);
   if(AU.beds.drone) setAt(AU.beds.drone.gain.gain,drone,.4);
   if(AU.beds.station) setAt(AU.beds.station.gain.gain,stn,.5);
+  musicUpdate(dt, m);
   var dull=state.sleeping||blinking();
   setAt(AU.muffle.frequency,dull?380:18000,dull?.05:.3);
 }
@@ -4009,6 +4067,8 @@ function drawMap(){
 $('foodBtn').addEventListener('click',eatRation);
 $('sndBtn').addEventListener('click',function(){ audioStart(); setSound(!AU.on); toast(AU.on?'SOUND ON':'SOUND OFF'); });
 setSound(AU.on);
+$('musBtn').addEventListener('click',function(){ audioStart(); setMusic(!MU.on); toast(MU.on?'MUSIC ON':'MUSIC OFF'); });
+setMusic(MU.on);
 $('restBtn').addEventListener('click',tapSleep);
 $('radarWrap').addEventListener('click',function(){ if(mapOpen) closeMap(); else openMap(); });
 $('mpClose').addEventListener('click',closeMap);
@@ -4215,7 +4275,7 @@ async function boot(){
 window.__nh={enterPlanet:function(i){ enterAtmosphere(planets[i]); }, ready:function(i){ return !!surfaces[i]; }, land:land, board:board, exitAtmo:exitAtmosphere,
   warp:startWarp, dock:startDock, cam:function(){ return camera; }, station:function(){ return station; }, ship:function(){ return ship; }, state:state, getS:function(){ return S; }, sys:function(){ return SYS; }, enter:function(){ $('enterBtn').click(); },
   queue:queueSurface, terrain:planetTerrain, normalFromSurf:normalFromSurf, openMap:openMap, chunkBuilder:chunkBuilder, planets:function(){ return planets; }, offers:boardOffers, townLoc:townLoc,
-  au:function(){ return AU; }, law:{hall:function(){ return station&&station.gate; }, spawnPirates:spawnPirates, scan:customsScan, actors:function(){ return lawActors; }, heat:heatOf, sec:secOf}};
+  au:function(){ return AU; }, mu:function(){ return MU; }, law:{hall:function(){ return station&&station.gate; }, spawnPirates:spawnPirates, scan:customsScan, actors:function(){ return lawActors; }, heat:heatOf, sec:secOf}};
 boot().catch(function(e){ console.error(e); $('loader').firstChild.nodeValue='Your device could not start the renderer: '+(e&&e.message||e); });
 })();
 </script>
