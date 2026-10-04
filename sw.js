@@ -2,7 +2,7 @@
    Bump VERSION on every release so installed copies pick up the new game. */
 const VERSION = 'nh-2026-10-03-rook';
 const MUSIC_CACHE = 'nh-music-1';   // kept across releases so music downloads once
-const THREE_BASE = 'https://cdn.jsdelivr.net/npm/three@0.128.0/';
+const THREE_BASE = 'https://cdn.jsdelivr.net/npm/three@0.147.0/';
 const CORE = [
   './', './index.html', './manifest.webmanifest',
   './audio/cab_drone.mp3', './audio/station_amb.mp3', './audio/warp_whoosh.mp3', './audio/hatch_open.mp3', './audio/hatch_close.mp3', './audio/forklift.mp3', './audio/warehouse.mp3', './audio/warp_spool.mp3', './audio/landing.mp3', './audio/airbrake.mp3', './audio/scanner.mp3', './audio/confirm.mp3', './audio/gate_chains.mp3', './audio/steps.mp3', './audio/town_amb.mp3', './audio/crickets.mp3', './audio/gear.mp3', './audio/reentry.mp3', './audio/reentry_loop.mp3',

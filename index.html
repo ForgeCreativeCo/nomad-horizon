@@ -432,13 +432,13 @@ body.mapopen #joywrap,body.mapopen #actions,body.mapopen #throttle{visibility:hi
   });
 })();
 </script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/CopyShader.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/LuminosityHighPassShader.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/EffectComposer.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/ShaderPass.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/RenderPass.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/shaders/CopyShader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/shaders/LuminosityHighPassShader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/postprocessing/EffectComposer.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/postprocessing/ShaderPass.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/postprocessing/RenderPass.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
 <script>
 (function(){
 'use strict';
@@ -560,8 +560,8 @@ function buildComposer(){
   if(composer){ composer.renderTarget1.dispose(); composer.renderTarget2.dispose(); }
   var params = {minFilter:THREE.LinearFilter, magFilter:THREE.LinearFilter, format:THREE.RGBAFormat, type:hdrType, stencilBuffer:false};
   var rt;
-  if(Q.msaa && gl2 && THREE.WebGLMultisampleRenderTarget){ rt = new THREE.WebGLMultisampleRenderTarget(4,4,params); rt.samples = Q.msaa; }
-  else rt = new THREE.WebGLRenderTarget(4,4,params);
+  rt = new THREE.WebGLRenderTarget(4,4,params);
+  if(Q.msaa && gl2) rt.samples = Q.msaa;
   composer = new THREE.EffectComposer(renderer, rt);
   renderPass = new THREE.RenderPass(spaceScene, camera);
   bloomPass = new THREE.UnrealBloomPass(new THREE.Vector2(256,256), HDR?0.6:0.5, 0.35, HDR?1.5:0.85);
@@ -642,6 +642,8 @@ function bake(fs, uniforms, w, h, srgb){
   if(srgb) rt.texture.encoding=THREE.sRGBEncoding;
   rt.texture.anisotropy=maxAniso; tud(rt.texture).rt=rt;
   uniforms.noiseTex={value:noiseTex};
+  // sRGB targets are encoded by the GPU on write, so those shaders hand over linear colour
+  if(srgb) fs=fs.replace(/pow\(col,vec3\(1\.0\/2\.2\)\)/g,'col');
   var mat=new THREE.ShaderMaterial({uniforms:uniforms, vertexShader:BAKE_VS, fragmentShader:BAKE_COMMON+'\n'+fs, depthTest:false, depthWrite:false});
   bakeQuad.material=mat;
   renderer.setRenderTarget(rt); renderer.render(bakeScene,bakeCam); renderer.setRenderTarget(null);
