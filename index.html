@@ -2677,6 +2677,7 @@ function enterAtmosphere(p){
   showBanner('ENTERING ATMOSPHERE', S.biome.name, S.biome.meta);
 }
 function exitAtmosphere(){
+  if(state.ap && state.ap.kind==='orbit'){ apOff(''); setTimeout(function(){ toast('IN ORBIT · TAP THE RADAR FOR SYSTEM NAV'); },900); }
   if(state.ap && state.ap.kind==='town') apOff('');
   var p=planets[S.idx], n=normalFromSurf(S.ship.position.x,S.ship.position.z); state.entryNormal=n; sfx('whoosh',.45,1.2);
   ship.position.copy(p.pos).addScaledVector(n,p.radius*1.95);
@@ -3672,7 +3673,9 @@ function updateAutopilot(dt){
 var apChipT=0;
 function updateApChip(force){
   var el=$('apChip'), A=state.ap;
-  if(!A || (state.mode!=='space' && !(state.mode==='atmo' && A.kind==='town'))){ if(!el.hidden) el.hidden=true; return; }
+  if(!A || (state.mode!=='space' && !(state.mode==='atmo' && (A.kind==='town'||A.kind==='orbit')))){ if(!el.hidden) el.hidden=true; return; }
+  if(A.kind==='orbit'){ apChipT-=1/60; if(!force && apChipT>0) return; apChipT=.25; var od=A.dist==null?300:A.dist;
+    el.hidden=false; $('apName').textContent='BACK TO ORBIT'; $('apInfo').textContent='CLIMBING · '+Math.round(od)+' M TO GO'; return; }
   if(A.kind==='town'){ apChipT-=1/60; if(!force && apChipT>0) return; apChipT=.25; var td=A.dist==null?0:A.dist;
     el.hidden=false; $('apName').textContent=A.name; $('apInfo').textContent=(td<70?'ON APPROACH':'CRUISE')+' · '+fmtDist(td)+' · ETA '+clockStr(td/Math.max(1,atmoCruise())+4); return; }
   apChipT-=1/60; if(!force && apChipT>0) return; apChipT=.25;
@@ -4671,8 +4674,22 @@ function startAtmoAutopilot(T){
   state.ap={kind:'town', key:T.key, name:T.name, t:0}; state.waypoint=T.key;
   closeMap(); toast('AUTOPILOT ENGAGED · '+T.name,'life'); updateApChip(true);
 }
+function startOrbitAutopilot(){
+  if(state.mode!=='atmo' || state.landing) return;
+  state.ap={kind:'orbit', name:'BACK TO ORBIT', t:0};
+  closeMap(); toast('AUTOPILOT ENGAGED · CLIMBING TO ORBIT','life'); updateApChip(true);
+}
 function updateAtmoAutopilot(dt){
-  var A=state.ap; if(!A || A.kind!=='town') return;
+  var A=state.ap; if(!A || (A.kind!=='town' && A.kind!=='orbit')) return;
+  if(A.kind==='orbit'){
+    if(state.mode!=='atmo' || state.landing){ apOff(''); return; }
+    if(Math.abs(joy.x)>.35||Math.abs(joy.y)>.35||keys.KeyA||keys.KeyD||keys.ArrowLeft||keys.ArrowRight||keys.ArrowUp||keys.ArrowDown){ apOff('AUTOPILOT OFF · MANUAL CONTROL'); return; }
+    var op=S.ship.position; A.dist=Math.max(0,300-op.y);
+    var eP0=clamp(.75-state.pitch,-1,1);
+    state.apAxes={x:-clamp(-state.yawRate*.5,-.2,.2), y:(INVERT_PITCH?1:-1)*clamp(eP0*3,-1,1)};
+    setThrottle(1);
+    return;
+  }
   if(state.mode!=='atmo' || state.landing){ apOff(''); return; }
   var manual=Math.abs(joy.x)>.35||Math.abs(joy.y)>.35||keys.KeyA||keys.KeyD||keys.ArrowLeft||keys.ArrowRight||keys.ArrowUp||keys.ArrowDown;
   if(manual){ apOff('AUTOPILOT OFF · MANUAL CONTROL'); return; }
@@ -4880,6 +4897,12 @@ function closeMap(){ mapOpen=false; clearInterval(mapTimer); $('mapPanel').hidde
 function fmtDist(d){ return d>=1000?(d/1000).toFixed(1)+' KM':Math.round(d)+' M'; }
 function renderMapList(){
   var f=mapFocus(), list=$('mpList'); list.innerHTML='';
+  if(state.mode==='atmo' && !state.landing){
+    var orow=document.createElement('button'), oon=state.ap && state.ap.kind==='orbit'; orow.type='button'; orow.className='wp-row';
+    orow.innerHTML='<span class="mp-ico" style="background:#7fe8ff"></span><span class="wp-name">BACK TO ORBIT</span><span class="wp-dist">'+Math.max(0,Math.round(300-S.ship.position.y))+' M UP</span>'+
+      '<span class="wp-meta">'+(oon?'<span style="color:var(--cyan)">AUTOPILOT ENGAGED</span>':'TAP TO CLIMB OUT TO SPACE ON AUTOPILOT')+'</span>';
+    orow.addEventListener('click',startOrbitAutopilot); list.appendChild(orow);
+  }
   S.towns.map(function(T){ return {T:T, d:Math.hypot(T.x-f.x,T.z-f.z), dest:townDest(T)}; })
     .sort(function(a,b){ return (b.dest?1:0)-(a.dest?1:0) || a.d-b.d; })
     .forEach(function(o){
@@ -5124,7 +5147,7 @@ async function boot(){
   setTimeout(function(){ ld.style.opacity=0; },400);
   frame();
 }
-window.__nh={gfx:{foot:function(){ var T=S.towns[0], x=T.x+40, z=T.z+40; S.ship.position.set(x,S.heightAt(x,z)+hullGear(S.ship),z); state.landing=null; disembark(); state.camFrom=null; }, chunks:function(x,z){ if(S) updateChunks(S,x,z,true); }, day:function(ph){ if(S){ S.day.phase=ph; updateDay(0); state.exposure=state.exposureTarget; } }, Q:function(){ return Q; }}, step:function(n,dt){ dt=dt||.05; for(var i=0;i<n;i++){ state.t+=dt; if(state.mode==='space') updateSpace(dt); else if(state.mode==='atmo'&&S) updateAtmo(dt); updateLaw(dt); updateSpool(dt); } }, pulse:{engage:function(){ return engagePulse(false); }, drop:function(){ dropPulse(''); }, block:function(){ return pulseBlock(); }, targets:function(){ return apTargets(); }, ap:function(i){ startAutopilot(apTargets()[i]); }, apTo:function(kind,idx){ startAutopilot(apTargets().filter(function(t){ return t.kind===kind && (kind==='station'||t.idx===idx); })[0]); }, nav:function(){ openNav(); }, atmoTo:function(i){ var T=S.towns.slice().sort(function(a,b){ return Math.hypot(b.x-S.ship.position.x,b.z-S.ship.position.z)-Math.hypot(a.x-S.ship.position.x,a.z-S.ship.position.z); })[i||0]; startAtmoAutopilot(T); return T.name; }, speed:function(){ return pulseSpeed(); }}, fx:{hasMod:hasMod, modSlots:modSlots, holdCap:holdCap, fuelCap:fuelCap, kindNeeds:kindNeeds, wearHull:wearHull, save:save, swap:swapPlayerHull}, enterPlanet:function(i){ enterAtmosphere(planets[i]); }, ready:function(i){ return !!surfaces[i]; }, land:land, board:board, exitAtmo:exitAtmosphere,
+window.__nh={gfx:{foot:function(){ var T=S.towns[0], x=T.x+40, z=T.z+40; S.ship.position.set(x,S.heightAt(x,z)+hullGear(S.ship),z); state.landing=null; disembark(); state.camFrom=null; }, chunks:function(x,z){ if(S) updateChunks(S,x,z,true); }, day:function(ph){ if(S){ S.day.phase=ph; updateDay(0); state.exposure=state.exposureTarget; } }, Q:function(){ return Q; }}, step:function(n,dt){ dt=dt||.05; for(var i=0;i<n;i++){ state.t+=dt; if(state.mode==='space') updateSpace(dt); else if(state.mode==='atmo'&&S) updateAtmo(dt); updateLaw(dt); updateSpool(dt); } }, pulse:{engage:function(){ return engagePulse(false); }, drop:function(){ dropPulse(''); }, block:function(){ return pulseBlock(); }, targets:function(){ return apTargets(); }, ap:function(i){ startAutopilot(apTargets()[i]); }, apTo:function(kind,idx){ startAutopilot(apTargets().filter(function(t){ return t.kind===kind && (kind==='station'||t.idx===idx); })[0]); }, nav:function(){ openNav(); }, orbit:function(){ startOrbitAutopilot(); }, atmoTo:function(i){ var T=S.towns.slice().sort(function(a,b){ return Math.hypot(b.x-S.ship.position.x,b.z-S.ship.position.z)-Math.hypot(a.x-S.ship.position.x,a.z-S.ship.position.z); })[i||0]; startAtmoAutopilot(T); return T.name; }, speed:function(){ return pulseSpeed(); }}, fx:{hasMod:hasMod, modSlots:modSlots, holdCap:holdCap, fuelCap:fuelCap, kindNeeds:kindNeeds, wearHull:wearHull, save:save, swap:swapPlayerHull}, enterPlanet:function(i){ enterAtmosphere(planets[i]); }, ready:function(i){ return !!surfaces[i]; }, land:land, board:board, exitAtmo:exitAtmosphere,
   warp:startWarp, dock:startDock, cam:function(){ return camera; }, station:function(){ return station; }, ship:function(){ return ship; }, state:state, getS:function(){ return S; }, sys:function(){ return SYS; }, enter:function(){ $('enterBtn').click(); },
   queue:queueSurface, terrain:planetTerrain, normalFromSurf:normalFromSurf, openMap:openMap, chunkBuilder:chunkBuilder, planets:function(){ return planets; }, offers:boardOffers, townLoc:townLoc,
   au:function(){ return AU; }, mu:function(){ return MU; }, law:{hall:function(){ return station&&station.gate; }, spawnPirates:spawnPirates, scan:customsScan, actors:function(){ return lawActors; }, heat:heatOf, sec:secOf}};
