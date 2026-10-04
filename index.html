@@ -305,11 +305,31 @@ button:focus-visible{outline:2px solid var(--cyan);outline-offset:3px;}
 #btnWarp.has-drop::after{content:"";position:absolute;top:.5rem;right:.55rem;width:.6rem;height:.6rem;border-radius:50%;background:var(--amber);box-shadow:0 0 10px var(--amber);}
 .st-row .nm small.fx .xs{color:var(--amber);}
 .wp-meta{grid-column:2 / 4;font-family:var(--font-mono);font-size:.6rem;letter-spacing:.06em;color:var(--ink-dim);}
+#navPanel{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:30;width:min(92vw,27rem);max-height:84%;overflow:hidden;
+  padding:1rem;pointer-events:auto;display:flex;flex-direction:column;gap:.55rem;background:rgba(6,11,22,.86);}
+#navPanel .wp-head,#navPanel .wp-title{padding-right:2.8rem;}
+#nvList{display:flex;flex-direction:column;gap:.5rem;overflow-y:auto;min-height:0;flex:1 1 auto;-webkit-overflow-scrolling:touch;}
+.nv-btns{display:flex;justify-content:center;gap:.6rem;flex:0 0 auto;}
+.nv-btns button{margin-top:.2rem;font-family:var(--font-mono);font-size:.68rem;letter-spacing:.16em;color:var(--ink-dim);background:none;border:1px solid var(--line);border-radius:99px;padding:.55rem 1.4rem;cursor:pointer;}
+#nvOff{color:var(--amber);border-color:rgba(255,178,77,.6);}
+#apChip{position:absolute;left:50%;transform:translateX(-50%);top:calc(3.75rem + env(safe-area-inset-top,0px));z-index:12;pointer-events:auto;cursor:pointer;
+  display:flex;align-items:center;gap:.55rem;padding:.35rem .5rem .35rem .8rem;border-radius:99px;border:1px solid rgba(127,232,255,.55);
+  background:rgba(6,14,26,.72);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);color:var(--ink);font-family:var(--font-mono);font-size:.6rem;letter-spacing:.08em;white-space:nowrap;max-width:min(92vw,23rem);overflow:hidden;}
+#apChip .ap-eye{color:var(--cyan);letter-spacing:.2em;}
+#apChip #apName{font-family:var(--font-display);font-weight:700;font-size:.74rem;letter-spacing:.06em;min-width:0;overflow:hidden;text-overflow:ellipsis;}
+#apChip #apInfo{color:var(--ink-dim);font-variant-numeric:tabular-nums;}
+#apChip .ap-x{width:1.3rem;height:1.3rem;border-radius:50%;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.08);}
+@media (max-width:900px){ #apChip .ap-eye{display:none;} }
+#btnPulse{pointer-events:auto;width:3.5rem;height:2.1rem;border-radius:99px;border:1px solid rgba(127,232,255,.6);background:var(--glass);color:var(--ink);
+  font-family:var(--font-display);font-weight:700;font-size:.66rem;letter-spacing:.12em;cursor:pointer;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);margin-bottom:.15rem;}
+#btnPulse[hidden]{display:none;}
+#btnPulse.on{color:#04121a;background:radial-gradient(circle,#e4fbff,var(--cyan));box-shadow:0 0 18px rgba(127,232,255,.7);}
+#btnPulse.locked{opacity:.45;border-color:var(--line);}
 #wpClose{align-self:center;margin-top:.2rem;font-family:var(--font-mono);font-size:.68rem;letter-spacing:.16em;color:var(--ink-dim);
   background:none;border:1px solid var(--line);border-radius:99px;padding:.55rem 1.4rem;cursor:pointer;}
 #radarWrap{pointer-events:auto;cursor:pointer;-webkit-tap-highlight-color:transparent;}
 #radarWrap .maptap{display:none;margin-top:.15rem;text-align:center;font-family:var(--font-mono);font-size:.5rem;letter-spacing:.2em;color:var(--ink-dim);}
-#radarWrap.planet .maptap{display:block;}
+#radarWrap .maptap{display:block;}
 #mapPanel{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:30;width:min(94vw,30rem);max-height:92%;overflow:auto;
   padding:.9rem;pointer-events:auto;display:grid;grid-template-columns:1fr;gap:.55rem;background:rgba(6,11,22,.9);}
 body.mapopen #joywrap,body.mapopen #actions,body.mapopen #throttle{visibility:hidden;}
@@ -375,6 +395,14 @@ body.mapopen #joywrap,body.mapopen #actions,body.mapopen #throttle{visibility:hi
       <button id="wpClose" type="button">CANCEL</button>
     </div>
     <div id="lawPanel" class="panel" hidden><div id="lwHead"><span id="lwEye"></span><span id="lwTimer"></span></div><div id="lwTitle"></div><div id="lwBody"></div><div id="lwBtns"></div></div>
+    <div id="navPanel" class="panel" hidden>
+      <button class="panel-x" id="nvX" type="button" aria-label="Close nav">&#x2715;</button>
+      <div class="wp-head">SYSTEM NAV &middot; <span id="nvSys"></span></div>
+      <div class="wp-title">Set autopilot</div>
+      <div id="nvList"></div>
+      <div class="nv-btns"><button id="nvOff" type="button" hidden>AUTOPILOT OFF</button><button id="nvClose" type="button">CANCEL</button></div>
+    </div>
+    <button id="apChip" type="button" hidden aria-label="Autopilot, tap to turn off"><span class="ap-eye">AUTOPILOT</span><span id="apName"></span><span id="apInfo"></span><span class="ap-x">&#x2715;</span></button>
     <div id="mapPanel" class="panel" hidden>
       <div class="wp-head">PLANET MAP &middot; <span id="mpPlanet"></span></div>
       <canvas id="mapCv" width="512" height="512"></canvas>
@@ -386,7 +414,7 @@ body.mapopen #joywrap,body.mapopen #actions,body.mapopen #throttle{visibility:hi
 
   <div id="lookzone"></div>
   <div id="joywrap"><div id="joybase"></div><div id="joyknob"></div><span id="joyCap">STEER</span></div>
-  <div id="throttle" hidden><span id="thVal">0%</span><div id="thTrack" role="slider" aria-label="Throttle"><i id="thRev"></i><i id="thFill"></i><span class="th-zero"></span><b id="thKnob"></b></div><span class="th-lbl">THROTTLE</span></div>
+  <div id="throttle" hidden><button id="btnPulse" type="button" hidden>PULSE</button><span id="thVal">0%</span><div id="thTrack" role="slider" aria-label="Throttle"><i id="thRev"></i><i id="thFill"></i><span class="th-zero"></span><b id="thKnob"></b></div><span class="th-lbl">THROTTLE</span></div>
   <div id="actions">
     <button class="actbtn" id="btnWarp" type="button" hidden>WARP</button>
     <button class="actbtn" id="btnScan" type="button" hidden>SCAN</button>
@@ -503,7 +531,7 @@ else if(!gl2 && renderer.extensions.has('OES_texture_half_float') && renderer.ex
 var HDR = hdrType===THREE.HalfFloatType;
 var maxAniso = renderer.capabilities.getMaxAnisotropy();
 
-var SYS_SPREAD=2.6, SUN_FAR=2.6;
+var SYS_SPREAD=95, SUN_FAR=60, PLANET_R=5, SPACE_UNIT=SYS_SPREAD/2.6;   // systems are wide: worlds sit 15-30K km out
 var camera = new THREE.PerspectiveCamera(62, 1, 0.1, 13000);
 var resScale = 1;
 function basePR(){ return Math.min(window.devicePixelRatio||1, Q.pr); }
@@ -763,7 +791,7 @@ var STAR_CLASSES=[{cls:'M',col:'#ffb07e',name:'RED DWARF'},{cls:'K',col:'#ffd3a4
 function systemName(seed){ var r=rng(ihash(seed,991)); return genWord(r,2+(r()<.4?1:0)).toUpperCase()+'-'+(10+Math.floor(r()*890)); }
 function homeSystem(){
   return finishStation({seed:0, name:'ORIGIN', star:{cls:'G',col:'#fff0dc',name:'YELLOW'}, sunPos:new THREE.Vector3(-260,240,-1300).multiplyScalar(SUN_FAR),
-    planets:[{pos:new THREE.Vector3(-90,-10,-190).multiplyScalar(SYS_SPREAD),radius:22},{pos:new THREE.Vector3(190,22,-70).multiplyScalar(SYS_SPREAD),radius:26},{pos:new THREE.Vector3(-40,-24,170).multiplyScalar(SYS_SPREAD),radius:24},{pos:new THREE.Vector3(230,-14,210).multiplyScalar(SYS_SPREAD),radius:19}],
+    planets:[{pos:new THREE.Vector3(-90,-10,-190).multiplyScalar(SYS_SPREAD),radius:22*PLANET_R},{pos:new THREE.Vector3(190,22,-70).multiplyScalar(SYS_SPREAD),radius:26*PLANET_R},{pos:new THREE.Vector3(-40,-24,170).multiplyScalar(SYS_SPREAD),radius:24*PLANET_R},{pos:new THREE.Vector3(230,-14,210).multiplyScalar(SYS_SPREAD),radius:19*PLANET_R}],
     biomes:HOME_BIOMES, neb:['#3a2a8a','#1a7a9a','#c87a5a'], belt:3, arrival:new THREE.Vector3(0,0,24)});
 }
 function genSystem(seed){
@@ -775,7 +803,7 @@ function genSystem(seed){
   while(habIdx.length<habN){ var hq=Math.floor(r()*n); if(habIdx.indexOf(hq)<0) habIdx.push(hq); }
   for(var i=0;i<n;i++){
     var ang=base+i*(TAU/n)+(r()-.5)*.7, dist=(150+r()*170)*SYS_SPREAD;
-    planets.push({pos:new THREE.Vector3(Math.cos(ang)*dist,(r()-.5)*50*SYS_SPREAD,Math.sin(ang)*dist), radius:16+r()*12});
+    planets.push({pos:new THREE.Vector3(Math.cos(ang)*dist,(r()-.5)*50*SYS_SPREAD,Math.sin(ang)*dist), radius:(16+r()*12)*PLANET_R});
     var pr=rng(ihash(seed,100+i)), suf=['',' PRIME',' MINOR',' IV',' VII',' B','',''];
     var isHab=habIdx.indexOf(i)>=0, ft=isHab?['lush','ocean','desert'][Math.floor(pr()*3)]:['frozen','scorched','toxic','exotic'][Math.floor(pr()*4)];
     var b=genBiome(ihash(seed,i+1), genWord(pr,2+(pr()<.5?1:0)).toUpperCase()+suf[Math.floor(pr()*suf.length)], star.col, ft);
@@ -1194,15 +1222,16 @@ function buildSystem(sys){
   sys.planets.forEach(function(pd,i){
     var b=BIOMES[i], radius=pd.radius, tex=planetTex[i];
     var mat=new THREE.MeshStandardMaterial({map:tex.color, roughnessMap:tex.height, bumpMap:tex.height, bumpScale:.12, metalness:0, roughness:1});
-    var mesh=new THREE.Mesh(new THREE.SphereGeometry(radius,96,64),mat); mesh.position.copy(pd.pos); mesh.rotation.z=.25-i*.12;
-    sysGroup.add(mesh);
+    var vis=new THREE.Group(); vis.position.copy(pd.pos); sysGroup.add(vis);
+    var mesh=new THREE.Mesh(new THREE.SphereGeometry(radius,96,64),mat); mesh.rotation.z=.25-i*.12;
+    vis.add(mesh);
     var cl=new THREE.Mesh(new THREE.SphereGeometry(radius*1.012,96,64), new THREE.MeshStandardMaterial({color:0xffffff, alphaMap:tex.clouds, transparent:true, depthWrite:false, roughness:1, opacity:Math.min(1,b.cloud*1.3)}));
     mesh.add(cl);
     var atmoCol=lin(b.horizon).multiplyScalar(1.4).lerp(lin(b.zenith),.35);
     var atmo=new THREE.Mesh(new THREE.SphereGeometry(radius*1.09,96,64), atmoMaterial(atmoCol,1.09,2.2,SPACE_SUN));
-    atmo.position.copy(pd.pos); sysGroup.add(atmo);
-    if(b.ring){ var rg=ringMesh(radius*1.45, radius*2.3, lin(b.peak).multiplyScalar(.9)); rg.rotation.x=-Math.PI/2+.38; rg.rotation.y=.2; rg.position.copy(pd.pos); sysGroup.add(rg); }
-    planets.push({mesh:mesh, clouds:cl, radius:radius, index:i, biome:b, spin:.012+i*.003});
+    vis.add(atmo);
+    if(b.ring){ var rg=ringMesh(radius*1.45, radius*2.3, lin(b.peak).multiplyScalar(.9)); rg.rotation.x=-Math.PI/2+.38; rg.rotation.y=.2; vis.add(rg); }
+    planets.push({mesh:mesh, vis:vis, pos:pd.pos.clone(), soft:[atmo.material, cl.material], clouds:cl, radius:radius, index:i, biome:b, spin:.012+i*.003});
   });
 
   station=null;
@@ -1212,14 +1241,14 @@ function buildSystem(sys){
     for(var k=0;k<ap.count;k++){ v.fromBufferAttribute(ap,k); var n=.75+fbm(v.x*1.7+3,v.y*1.7+v.z*1.3,3)*.55; v.multiplyScalar(n); ap.setXYZ(k,v.x,v.y*.8,v.z); }
     ag.computeVertexNormals();
     var am=new THREE.MeshStandardMaterial({color:0x6a5e54, roughness:.95, metalness:.05, map:detailAlbedo, normalMap:detailNormal});
-    var pr=planets[sys.belt].radius, AC=260, inst=new THREE.InstancedMesh(ag,am,AC), dmy=new THREE.Object3D(), ar=rng(9+sys.seed);
+    var pr=planets[sys.belt].radius, AC=420, inst=new THREE.InstancedMesh(ag,am,AC), dmy=new THREE.Object3D(), ar=rng(9+sys.seed);
     for(var a=0;a<AC;a++){
       var ang=ar()*TAU, rad=pr*1.6+ar()*pr;
-      dmy.position.set(Math.cos(ang)*rad,(ar()-.5)*4,Math.sin(ang)*rad);
-      dmy.rotation.set(ar()*TAU,ar()*TAU,ar()*TAU); var s=.25+Math.pow(ar(),3)*2.4; dmy.scale.set(s,s*(.6+ar()*.5),s);
+      dmy.position.set(Math.cos(ang)*rad,(ar()-.5)*12,Math.sin(ang)*rad);
+      dmy.rotation.set(ar()*TAU,ar()*TAU,ar()*TAU); var s=(.25+Math.pow(ar(),3)*2.4)*2.5; dmy.scale.set(s,s*(.6+ar()*.5),s);
       dmy.updateMatrix(); inst.setMatrixAt(a,dmy.matrix);
     }
-    asteroidGroup=new THREE.Group(); asteroidGroup.add(inst); asteroidGroup.position.copy(planets[sys.belt].mesh.position); asteroidGroup.rotation.x=.28; sysGroup.add(asteroidGroup);
+    asteroidGroup=new THREE.Group(); asteroidGroup.add(inst); asteroidGroup.rotation.x=.28; planets[sys.belt].vis.add(asteroidGroup);
   }
   buildStation(sys.station, sysGroup);
 }
@@ -2058,7 +2087,7 @@ window.addEventListener('mouseup',function(){ setHold(false); });
 /* =========================================================================
    Game state + HUD
    ========================================================================= */
-var state={throttle:0, yawRate:0, pitchRate:0, mode:'title', yaw:Math.PI, pitch:0, vel:new THREE.Vector3(), energy:100, scan:1, credits:0, inv:{}, found:{}, sysSeed:0, up:{}, cargo:[], taken:{}, boardGen:{}, delivered:0, dock:null, mods:[], modsOwned:{}, lic:{}, fuel:null, hull:100, company:null, hullSel:null, rooks:{}, fits:{}, fuelReserve:0, cleared:0, heat:{}, flares:3, food:100, rest:100, rations:2, fedT:0, restedT:0, needsOff:false, blinkT:0, sleeping:false, law:null, chase:null, arrivedT:0, pirateT:30,
+var state={throttle:0, yawRate:0, pitchRate:0, mode:'title', yaw:Math.PI, pitch:0, vel:new THREE.Vector3(), energy:100, scan:1, credits:0, inv:{}, found:{}, sysSeed:0, up:{}, cargo:[], taken:{}, boardGen:{}, delivered:0, dock:null, mods:[], modsOwned:{}, lic:{}, fuel:null, hull:100, company:null, hullSel:null, rooks:{}, pulse:null, pulseK:0, ap:null, apAxes:null, fits:{}, fuelReserve:0, cleared:0, heat:{}, flares:3, food:100, rest:100, rations:2, fedT:0, restedT:0, needsOff:false, blinkT:0, sleeping:false, law:null, chase:null, arrivedT:0, pirateT:30,
   pos:new THREE.Vector3(), vy:0, grounded:true, bob:0, fovKick:0, exposure:1, exposureTarget:1, t:0, warp:null};
 var OLD_KEYS={'CINDER REACH':'PYRITE','GLASSWATER':'CYANITE','VERDANT HOLLOW':'AMETHINE','PALE SILICATE':'AURUM'};
 try{
@@ -2162,8 +2191,8 @@ function loadSystem(seed){
   buildSystem(genSystem(seed));
   state.sysSeed=seed;
   ship.position.copy(SYS.arrival);
-  var near=planets.reduce(function(a,p){ return (!a || p.mesh.position.distanceTo(ship.position)<a.mesh.position.distanceTo(ship.position))?p:a; },null);
-  var d=near.mesh.position.clone().sub(ship.position).normalize();
+  var near=planets.reduce(function(a,p){ return (!a || p.pos.distanceTo(ship.position)<a.pos.distanceTo(ship.position))?p:a; },null);
+  var d=near.pos.clone().sub(ship.position).normalize();
   state.yaw=Math.atan2(d.x,d.z); state.pitch=Math.asin(clamp(d.y,-1,1))*.5;
   M4.lookAt(V3.copy(ship.position).sub(d), ship.position, UP); ship.quaternion.setFromRotationMatrix(M4);
   state.arrivedT=state.t; initLaw();
@@ -2184,7 +2213,8 @@ function setVeil(v, color, heat){
 function setScene(scene){ renderPass.scene=scene; }
 function setModeUI(mode){
   var foot=mode==='surface';
-  $('enLabel').textContent=foot?'JETPACK':'PULSE'; btnA.textContent=foot?'JET':'BOOST'; $('btnScan').hidden=!foot;
+  $('enLabel').textContent=foot?'JETPACK':'BOOST'; $('radarWrap').querySelector('.maptap').textContent=mode==='space'?'TAP · NAV':'TAP · MAP';
+  if(mode!=='space'){ closeNav(); } btnA.textContent=foot?'JET':'BOOST'; $('btnScan').hidden=!foot;
   $('btnWarp').hidden=mode!=='space';
   if(mode!=='space') $('warpPanel').hidden=true;
   $('radarWrap').classList.toggle('planet',mode!=='space'); if(mode==='space') closeMap();
@@ -2210,8 +2240,9 @@ function enterAtmosphere(p){
     renderer.compile(S.scene,camera);
   }
   updateHullCargo();
-  state.entryNormal=ship.position.clone().sub(p.mesh.position).normalize(); wearHull(.4); if(AU.buf.reentry){ sfx('reentry',.95); sfx('whoosh',.25,1.35); } else sfx('whoosh',.55,1.35);
-  setDayFromElevation(S, state.entryNormal.dot(V3.copy(SPACE_SUN).sub(p.mesh.position).normalize()));
+  state.entryNormal=ship.position.clone().sub(p.pos).normalize(); wearHull(.4); if(AU.buf.reentry){ sfx('reentry',.95); sfx('whoosh',.25,1.35); } else sfx('whoosh',.55,1.35);
+  setDayFromElevation(S, state.entryNormal.dot(V3.copy(SPACE_SUN).sub(p.pos).normalize()));
+  if(state.ap) apOff('AUTOPILOT OFF · YOU HAVE CONTROL'); state.pulse=null; state.pulseK=0;
   state.mode='atmo'; setScene(S.scene); setModeUI('atmo');
   var fx=Math.sin(state.yaw), fz=Math.cos(state.yaw), spot=surfFromNormal(state.entryNormal), lim=WORLD_E-260;
   var tx=clamp(spot.x,-lim,lim), tz=clamp(spot.z,-lim,lim);
@@ -2232,7 +2263,7 @@ function enterAtmosphere(p){
 }
 function exitAtmosphere(){
   var p=planets[S.idx], n=normalFromSurf(S.ship.position.x,S.ship.position.z); state.entryNormal=n; sfx('whoosh',.45,1.2);
-  ship.position.copy(p.mesh.position).addScaledVector(n,p.radius*1.95);
+  ship.position.copy(p.pos).addScaledVector(n,p.radius*1.95);
   state.yaw=Math.atan2(n.x,n.z); state.pitch=Math.asin(clamp(n.y,-1,1))*.6; state.camYaw=null; state.camPitch=null;
   state.vel.copy(n).multiplyScalar(32);
   M4.lookAt(V3.copy(ship.position).sub(n), ship.position, UP); ship.quaternion.setFromRotationMatrix(M4);
@@ -2256,6 +2287,7 @@ function flightAxes(){
   if(blinking()) return {x:0, y:0, hold:false};
   var x=joy.x+((keys.KeyD||keys.ArrowRight)?1:0)-((keys.KeyA||keys.ArrowLeft)?1:0);
   var y=joy.y+(keys.ArrowDown?1:0)-(keys.ArrowUp?1:0);
+  if(state.ap && state.apAxes && state.mode==='space') return {x:state.apAxes.x, y:state.apAxes.y, hold:false};
   return {x:clamp(x,-1,1), y:clamp(y,-1,1), hold:holdA||keys.Space||keys.ShiftLeft||keys.ShiftRight};
 }
 function curve(v){ return (v<0?-1:1)*Math.pow(Math.abs(v),1.5); }
@@ -2266,7 +2298,8 @@ function flyShip(dt, obj, sc, cruiseSpd, boostSpd, openK){
   // throttle keys (desktop)
   if(keys.KeyW) setThrottle(state.throttle+dt*.7); if(keys.KeyS) setThrottle(state.throttle-dt*.7);
   // turn rates with inertia
-  var tYaw=-curve(inp.x)*HH.yaw, tPitch=(INVERT_PITCH?1:-1)*curve(inp.y)*HH.pitch, k=1-Math.exp(-HH.agi*needsAgi()*dt);
+  var turnK=1-.55*(state.mode==='space'?(state.pulseK||0):0);
+  var tYaw=-curve(inp.x)*HH.yaw*turnK, tPitch=(INVERT_PITCH?1:-1)*curve(inp.y)*HH.pitch*turnK, k=1-Math.exp(-HH.agi*needsAgi()*dt);
   state.yawRate+=(tYaw-state.yawRate)*k; state.pitchRate+=(tPitch-state.pitchRate)*k;
   // soft pitch limit: resistance builds near vertical instead of a wall
   var lim=1.3, pr=state.pitchRate;
@@ -2274,9 +2307,10 @@ function flyShip(dt, obj, sc, cruiseSpd, boostSpd, openK){
   state.yaw+=state.yawRate*dt; state.pitch=clamp(state.pitch+pr*dt,-lim,lim);
   var fwd=FWD.set(Math.sin(state.yaw)*Math.cos(state.pitch),Math.sin(state.pitch),Math.cos(state.yaw)*Math.cos(state.pitch)).normalize();
   // speed from the throttle lever (boost overrides)
-  var boosting=inp.hold && state.energy>1, thr=state.throttle;
+  var pk=state.mode==='space'?(state.pulseK||0):0, boosting=inp.hold && state.energy>1 && !state.pulse, thr=state.throttle;
   if(boosting){ state.energy=Math.max(0,state.energy-dt*16); thr=Math.max(thr,1); } else state.energy=Math.min(100,state.energy+dt*8*needsEnergyMul());
   var speed=(boosting?boostSpd:cruiseSpd)*thr;
+  if(pk>0) speed=lerp(Math.max(speed,cruiseSpd),pulseSpeed(),pk);
   var target=new THREE.Vector3().copy(fwd).multiplyScalar(speed);
   state.vel.lerp(target,1-Math.pow(HH.grip,dt));
   obj.position.addScaledVector(state.vel,dt);
@@ -2288,7 +2322,7 @@ function flyShip(dt, obj, sc, cruiseSpd, boostSpd, openK){
   obj.quaternion.slerp(QT,1-Math.pow(.002,dt));
   var thrust=clamp(Math.abs(thr)+(boosting?1.2:0)+state.vel.length()/(cruiseSpd*4),0,2.2);
   obj.userData.flames.forEach(function(f){ var u=f.material.uniforms; u.intensity.value=lerp(u.intensity.value,.25+thrust*.9,.15); u.time.value=state.t; f.scale.y=.4+thrust*.6; });
-  state.fovKick=lerp(state.fovKick,boosting?14:0,1-Math.pow(.05,dt));
+  state.fovKick=lerp(state.fovKick,Math.max(boosting?14:0,pk*16),1-Math.pow(.05,dt));
   camera.fov=62+state.fovKick; camera.updateProjectionMatrix();
   // chase camera: locked to the ship's heading with a short, tight lag (no positional spring)
   var kc=1-Math.exp(-9*dt);
@@ -2301,7 +2335,7 @@ function flyShip(dt, obj, sc, cruiseSpd, boostSpd, openK){
   var dist=(10+state.fovKick*.15)*sc, cy=state.camYaw+Math.PI+state.lookYaw, cp=-state.camPitch+.24+state.lookPitch;
   CAMOFF.set(Math.sin(cy)*Math.cos(cp),Math.sin(cp),Math.cos(cy)*Math.cos(cp)).multiplyScalar(dist);
   camera.position.copy(obj.position).add(CAMOFF).addScaledVector(UP,1.1*sc);
-  if(boosting){ camera.position.x+=(Math.random()-.5)*.08; camera.position.y+=(Math.random()-.5)*.08; }
+  if(boosting||pk>.3){ var sh=boosting?.08:.05*pk; camera.position.x+=(Math.random()-.5)*sh; camera.position.y+=(Math.random()-.5)*sh; }
   finalPass.uniforms.boost.value=state.fovKick/14;
   var la=state.lookYaw, lp=state.lookPitch, fl=Math.min(1,Math.max(Math.abs(la),Math.abs(lp))*3);
   var ahead=new THREE.Vector3(Math.sin(state.camYaw)*Math.cos(state.camPitch),Math.sin(state.camPitch),Math.cos(state.camYaw)*Math.cos(state.camPitch));
@@ -2467,7 +2501,7 @@ function locDist(a, b){
     var st=planetTerrain(SYS.biomes[a.planet]).sites, p=st[a.site||0], q=st[b.site||0];
     return 150+Math.hypot(p.x-q.x,p.z-q.z)*.6;
   }
-  return locPos(a).distanceTo(locPos(b));
+  return locPos(a).distanceTo(locPos(b))/SPACE_UNIT*1.5;   // longer legs since systems spread out
 }
 function locPos(loc){ return loc.kind==='station'?SYS.station.pos:SYS.planets[loc.planet].pos; }
 function priceAt(el, loc){
@@ -2793,6 +2827,7 @@ function dockArrived(){
 }
 function startDock(){
   if(state.dock||!station) return;
+  state.pulse=null; state.pulseK=0; closeNav();
   stopRates(); setThrottle(0);
   var E=station.mouthW.clone().addScaledVector(station.dirW,30), P0=ship.position.clone(), d=P0.distanceTo(E);
   state.dock={phase:'approach', t:0, p0:P0, E:E, I:dockPoint(), D:station.dirW.clone(), dur:clamp(d/45,1.8,5), ctrl:E.clone().addScaledVector(station.dirW,Math.min(d*.6,90))};
@@ -3082,31 +3117,236 @@ $('undockBtn').addEventListener('click',function(){ if(termLoc && termLoc.kind==
 
 
 /* =========================================================================
+   Pulse drive and autopilot. Systems are wide: worlds sit tens of thousands
+   of km apart, so in open space the pulse drive carries you between them and
+   the autopilot can point the ship and fly the whole leg for you.
+   ========================================================================= */
+var PULSE_SPD=450, PULSE_SPOOL=1.6, PULSE_DROP=2.2, PULSE_FUEL=1/20, AP_PULSE_MIN=3000;
+function shortKm(d){ return d>=10000?(d/1000).toFixed(1)+'K KM':fmt(d)+' KM'; }
+function nearestBody(pos){ var best=null, bd=1e12; planets.forEach(function(p){ var d=pos.distanceTo(p.pos)-p.radius; if(d<bd){ bd=d; best=p; } }); return {p:best, d:bd}; }
+function pulseSpeed(){ return PULSE_SPD*speedMul()*HULL_HANDLING[hullTier()].spd; }
+function pulseBlock(){
+  if(state.mode!=='space'||state.warp||state.dock||state.spool) return 'PULSE DRIVE UNAVAILABLE';
+  if(state.law||state.chase||state.scale||pirateActive()) return 'MASS LOCKED · HOSTILES NEARBY';
+  if(state.fuel<1) return 'NO FUEL FOR THE PULSE DRIVE';
+  var nb=nearestBody(ship.position); if(nb.p && nb.d<nb.p.radius*1.5) return 'MASS LOCKED · TOO CLOSE TO '+nb.p.biome.name;
+  if(station && ship.position.distanceTo(station.center)<200) return 'MASS LOCKED · TOO CLOSE TO THE STATION';
+  return '';
+}
+function engagePulse(quiet){
+  if(state.pulse) return true;
+  var why=pulseBlock(); if(why){ if(!quiet) toast(why); return false; }
+  state.pulse={phase:'spool', t:0}; setThrottle(1);
+  sfx('warpSpool',.5,1.9);
+  return true;
+}
+function dropPulse(msg, hard){
+  var P=state.pulse; if(!P) return;
+  if(P.phase==='spool'){ state.pulse=null; state.pulseK=0; if(msg) toast(msg); return; }
+  if(P.phase==='drop') return;
+  state.pulse={phase:'drop', t:0, k0:state.pulseK||0, len:hard?.8:PULSE_DROP};
+  sfx('whoosh',.35,.7); if(msg) toast(msg);
+}
+function updatePulse(dt){
+  var P=state.pulse;
+  if(!P){ state.pulseK=0; return; }
+  if(state.mode!=='space'||state.warp||state.dock){ state.pulse=null; state.pulseK=0; return; }
+  P.t+=dt;
+  if(P.phase==='spool'){
+    state.pulseK=0; state.fovKick=Math.max(state.fovKick||0,P.t/PULSE_SPOOL*5);
+    if(state.law||pirateActive()){ state.pulse=null; return; }
+    if(P.t>=PULSE_SPOOL){ P.phase='on'; P.t=0; sfx('whoosh',.45,1.3); }
+  } else if(P.phase==='on'){
+    state.pulseK=Math.min(1,(state.pulseK||0)+dt/1.4);
+    state.fuel=Math.max(0,state.fuel-dt*PULSE_FUEL*HULL_BURN[hullTier()]);
+    var spd=state.vel.length(), brake=spd*PULSE_DROP*.55, dir=V1.copy(state.vel).normalize();
+    if(state.fuel<=0){ dropPulse('OUT OF FUEL · PULSE DRIVE OFFLINE'); return; }
+    if(state.throttle<=.05){ dropPulse('PULSE DRIVE DISENGAGED'); return; }
+    for(var i=0;i<planets.length;i++){ var p=planets[i], to=V2.copy(p.pos).sub(ship.position), dc=to.length(), bd=dc-p.radius;
+      if(bd<p.radius*1.8+brake && dir.dot(to.multiplyScalar(1/dc))>.3){
+        var mine=state.ap && state.ap.kind==='planet' && state.ap.idx===p.index;
+        dropPulse((mine||!state.ap?'ARRIVING · ':'PULSE DROPPED · PASSING ')+p.biome.name); return; } }
+    if(station){ var ts=V2.copy(station.center).sub(ship.position), sdd=ts.length();
+      if(sdd<450+brake && dir.dot(ts.multiplyScalar(1/sdd))>.3){ dropPulse('ARRIVING · '+SYS.station.name); return; } }
+  } else {
+    state.pulseK=P.k0*Math.max(0,1-P.t/P.len);
+    if(P.t>=P.len){ state.pulse=null; state.pulseK=0; }
+  }
+}
+function togglePulse(){
+  if(state.mode!=='space') return;
+  if(state.pulse && state.pulse.phase!=='drop'){ if(state.ap) apOff(''); dropPulse('PULSE DRIVE DISENGAGED'); }
+  else engagePulse(false);
+}
+
+/* ---------- autopilot ---------- */
+function apTargets(){
+  var out=[], dests=activeDests();
+  planets.forEach(function(p){
+    var sites=planetTerrain(p.biome).sites, di=dests.filter(function(d){ return d.loc.kind==='town' && d.loc.planet===p.index; });
+    var site=di.length?(di[0].loc.site||0):0;
+    out.push({kind:'planet', idx:p.index, site:site, name:p.biome.name, col:p.biome.crystal,
+      meta:(TYPE_SHORT[p.biome.type]||p.biome.type.toUpperCase())+' · '+sites.length+' '+(p.biome.town?'TOWN':'OUTPOST')+(sites.length>1?'S':'')+(sites[site]?' · LANDS AT '+sites[site].name:''),
+      drop:di.reduce(function(a,d){ return a+d.crates; },0), dropTo:di.map(function(d){ return d.loc.name; }).join(', ')});
+  });
+  if(station){ var sd=dests.filter(function(d){ return d.loc.kind==='station'; });
+    out.push({kind:'station', name:SYS.station.name, col:'#eef6ff', meta:'STATION · TRADE · REPAIRS · AUTO-DOCKS', drop:sd.reduce(function(a,d){ return a+d.crates; },0), dropTo:SYS.station.name}); }
+  out.forEach(function(t){ t.dist=apDist(t); });
+  return out.sort(function(a,b){ return a.dist-b.dist; });
+}
+function apAbove(t){ var p=planets[t.idx], st=planetTerrain(p.biome).sites[t.site||0], n=st?normalFromSurf(st.x,st.z):new THREE.Vector3(0,1,0); return {p:p, n:n}; }
+function apDist(t){
+  if(t.kind==='station') return station?Math.max(0,ship.position.distanceTo(station.center)-60):0;
+  var a=apAbove(t); return Math.max(0,ship.position.distanceTo(a.p.pos)-a.p.radius);
+}
+function apEta(d){
+  if(d<AP_PULSE_MIN) return d/60;
+  return (d-1200)/pulseSpeed()+PULSE_SPOOL+3+1200/55;
+}
+function clockStr(s){ s=Math.max(0,Math.round(s)); return Math.floor(s/60)+':'+('0'+(s%60)).slice(-2); }
+/* steer around a sphere that sits between us and the goal */
+function avoidSphere(from, to, c, R){
+  var d=V1.copy(to).sub(from), L=d.length(); if(L<1) return to; d.multiplyScalar(1/L);
+  var t=V2.copy(c).sub(from).dot(d); if(t<=0 || t>=L) return to;
+  var q=V2.copy(from).addScaledVector(d,t), off=V3.copy(q).sub(c), ol=off.length(); if(ol>=R) return to;
+  if(ol<.001){ off.set(-d.z,0,d.x); if(off.lengthSq()<.001) off.set(1,0,0); ol=off.length(); }
+  return c.clone().addScaledVector(off.multiplyScalar(1/ol),R*1.25);
+}
+function startAutopilot(t){
+  if(state.mode!=='space'||state.dock||state.warp) return;
+  if(state.law||state.chase||pirateActive()){ toast('AUTOPILOT UNAVAILABLE · HOSTILES NEARBY'); return; }
+  state.ap={kind:t.kind, idx:t.idx, site:t.site, name:t.name, t:0};
+  if(t.kind==='planet') queueSurface(t.idx,false);
+  $('navPanel').hidden=true; toast('AUTOPILOT ENGAGED · '+t.name,'life'); updateApChip(true);
+}
+function apOff(msg){ if(!state.ap) return; state.ap=null; state.apAxes=null; updateApChip(true); if(msg) toast(msg); }
+function updateAutopilot(dt){
+  var A=state.ap; if(!A) return;
+  if(state.mode!=='space'||state.warp||state.dock){ apOff(''); return; }
+  if(state.law||state.chase||pirateActive()){ apOff('AUTOPILOT OFF · YOU HAVE CONTROL'); return; }
+  var manual=Math.abs(joy.x)>.35||Math.abs(joy.y)>.35||keys.KeyA||keys.KeyD||keys.ArrowLeft||keys.ArrowRight||keys.ArrowUp||keys.ArrowDown;
+  if(manual){ apOff('AUTOPILOT OFF · MANUAL CONTROL'); if(state.pulse) dropPulse(''); return; }
+  A.t+=dt;
+  var aim, dist;
+  if(A.kind==='station'){
+    if(!station){ apOff(''); return; }
+    var mouth=station.mouthW.clone().addScaledVector(station.dirW,50), sd=ship.position.distanceTo(station.center);
+    dist=Math.max(0,sd-60);
+    aim=avoidSphere(ship.position, mouth, station.center, 95);
+    if(sd<DOCK_RANGE && !state.dockCool){ apOff(''); startDock(); return; }
+  } else {
+    var ab=apAbove(A), p=ab.p, r=p.radius, above=p.pos.clone().addScaledVector(ab.n,r*1.7);
+    dist=Math.max(0,ship.position.distanceTo(p.pos)-r);
+    if(dist<15000) queueSurface(p.index,true);
+    above=p.pos.clone().addScaledVector(ab.n,r*1.45);
+    if(ship.position.distanceTo(above)>r*.4) aim=avoidSphere(ship.position, above, p.pos, r*1.3);
+    else aim=p.pos.clone().addScaledVector(ab.n,r*.4);
+    if(station && ship.position.distanceTo(station.center)<500) aim=avoidSphere(ship.position, aim, station.center, 110);
+  }
+  A.dist=dist;
+  var D=V3.copy(aim).sub(ship.position).normalize();
+  var wantYaw=Math.atan2(D.x,D.z), wantPitch=clamp(Math.asin(clamp(D.y,-1,1)),-1.2,1.2);
+  var eY=wrapA(wantYaw-state.yaw), eP=wantPitch-state.pitch, slow=state.pulse&&state.pulse.phase==='on'?2.5:4;
+  state.apAxes={x:-clamp(eY*slow,-1,1), y:(INVERT_PITCH?1:-1)*clamp(eP*slow,-1,1)};
+  setThrottle(1);
+  var fwd=V1.set(Math.sin(state.yaw)*Math.cos(state.pitch),Math.sin(state.pitch),Math.cos(state.yaw)*Math.cos(state.pitch));
+  if(!state.pulse && dist>AP_PULSE_MIN && fwd.dot(D)>.985 && !pulseBlock()) engagePulse(true);
+}
+/* the chip under the compass: where we're headed and how long it will take */
+var apChipT=0;
+function updateApChip(force){
+  var el=$('apChip'), A=state.ap;
+  if(!A || state.mode!=='space'){ if(!el.hidden) el.hidden=true; return; }
+  apChipT-=1/60; if(!force && apChipT>0) return; apChipT=.25;
+  var d=A.dist==null?apDist(A):A.dist, ph=state.pulse?(state.pulse.phase==='spool'?'PULSE SPOOLING':state.pulse.phase==='on'?'PULSE':'DROPPING OUT'):(d>AP_PULSE_MIN?'ALIGNING':'APPROACH');
+  el.hidden=false;
+  $('apName').textContent=A.name; $('apInfo').textContent=ph+' · '+shortKm(d)+' · ETA '+clockStr(apEta(d));
+}
+/* the system nav list (tap the radar in space) */
+function openNav(){
+  if(state.mode!=='space'||state.dock||state.warp) return;
+  warpPanel.hidden=true;
+  var list=$('nvList'); list.innerHTML='';
+  apTargets().forEach(function(t){
+    var row=document.createElement('button'); row.type='button'; row.className='wp-row'+(t.drop?' drop':'');
+    var on=state.ap && state.ap.kind===t.kind && (t.kind==='station'||state.ap.idx===t.idx);
+    row.innerHTML='<span class="wp-star" style="color:'+t.col+';background:'+t.col+'"></span>'+
+      '<span class="wp-name">'+t.name+(on?' · <span style="color:var(--cyan)">ENGAGED</span>':'')+'</span><span class="wp-dist">'+shortKm(t.dist)+' · ETA '+clockStr(apEta(t.dist))+'</span>'+
+      (t.drop?'<span class="wp-drop">▸ DROP · '+t.drop+' CRATE'+(t.drop>1?'S':'')+' FOR '+t.dropTo+'</span>':'')+
+      '<span class="wp-meta">'+t.meta+'</span>';
+    row.addEventListener('click',function(){ startAutopilot(t); });
+    list.appendChild(row);
+  });
+  $('nvSys').textContent=SYS.name+' · FUEL '+Math.floor(state.fuel)+'/'+fuelCap();
+  $('nvOff').hidden=!state.ap;
+  $('navPanel').hidden=false;
+}
+function closeNav(){ $('navPanel').hidden=true; }
+$('nvX').addEventListener('click',closeNav); $('nvClose').addEventListener('click',closeNav);
+$('nvOff').addEventListener('click',function(){ apOff('AUTOPILOT OFF'); if(state.pulse) dropPulse(''); closeNav(); });
+$('apChip').addEventListener('click',function(){ apOff('AUTOPILOT OFF'); if(state.pulse) dropPulse(''); });
+$('btnPulse').addEventListener('click',function(e){ e.stopPropagation(); togglePulse(); });
+['pointerdown','touchstart'].forEach(function(ev){ $('btnPulse').addEventListener(ev,function(e){ e.stopPropagation(); },{passive:true}); });
+window.addEventListener('keydown',function(e){
+  if(e.target && e.target.tagName==='INPUT') return;
+  if(e.code==='KeyP') togglePulse();
+  if(e.code==='KeyN' && state.mode==='space'){ if($('navPanel').hidden) openNav(); else closeNav(); }
+  if(e.code==='Escape') closeNav();
+});
+function updatePulseBtn(){
+  var b=$('btnPulse'), show=state.mode==='space' && !state.dock && !state.warp;
+  if(b.hidden===show) b.hidden=!show; if(!show) return;
+  var P=state.pulse, txt=P?(P.phase==='spool'?'SPOOL':P.phase==='on'?'DROP':'PULSE'):'PULSE';
+  if(b.textContent!==txt) b.textContent=txt;
+  b.classList.toggle('on',!!P && P.phase!=='drop');
+  b.classList.toggle('locked',!P && !!pulseBlock());
+}
+
+/* far planets and the star are drawn at a compressed distance (same size on screen),
+   so the whole system fits inside the camera's depth range without flicker */
+var SS_CAP=4000, SS_SOFT=2000;
+function ssPlace(obj, pos, cam){
+  var d=cam.distanceTo(pos);
+  if(d<=SS_CAP){ obj.position.copy(pos); obj.scale.setScalar(1); return d; }
+  var f=SS_CAP+(d-SS_CAP)*.06, s=f/d; obj.position.copy(pos).sub(cam).multiplyScalar(s).add(cam); obj.scale.setScalar(s); return d;
+}
+function scaledSpace(){
+  if(!sysGroup) return;
+  var cam=camera.position;
+  planets.forEach(function(p){
+    var d=ssPlace(p.vis,p.pos,cam), far=d>SS_SOFT;
+    if(p.far!==far){ p.far=far; p.soft.forEach(function(m){ m.depthTest=!far; }); }
+  });
+  if(spaceSunMesh) ssPlace(spaceSunMesh,SPACE_SUN,cam);
+}
+
+/* =========================================================================
    Update: space
    ========================================================================= */
 function updateSpace(dt){
   if(state.dock){ updateDock(dt); return; }
   if(state.warp){ updateWarp(dt); return; }
-  var nearD=1e9; planets.forEach(function(p){ nearD=Math.min(nearD,ship.position.distanceTo(p.mesh.position)-p.radius*1.6); });
+  updatePulse(dt); updateAutopilot(dt);
+  var nearD=1e9; planets.forEach(function(p){ nearD=Math.min(nearD,ship.position.distanceTo(p.pos)-p.radius*1.6); });
   if(station) nearD=Math.min(nearD,ship.position.distanceTo(station.center)-60);
   state.openK=lerp(state.openK||0,sstep(40,320,nearD),1-Math.pow(.3,dt));
   var f=flyShip(dt, ship, 1, 24*speedMul(), 70*speedMul(), state.openK);
   camera.lookAt(f.aim); camera.rotateZ(f.roll);
   entryCooldown=Math.max(0,entryCooldown-dt);
   var best=null, bd=1e9;
-  planets.forEach(function(p){ var d=ship.position.distanceTo(p.mesh.position)-p.radius; if(d<bd){ bd=d; best=p; } });
+  planets.forEach(function(p){ var d=ship.position.distanceTo(p.pos)-p.radius; if(d<bd){ bd=d; best=p; } });
   var altVeil=0, heat=0;
   if(best){
-    var r=best.radius, minD=r*1.12, dc=ship.position.distanceTo(best.mesh.position);
-    if(bd<r*6) queueSurface(best.index,true);
-    if(entryCooldown>0 && dc<minD){ ship.position.sub(best.mesh.position).setLength(minD).add(best.mesh.position); }
+    var r=best.radius, minD=r*1.12, dc=ship.position.distanceTo(best.pos);
+    if(bd<Math.max(r*6,9000)) queueSurface(best.index,true);
+    if(entryCooldown>0 && dc<minD){ ship.position.sub(best.pos).setLength(minD).add(best.pos); }
     if(entryCooldown<=0){
       altVeil=1-sstep(r*.3,r*.95,bd);
-      var inward=-state.vel.dot(V3.copy(ship.position).sub(best.mesh.position).normalize());
+      var inward=-state.vel.dot(V3.copy(ship.position).sub(best.pos).normalize());
       heat=altVeil*(1-altVeil)*4*clamp(inward/45,0,1);
       if(bd<r*.3){
         if(surfaces[best.index]){ enterAtmosphere(best); return; }
-        ship.position.sub(best.mesh.position).setLength(best.radius*1.3).add(best.mesh.position); altVeil=1;
+        ship.position.sub(best.pos).setLength(best.radius*1.3).add(best.pos); altVeil=1;
         if(state.t-holdToast>3){ holdToast=state.t; toast('CHARTING SURFACE… HOLD COURSE'); }
       }
       if(bd<r*1.8 && approachHint!==best.index){ approachHint=best.index; var nst=planetTerrain(best.biome).sites.length; toast(best.biome.name+' · '+nst+' '+(best.biome.town?'TOWN':'OUTPOST')+(nst>1?'S':'')+' · AIM WHERE YOU WANT TO LAND'); }
@@ -3123,18 +3363,20 @@ function updateSpace(dt){
   else if(hasMod('flares') && state.flares>0 && lawActors.some(function(a){ return a.kind==='pirate' && a.mode==='attack'; })) setPrompt('DROP FLARES',state.flares+' LEFT',dropFlares);
   else setPrompt(null);
   spaceAmbient(dt);
-  updateDust(-.05-(f.boosting?.05:0), clamp((state.vel.length()-8)/50,0,.7));
+  updateDust(-.05-(f.boosting?.05:0)+(state.pulseK||0)*.03, clamp((state.vel.length()-8)/50,0,.7));
   var dests=activeDests();
-  var cm=planets.map(function(p){ var dx=p.mesh.position.x-ship.position.x, dz=p.mesh.position.z-ship.position.z;
+  var cm=planets.map(function(p){ var dx=p.pos.x-ship.position.x, dz=p.pos.z-ship.position.z;
     var drop=dests.some(function(d){ return d.loc.kind==='town' && d.loc.planet===p.index; });
-    return {bearing:bearingTo(dx,dz), color:drop?'#ffb24d':p.biome.crystal, label:drop?'DROP':(p===best?Math.round(bd)+'km':'')}; });
+    return {bearing:bearingTo(dx,dz), color:drop?'#ffb24d':p.biome.crystal, label:drop?'DROP':(p===best||(state.ap&&state.ap.idx===p.index&&state.ap.kind==='planet')?fmt(Math.max(0,ship.position.distanceTo(p.pos)-p.radius))+'km':'')}; });
   if(station){ var sdrop=dests.some(function(d){ return d.loc.kind==='station'; });
     cm.push({bearing:bearingTo(station.center.x-ship.position.x,station.center.z-ship.position.z), color:sdrop?'#ffb24d':'#eef6ff', label:sdrop?'DROP':(sd<600?'STATION':'')}); }
   drawCompass(cm.concat(lawCompass()));
-  var ri=planets.map(function(p){ return {x:p.mesh.position.x, z:p.mesh.position.z, color:p.biome.crystal, kind:'planet', size:p.radius}; });
+  var ri=planets.map(function(p){ return {x:p.pos.x, z:p.pos.z, color:p.biome.crystal, kind:'planet', size:p.radius}; });
   if(station) ri.push({x:station.center.x, z:station.center.z, color:'#eef6ff', kind:'station'});
   ri=ri.concat(lawRadar());
-  drawRadar(ship.position, state.yaw, 1100, ri, sd<DOCK_RANGE?SYS.station.name:(best?best.biome.name:''));
+  var rr=Math.min(sd,best?bd:1e9); rr=clamp(rr*1.3,1100,90000);
+  drawRadar(ship.position, state.yaw, rr, ri, sd<DOCK_RANGE?SYS.station.name:(best?best.biome.name:''));
+  updateApChip(false);
   setSun(SPACE_SUN.clone(),1);
   shipTag(null); navTags(spaceNav().concat(lawNav()));
   setClock('SYSTEM', SYS.name);
@@ -3284,7 +3526,9 @@ function audioUpdate(dt){
     drone=docked?.32:.55;
     var sd=station?ship.position.distanceTo(station.center):1e9; stn=docked?.6:clamp(1-sd/260,0,1)*.35;
     if(state.warp){ var W=state.warp, k=W.t<1.5?W.t/1.5:(W.t<1.5+W.cruise?1:Math.max(0,1-(W.t-1.5-W.cruise)/2)); thrust=.25+.5*k; tf=250+k*1400; tone=.08+.1*k; of=46+k*40; }
-    else if(!docked){ thrust=.04+.22*thr+(boosting?.28:0); tf=180+spd*10+(boosting?500:0); tone=.03+.07*thr+(boosting?.05:0); of=40+spd*.45;
+    else if(!docked){ thrust=.04+.22*thr+(boosting?.28:0); tf=Math.min(180+spd*10,950)+(boosting?500:0); tone=.03+.07*thr+(boosting?.05:0); of=Math.min(40+spd*.45,72);
+      var pk2=state.pulseK||0; if(pk2>0){ thrust=Math.max(thrust,.2+.42*pk2); tf=Math.max(tf,300+pk2*1200); tone=Math.max(tone,.05+.09*pk2); of=Math.max(of,46+pk2*34); }
+      if(state.pulse && state.pulse.phase==='spool'){ var pq=state.pulse.t/PULSE_SPOOL; thrust+=.12*pq; tf+=600*pq; tone+=.04*pq; of+=24*pq; }
       if(state.spool){ var sk=Math.min(1,state.spool.t/SPOOL_T); thrust+=.15*sk; tf+=700*sk; tone+=.05*sk; of+=34*sk; } }
     else { thrust=.02; tone=.015; }
   } else if(m==='atmo'){
@@ -3599,8 +3843,8 @@ function hazardTex(){
 }
 function buildCustomsGate(parent){
   if(!station || !SYS) return;
-  var arr=SYS.arrival.clone(), near=planets.reduce(function(a,p){ return (!a||p.mesh.position.distanceTo(arr)<a.mesh.position.distanceTo(arr))?p:a; },null);
-  var dir=near.mesh.position.clone().sub(arr); dir.y=0; dir.normalize();
+  var arr=SYS.arrival.clone(), near=planets.reduce(function(a,p){ return (!a||p.pos.distanceTo(arr)<a.pos.distanceTo(arr))?p:a; },null);
+  var dir=near.pos.clone().sub(arr); dir.y=0; dir.normalize();
   var dist=150, pos=new THREE.Vector3();
   for(var k=0;k<20;k++){ pos.copy(arr).addScaledVector(dir,dist); if(pos.distanceTo(station.center)>105) break; dist+=20; }
   var g=new THREE.Group(); g.position.copy(pos); g.lookAt(V3.copy(pos).add(dir)); parent.add(g);
@@ -3693,7 +3937,7 @@ function initLaw(){
   for(var i=0;i<sec.patrols;i++){
     var h=buildHull(0,false); h.scale.setScalar(.55); h.userData.flames.concat(h.userData.glows).forEach(function(f){ f.visible=false; });
     lightBar(h,[new THREE.Color(.4,.9,4),new THREE.Color(4,.4,.4)]); sysGroup.add(h);
-    var p=i===0?{c:station.center.clone(), r:320}:{c:planets[i%planets.length].mesh.position.clone(), r:planets[i%planets.length].radius*3.2};
+    var p=i===0?{c:station.center.clone(), r:320}:{c:planets[i%planets.length].pos.clone(), r:planets[i%planets.length].radius*3.2};
     var a={kind:'patrol', obj:h, home:p.c, r:p.r, ang:i*2.1, mode:'patrol', vel:new THREE.Vector3(), cool:0, caught:0};
     h.position.copy(a.home).add(V3.set(Math.cos(a.ang)*a.r,10,Math.sin(a.ang)*a.r)); lawActors.push(a);
   }
@@ -3711,6 +3955,7 @@ function steerActor(a, target, speed, dt){
 function endChase(){ lawActors.forEach(function(a){ if(a.kind==='patrol' && a.mode!=='patrol'){ a.mode='return'; a.cool=20; } }); state.chase=null; if(state.law && (state.law.type==='hail')) hideLaw(); }
 
 function hailPatrol(a){
+  if(state.pulse) dropPulse('',true); apOff('');
   a.mode='hail'; SND.siren();
   showLaw({type:'hail', actor:a, eye:'PATROL CUTTER · '+secOf(SYS.seed).name+' SECURITY', title:'Cut your engines for inspection',
     body:'<p>'+(isWanted()?'You are wanted in this system.':!isCleared()?'You have not checked in at customs.':'Random inspection.')+' Throttle to zero, or tap comply.</p>',
@@ -3813,7 +4058,7 @@ function updateLaw(dt){
   if(free && !state.law && !pirateActive() && state.cargo.length && sd>500 && state.t>state.pirateT){
     state.pirateT=state.t+18;
     var cb=contrabandAboard().length, chance=sec.pirates*.1*(1+Math.min(2,cargoValue()/8000)+cb*.4);
-    if(Math.random()<chance) spawnPirates();
+    if(Math.random()<chance){ if(state.pulse){ apOff(''); dropPulse('INTERDICTED · RAIDERS PULLED YOU OUT OF PULSE',true); } spawnPirates(); }
   }
 }
 function pirateDisable(){
@@ -3901,6 +4146,7 @@ function updateSpool(dt){
   if(sp.t>=SPOOL_T){ state.spool=null; $('btnWarp').classList.remove('spooling'); $('btnWarp').textContent='WARP'; beginWarp(sp.seed); }
 }
 function beginWarp(seed){
+  apOff(''); state.pulse=null; state.pulseK=0; closeNav();
   var ly=lightYears(SYS.seed,seed), fuel=warpFuel(ly);
   sfx('whoosh',.85);
   state.fuel=Math.max(0,state.fuel-fuel); wearHull(2+ly/100); if(needsOn()) state.rest=Math.max(0,state.rest-3); save(); state.warp={t:0, seed:seed, swapped:false, ly:ly, cruise:clamp(ly/75,.6,5.4), prog:0};
@@ -4221,7 +4467,7 @@ setSound(AU.on);
 $('musBtn').addEventListener('click',function(){ audioStart(); setMusic(!MU.on); toast(MU.on?'MUSIC ON':'MUSIC OFF'); });
 setMusic(MU.on);
 $('restBtn').addEventListener('click',tapSleep);
-$('radarWrap').addEventListener('click',function(){ if(mapOpen) closeMap(); else openMap(); });
+$('radarWrap').addEventListener('click',function(){ if(state.mode==='space'){ if($('navPanel').hidden) openNav(); else closeNav(); return; } if(mapOpen) closeMap(); else openMap(); });
 $('mpClose').addEventListener('click',closeMap);
 
 /* =========================================================================
@@ -4297,9 +4543,9 @@ function spaceNav(){
     var pos, dist;
     if(d.loc.kind==='station'){ pos=station.center.clone().add(new THREE.Vector3(0,64,0)); dist=ship.position.distanceTo(station.center); }
     else { var p=planets[d.loc.planet], st=planetTerrain(p.biome).sites[d.loc.site||0];
-      pos=st?p.mesh.position.clone().addScaledVector(normalFromSurf(st.x,st.z),p.radius*1.08):p.mesh.position.clone().add(new THREE.Vector3(0,p.radius*1.3,0));
-      dist=Math.max(0,ship.position.distanceTo(p.mesh.position)-p.radius); }
-    return {pos:pos, name:'▸ '+d.loc.name, sub:d.crates+' CRATE'+(d.crates>1?'S':'')+' · '+Math.round(dist)+' KM', drop:true};
+      pos=st?p.pos.clone().addScaledVector(normalFromSurf(st.x,st.z),p.radius*1.08):p.pos.clone().add(new THREE.Vector3(0,p.radius*1.3,0));
+      dist=Math.max(0,ship.position.distanceTo(p.pos)-p.radius); }
+    return {pos:pos, name:'▸ '+d.loc.name, sub:d.crates+' CRATE'+(d.crates>1?'S':'')+' · '+shortKm(dist), drop:true};
   });
 }
 function surfaceNav(from){
@@ -4356,6 +4602,8 @@ function frame(){
   state.exposure=lerp(state.exposure,state.exposureTarget,1-Math.pow(.25,dt));
   var u=finalPass.uniforms; u.exposure.value=state.exposure; u.time.value=state.t;
   if(!navSet){ navTags([]); navSet=false; }
+  if(state.mode==='space'||state.mode==='title') scaledSpace();
+  updatePulseBtn(); if(state.mode!=='space') updateApChip(false);
   composer.render(dt);
   $('enFill').style.width=state.energy.toFixed(1)+'%'; $('scFill').style.width=(state.scan*100).toFixed(1)+'%';
   fpsAcc+=dt; fpsN++; fpsT+=dt;
@@ -4401,7 +4649,7 @@ $('enterBtn').addEventListener('click',function(){
   var t=$('title'); t.style.opacity=0; setTimeout(function(){ t.hidden=true; },900);
   $('hud').classList.add('on'); $('joywrap').classList.add('on'); $('actions').classList.add('on'); thWrap.classList.add('on'); setThrottle(.3);
   state.mode='space'; setModeUI('space');
-  var near=planets[0], d=near.mesh.position.clone().sub(ship.position).normalize();
+  var near=planets[0], d=near.pos.clone().sub(ship.position).normalize();
   state.yaw=Math.atan2(d.x,d.z)+.25; state.pitch=Math.asin(clamp(d.y,-1,1))*.4;
   try{ if(screen.orientation && screen.orientation.lock) screen.orientation.lock('landscape').catch(function(){}); }catch(e){}
 });
@@ -4423,7 +4671,7 @@ async function boot(){
   setTimeout(function(){ ld.style.opacity=0; },400);
   frame();
 }
-window.__nh={fx:{hasMod:hasMod, modSlots:modSlots, holdCap:holdCap, fuelCap:fuelCap, kindNeeds:kindNeeds, wearHull:wearHull, save:save, swap:swapPlayerHull}, enterPlanet:function(i){ enterAtmosphere(planets[i]); }, ready:function(i){ return !!surfaces[i]; }, land:land, board:board, exitAtmo:exitAtmosphere,
+window.__nh={step:function(n,dt){ dt=dt||.05; for(var i=0;i<n;i++){ state.t+=dt; if(state.mode==='space') updateSpace(dt); else if(state.mode==='atmo'&&S) updateAtmo(dt); updateLaw(dt); updateSpool(dt); } }, pulse:{engage:function(){ return engagePulse(false); }, drop:function(){ dropPulse(''); }, block:function(){ return pulseBlock(); }, targets:function(){ return apTargets(); }, ap:function(i){ startAutopilot(apTargets()[i]); }, apTo:function(kind,idx){ startAutopilot(apTargets().filter(function(t){ return t.kind===kind && (kind==='station'||t.idx===idx); })[0]); }, nav:function(){ openNav(); }, speed:function(){ return pulseSpeed(); }}, fx:{hasMod:hasMod, modSlots:modSlots, holdCap:holdCap, fuelCap:fuelCap, kindNeeds:kindNeeds, wearHull:wearHull, save:save, swap:swapPlayerHull}, enterPlanet:function(i){ enterAtmosphere(planets[i]); }, ready:function(i){ return !!surfaces[i]; }, land:land, board:board, exitAtmo:exitAtmosphere,
   warp:startWarp, dock:startDock, cam:function(){ return camera; }, station:function(){ return station; }, ship:function(){ return ship; }, state:state, getS:function(){ return S; }, sys:function(){ return SYS; }, enter:function(){ $('enterBtn').click(); },
   queue:queueSurface, terrain:planetTerrain, normalFromSurf:normalFromSurf, openMap:openMap, chunkBuilder:chunkBuilder, planets:function(){ return planets; }, offers:boardOffers, townLoc:townLoc,
   au:function(){ return AU; }, mu:function(){ return MU; }, law:{hall:function(){ return station&&station.gate; }, spawnPirates:spawnPirates, scan:customsScan, actors:function(){ return lawActors; }, heat:heatOf, sec:secOf}};
