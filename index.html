@@ -3546,7 +3546,7 @@ function buildStation(st, parent){
     rail.push({g:rg, ph:r/5}); }
   // four berths: cradles, clamps, beacons, lifts, boarding tubes
   var clamps=[], berthBeacons=[], lifts=[];
-  var BM=!!ENV_GLB.berth, arms=[];
+  var BM=!!ENV_GLB.berth;
   BX.forEach(function(bx,i){
     if(BM){
       // modelled berth module: back wall on the spine, conveyor deck running out to the mouth
@@ -3559,10 +3559,12 @@ function buildStation(st, parent){
     var ft=new THREE.Mesh(new THREE.PlaneGeometry(10,.8),edgeM); ft.rotation.x=-Math.PI/2; ft.position.set(bx,PY+.27,41); g.add(ft);
     [-1,1].forEach(function(s){ box(.6,.6,26,bx+s*5.2,PY+.5,28,yellowM); });
     }
-    // robot loader arms in the gaps between berths
-    if(ENV_GLB.arm && i<BX.length-1 && i!==PLAYER_BERTH){ var ax=(bx+BX[i+1])/2, am=envPiece('arm',8,8,8,i%2?Math.PI:0); am.position.set(ax,PY+.457*8+.6,37); g.add(am);
-      box(7,1.2,7,ax,PY,37,dark); box(2,10,2,ax,PY-5.5,37,dark); arms.push({s:am.userData.slew, ph:i*1.9}); }
-    (BM?[25,31,37]:[20,28,36]).forEach(function(z){ [-1,1].forEach(function(s){ var cgp=new THREE.Group(); cgp.position.set(bx+s*5.4,PY+.4,z); g.add(cgp);
+    // docking clamps: the robot arms, one each side, reaching in to grip the hull (procedural clamps if the model is missing)
+    if(ENV_GLB.arm) [-1,1].forEach(function(s){ var AS=7.5, px=bx+s*9, z=27;
+      var am=envPiece('arm',AS,AS,AS,-s*Math.PI/2); am.position.set(px-s*.2*AS,PY+.85+.457*AS,z); g.add(am);
+      box(5.4,1.2,5.4,px,PY+.25,z,dark); box(2,9,2,px,PY-4.6,z,dark);
+      clamps.push({g:am, arm:am.userData.slew, s:s, b:i, o:0}); });
+    else (BM?[25,31,37]:[20,28,36]).forEach(function(z){ [-1,1].forEach(function(s){ var cgp=new THREE.Group(); cgp.position.set(bx+s*5.4,PY+.4,z); g.add(cgp);
       var p1=new THREE.Mesh(new THREE.BoxGeometry(.8,4.6,1.4),yellowM); p1.position.y=2.1; cgp.add(p1);
       var p2=new THREE.Mesh(new THREE.BoxGeometry(2,.8,1.4),yellowM); p2.position.set(-s*.8,4.2,0); cgp.add(p2);
       clamps.push({g:cgp, s:s, b:i}); }); });
@@ -3594,7 +3596,7 @@ function buildStation(st, parent){
   var mouthW=g.localToWorld(new THREE.Vector3(BX[PLAYER_BERTH],PY,42)), insideW=g.localToWorld(new THREE.Vector3(BX[PLAYER_BERTH],PY,28)), dirW=new THREE.Vector3(Math.sin(st.yaw),0,Math.cos(st.yaw));
   station={st:st, group:g, ring:ringG, blink:blink, traffic:traffic, center:st.pos.clone(), mouthW:mouthW, insideW:insideW, dirW:dirW,
     pier:{clamps:clamps, beacons:berthBeacons, lifts:lifts, rail:rail, crew:crew, lane:lane, inbound:inbound, parked:parked, board:{c:bc, t:bTex, last:-1}, PY:PY, BX:BX, player:PLAYER_BERTH,
-      floods:floods, vents:vents, weld:weld, arms:arms}};
+      floods:floods, vents:vents, weld:weld}};
   drawPierBoard(true);
   return station;
 }
@@ -3635,11 +3637,11 @@ function updatePier(dt){
   ib.userData.flames.concat(ib.userData.glows).forEach(function(f){ f.visible=fly; if(f.material.uniforms){ f.material.uniforms.intensity.value=1.2; f.material.uniforms.time.value=t; } });
   ib.rotation.y=cyc<.3?0:Math.PI; P.inPhase=ph;
   P.clamps.forEach(function(c){ var closed = c.b===P.player ? mineClosed : (c.b===3 ? (cyc>=.33&&cyc<.68) : true);
-    c.g.rotation.z+=((closed?0:c.s*.7)-c.g.rotation.z)*Math.min(1,dt*3); });
+    if(c.arm){ c.o+=((closed?0:1)-c.o)*Math.min(1,dt*1.6); c.arm.rotation.y=-c.s*1.15*c.o; }
+    else c.g.rotation.z+=((closed?0:c.s*.7)-c.g.rotation.z)*Math.min(1,dt*3); });
   P.beacons.forEach(function(L){ var on=((t*(L.b===P.player&&K?2.5:1)+L.k*.13)%1)<.22, free=(L.b===P.player&&!mineClosed)||(L.b===3&&ph==='OPEN');
     L.m.material.color.setRGB(free?4:.3,free?2.4:3.4,free?.6:.9).multiplyScalar(on?1:.12); });
   P.lifts.forEach(function(l){ var u=((t*.14+l.ph)%1); l.g.position.set(l.x,P.PY+.4+Math.sin(u*Math.PI)*16,l.z); });
-  (P.arms||[]).forEach(function(a){ if(a.s) a.s.rotation.y=Math.sin(t*.23+a.ph)*.9+Math.sin(t*.61+a.ph*2)*.25; });
   P.rail.forEach(function(r){ var f=((t*.025+r.ph)%1); r.g.position.x=-48+f*96; });
   P.crew.forEach(function(c){ c.g.position.x=c.x0+Math.sin(t*.22+c.ph)*4; c.g.rotation.y=Math.cos(t*.22+c.ph)>0?Math.PI/2:-Math.PI/2; });
   var laneOn=!mineClosed; P.lane.forEach(function(l,i){ var on=laneOn && ((t*1.4-i*.09)%1+1)%1<.16; l.material.color.setRGB(3.2,3.0,2.7).multiplyScalar(on?1:.08); });
