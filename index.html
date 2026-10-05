@@ -1530,7 +1530,7 @@ var SHIP_MODELS={
   4:{url:'models/rook_twinboom.glb', scale:17, rotY:Math.PI, legY:-.12, clipY:[.004,1], center:[.0001,.2028,.0564],
      engines:[[0,-.045,-.44,.04],[-.16,-.01,-.44,.025],[.16,-.01,-.44,.025],[-.16,-.07,-.44,.025],[.16,-.07,-.44,.025]], tips:[[.22,-.03,-.38],[-.22,-.03,-.38]]},
   // Atlas: nose (cab) toward +X in the file; the four pods are cut out by position so they can tilt
-  3:{url:'models/atlas.glb', scale:17.5, rotY:Math.PI/2, legY:-.05,
+  3:{url:'models/atlas.glb', scale:24, rotY:Math.PI/2, legY:-.05,
      engines:[[-.497,.016,-.072,.028],[-.497,.016,.072,.028]], tips:[],
      pods:[[.193,.011,-.329,-.065,.052],[.193,.011,.329,-.065,.052],[-.273,.028,-.31,-.045,.052],[-.273,.028,.32,-.045,.052]]}
 };
@@ -6083,7 +6083,11 @@ async function boot(){
   setTimeout(function(){ ld.style.opacity=0; },400);
   frame();
 }
-window.__nh={siteLoc:function(i,j){ return siteLoc(SYS,i,j||0); }, env:function(){ return {loaded:Object.keys(ENV_GLB), hall:HALL}; }, camHold:function(p,l){ CAMHOLD=p?{p:new THREE.Vector3(p[0],p[1],p[2]), l:new THREE.Vector3(l[0],l[1],l[2])}:null; },
+window.__nh={lineup:function(){ var sc=new THREE.Scene(); sc.background=new THREE.Color(.16,.165,.17); sc.environment=spaceScene.environment;
+    sc.add(new THREE.HemisphereLight(0xdfe6ee,0x30302c,.8)); var dl=new THREE.DirectionalLight(0xffffff,2.2); dl.position.set(-30,50,40); sc.add(dl);
+    var x=0; [0,1,4,2,3].forEach(function(t){ var h=buildHull(t,true,{value:.4}); var bb=new THREE.Box3().setFromObject(h); h.position.set(x-bb.min.x,-h.userData.gear,0); x+=bb.max.x-bb.min.x+3; sc.add(h); });
+    var cam=new THREE.PerspectiveCamera(30,innerWidth/innerHeight,.1,1000); cam.position.set(x/2,22,x*.95); cam.lookAt(x/2,0,0); SHOWCASE={scene:sc, cam:cam, ground:new THREE.Object3D()}; },
+  siteLoc:function(i,j){ return siteLoc(SYS,i,j||0); }, env:function(){ return {loaded:Object.keys(ENV_GLB), hall:HALL}; }, camHold:function(p,l){ CAMHOLD=p?{p:new THREE.Vector3(p[0],p[1],p[2]), l:new THREE.Vector3(l[0],l[1],l[2])}:null; },
   show:function(tier,landed,az,el){ if(!SHOWCASE){ var sc=new THREE.Scene(); sc.background=new THREE.Color(.16,.165,.17); sc.environment=spaceScene.environment;
     renderer.toneMappingExposure=.62; var sl=new THREE.DirectionalLight(0xfff4e6,2.2); sl.position.set(-6,10,-8); sc.add(sl); var fl=new THREE.DirectionalLight(0x9fb4d0,.9); fl.position.set(8,4,6); sc.add(fl); sc.add(new THREE.HemisphereLight(0xbfcbd8,0x2a2622,.25));
     var gr=new THREE.Mesh(new THREE.PlaneGeometry(200,200),new THREE.MeshStandardMaterial({color:0x2b2c2e,roughness:.9})); gr.rotation.x=-Math.PI/2; sc.add(gr);
