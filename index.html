@@ -1442,9 +1442,15 @@ function buildShip(landed){
    0 SKIFF · 1 MULE · 2 LONGHAUL · 3 ATLAS · 4/5 the two Rooks (bought outright, not upgrades)
    ========================================================================= */
 var DOCK_RANGE=82;
-var HULL_NAMES=['SKIFF','MULE','LONGHAUL','ATLAS','ROOK TWIN-BOOM','ROOK WEDGE RUNNER'], HULL_CLASS=['LIGHT COURIER','SHORT-HAUL HAULER','TRACTOR-TRAILER','HEAVY LIFTER','SMUGGLER\u2019S FREIGHTER','SMUGGLER\u2019S FREIGHTER'];
-var ROOK_TIERS=[4,5], ROOK_PRICE=7200;
-function isRookTier(t){ return t===4||t===5; }
+var HULL_NAMES=['SKIFF','MULE','LONGHAUL','ATLAS','ROOK TWIN-BOOM'], HULL_CLASS=['LIGHT COURIER','SHORT-HAUL HAULER','TRACTOR-TRAILER','HEAVY LIFTER','SMUGGLER\u2019S FREIGHTER'];
+var ROOK_TIERS=[4], ROOK_PRICE=7200;
+function isRookTier(t){ return t===4; }
+// the Wedge Runner was retired: old saves get a Twin-Boom in its place (or the price back if they own both)
+function retireWedge(sv){
+  if(state.rooks[5]){ if(state.rooks[4]) state.credits+=ROOK_PRICE; state.rooks[4]=1; delete state.rooks[5]; }
+  if(state.hullSel===5) state.hullSel=state.rooks[4]?4:null;
+  if(state.company && state.company.ships) state.company.ships.forEach(function(sh){ if(sh.tier===5) sh.tier=4; });
+}
 function isRook(){ return isRookTier(hullTier()); }
 var HULL_SPACE=.62, HULL_GROUND=.8;
 var HULL_HANDLING=[
@@ -1679,7 +1685,7 @@ function buildHull(tier, landed, wearU){
   function band(r,x,y,z,mat){ return M(new THREE.TorusGeometry(r,r*.07,6,24),mat||MT.dark,x,y,z,g,false); }
   function stripe(w,h,d,x,y,z){ return box(w,h,d,MT.trim,x,y,z,g,false); }
   var gear;
-  if(tier===4||tier===5){ gear=buildRookParts(tier,g,MT,{M:M,box:box,prof:prof,nozzle:nozzle,leg:leg,crate:crate,nav:nav,cyl:cyl}); }
+  if(tier===4){ gear=buildRookParts(tier,g,MT,{M:M,box:box,prof:prof,nozzle:nozzle,leg:leg,crate:crate,nav:nav,cyl:cyl}); }
   else if(tier===0){
     // SKIFF: capsule cab with wraparound glass, one strapped container in a cage, high side engine pods on stub wings
     M(hullProfile([[-5.3,.25],[-5.3,.85],[-4.8,1.45],[-3.7,2.05],[-1.7,2.3],[-.5,2.15],[-.3,.05],[-1.0,-.55],[-4.7,-.5]],2.7,.32),MT.paint,0,0,0);
@@ -1855,28 +1861,6 @@ function buildRookParts(tier,g,MT,H){
     H.leg(-1.1,-4.8,1.5,.16); H.leg(1.1,-4.8,1.5,.16); H.leg(-1.4,4.4,1.5,.16); H.leg(1.4,4.4,1.5,.16);
     return 1.57;
   }
-  // WEDGE RUNNER: flat arrowhead, squat cab, three salvaged engines across the tail
-  M(plan([[0,-7.4],[1.6,-3.4],[4.6,3.6],[4.2,5.6],[-4.2,5.6],[-4.6,3.6],[-1.6,-3.4]],1.1,.18),MT.paint,0,.35,0);
-  M(plan([[0,-5.2],[1.1,-2.6],[3.0,2.8],[-3.0,2.8],[-1.1,-2.6]],.5,.12),RM.patch[3],0,1.15,0);
-  prof([[-3.4,1.3],[-3.4,1.8],[-2.6,2.55],[-.4,2.6],[0,2.2],[0,1.3]],2.4,.12,MT.paint);
-  prof([[-3.34,1.85],[-2.58,2.48],[-1.7,2.52],[-2.1,1.86]],2.5,.03,MT.glass);
-  box(2.42,.08,1.0,MT.trim,0,2.15,-1.2,g,false);
-  box(3.6,.1,4.0,MT.dark,0,1.42,2.6,g,false);
-  var lid=box(3.7,.12,2.0,RM.patch[1],0,1.95,.4); lid.rotation.x=-.5;
-  var j=0; [1.2,2.2,3.2,4.2].forEach(function(z){ [-.8,.8].forEach(function(x){ H.crate(1.5,.8,.9,x,1.85,z,j++); }); });
-  var c1=M(new THREE.CylinderGeometry(.9,.8,1.6,20),MT.dark,-2.4,.6,5.8); c1.rotation.x=Math.PI/2; H.nozzle(.75,.6,-2.4,.6,6.7);
-  box(1.4,1.2,1.6,RM.patch[0],0,.75,5.9); H.nozzle(.45,.5,-.3,.75,6.8); H.nozzle(.45,.5,.35,.75,6.8);
-  var c3=M(new THREE.CylinderGeometry(.6,.7,2.2,16),RM.patch[2],2.4,.55,5.6); c3.rotation.x=Math.PI/2; H.nozzle(.55,.5,2.4,.55,6.9);
-  [-1,1].forEach(function(s){ M(hullProfile([[3.4,.9],[4.6,2.3],[5.4,2.3],[5.5,.9]],.14,0),MT.trim,s*3.7,0,0); });
-  M(new THREE.CylinderGeometry(.03,.05,1.3,6),MT.dark,-.7,3.2,-1.4); M(new THREE.SphereGeometry(.09,8,6),MT.red,-.7,3.9,-1.4,g,false);
-  bellyHatch(2.0,2.6,-.24,.4);
-  patches(10,function(R){ return [(R()-.5)*5,1.47,-2+R()*7]; });
-  scorch(7,function(R){ return [(R()-.5)*6,1.48,-3+R()*8]; });
-  decal(1.5,.75,0,1.49,-4.3,0).rotation.x=-Math.PI/2;
-  [-1,1].forEach(function(sd){ var dd=decal(1.5,.62,sd*2.86,.38,-.6,sd*Math.PI/2); dd.rotation.y=sd*(Math.PI/2-.38); });
-  H.nav(4.4,.4,4.4);
-  H.leg(0,-4.4,1.65,.17); H.leg(-2.7,3.6,1.65,.17); H.leg(2.7,3.6,1.65,.17);
-  return 1.85;
 }
 function hullTier(){ var top=Math.min(lvl('hold'),3), sel=state.hullSel; if(isRookTier(sel) && state.rooks && state.rooks[sel]) return sel; return (sel==null||sel>top||sel<0)?top:sel; }
 function ownsHull(t){ return isRookTier(t)?!!(state.rooks&&state.rooks[t]):t<=Math.min(lvl('hold'),3); }
@@ -2928,7 +2912,7 @@ try{
   var sv=JSON.parse(localStorage.getItem('nh_save')||'null');
   if(sv){
     state.credits=sv.credits||0; state.found=sv.found||{}; state.sysSeed=sv.sys||0; state.up=sv.up||{}; state.cargo=sv.cargo||[]; state.taken=sv.taken||{}; state.boardGen=sv.boardGen||{}; state.delivered=sv.delivered||0;
-    state.mods=sv.mods||[]; state.modsOwned=sv.modsOwned||{}; state.lic=sv.lic||{}; state.fuel=sv.fuel; state.hull=sv.hull==null?100:sv.hull; state.company=sv.company||null; state.hullSel=sv.hullSel==null?null:sv.hullSel; state.rooks=sv.rooks||{}; state.fits=sv.fits||{}; state.fuelReserve=sv.fuelReserve||0; state.cleared=sv.cleared===undefined?(sv.sys||0):sv.cleared; state.heat=sv.heat||{}; state.flares=sv.flares==null?3:sv.flares;
+    state.mods=sv.mods||[]; state.modsOwned=sv.modsOwned||{}; state.lic=sv.lic||{}; state.fuel=sv.fuel; state.hull=sv.hull==null?100:sv.hull; state.company=sv.company||null; state.hullSel=sv.hullSel==null?null:sv.hullSel; state.rooks=sv.rooks||{}; retireWedge(sv); state.fits=sv.fits||{}; state.fuelReserve=sv.fuelReserve||0; state.cleared=sv.cleared===undefined?(sv.sys||0):sv.cleared; state.heat=sv.heat||{}; state.flares=sv.flares==null?3:sv.flares;
     state.food=sv.food==null?100:sv.food; state.rest=sv.rest==null?100:sv.rest; state.rations=sv.rations==null?2:sv.rations; state.fedT=sv.fedT||0; state.restedT=sv.restedT||0; state.needsOff=!!sv.needsOff;
     Object.keys(sv.inv||{}).forEach(function(k){ var nk=OLD_KEYS[k]||k; if(ELEMENTS[nk]) state.inv[nk]=(state.inv[nk]||0)+sv.inv[k]; });
   }
@@ -3931,10 +3915,10 @@ function renderTerminal(tab){
     // the Rook: sold off the books, cheaper where nobody asks questions
     var lawlessHere=secOf(SYS.seed).key==='lawless', rp=Math.round(ROOK_PRICE*(lawlessHere?.75:1));
     h+='<div class="st-sub">SPECIAL ORDER · THE ROOK'+(lawlessHere?' · BACK-ROOM PRICE':'')+'</div>';
-    h+='<p class="st-note">A patched-up smuggler\u2019s freighter. 8 crates, 2 module slots and a smuggler\u2019s compartment built into the floor (no slot needed). Fastest hulls you can buy with the quickest turns, but the plating is thin: bumps, jumps and raider fire do '+Math.round((ROOK_FRAGILE-1)*100)+'% more damage. No oversize loads. Both join your hangar once bought.'+(lawlessHere?'':' Cheaper in lawless systems.')+'</p>';
+    h+='<p class="st-note">A patched-up smuggler\u2019s freighter. 8 crates, 2 module slots and a smuggler\u2019s compartment built into the floor (no slot needed). Fastest hulls you can buy with the quickest turns, but the plating is thin: bumps, jumps and raider fire do '+Math.round((ROOK_FRAGILE-1)*100)+'% more damage. No oversize loads.'+(lawlessHere?'':' Cheaper in lawless systems.')+'</p>';
     ROOK_TIERS.forEach(function(rt){
       var got=ownsHull(rt), cur=hullTier()===rt;
-      h+='<div class="st-row upg'+(cur?' hangar-on':'')+'"><span class="nm">'+HULL_NAMES[rt]+(got?'<span class="tag hi">OWNED</span>':'')+'<small>'+(rt===4?'Cargo spine with a high bridge and two engine booms':'Flat arrowhead with three salvaged engines across the tail')+' · '+HANGAR_FEEL[rt]+'</small>'+
+      h+='<div class="st-row upg'+(cur?' hangar-on':'')+'"><span class="nm">'+HULL_NAMES[rt]+(got?'<span class="tag hi">OWNED</span>':'')+'<small>'+'Cargo spine with a high bridge and two engine booms'+' · '+HANGAR_FEEL[rt]+'</small>'+
         '<small class="fx">'+HOLD_CAPS[rt]+' crates · '+MOD_SLOTS[rt]+' module slots · '+HULL_TANK[rt]+' fuel tank · warp burn ×'+HULL_BURN[rt].toFixed(2)+'</small></span>'+
         '<span class="acts">'+(got?(cur?'<span class="maxed">IN USE</span>':'<span class="maxed">IN HANGAR</span>'):'<button class="pri" data-act="rookbuy" data-tier="'+rt+'"'+(state.credits>=rp?'':' disabled')+'>'+fmt(rp)+' UNITS</button>')+'</span></div>';
     });
