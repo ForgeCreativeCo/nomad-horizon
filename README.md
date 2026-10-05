@@ -2,7 +2,7 @@
 
 A mobile-first space trucker game that runs in the browser. Haul freight between space stations and frontier towns, fly seamlessly from orbit down to procedurally generated planets, and warp across an endless galaxy.
 
-Everything (planets, terrain, skies, wildlife, star systems and towns) is generated in code at runtime with [three.js](https://threejs.org/) r128. There are no image or model assets.
+Everything (planets, terrain, skies, wildlife, star systems and towns) is generated in code at runtime with [three.js](https://threejs.org/) r128. A few hand-made 3D models live in `models/` (the Skiff and Atlas hulls, the customs hall, its scanner arch, the berth modules and the pier's loader arms); anything else, or any model that fails to load, is built procedurally.
 
 ## Play
 

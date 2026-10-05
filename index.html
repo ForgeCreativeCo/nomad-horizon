@@ -1525,7 +1525,42 @@ function loadShipModels(){
   var L=new THREE.GLTFLoader();
   var all=Object.keys(SHIP_MODELS).map(function(k){ var cfg=SHIP_MODELS[k];
     return new Promise(function(res){ L.load(cfg.url,function(gl){ try{ SHIP_GLB[k]=prepShipModel(gl,cfg); }catch(e){ console.warn('ship model',k,e); } res(); },undefined,function(){ res(); }); }); });
-  return Promise.race([Promise.all(all), new Promise(function(r){ setTimeout(r,20000); })]);
+  var env=Object.keys(ENV_MODELS).map(function(k){ var cfg=ENV_MODELS[k];
+    return new Promise(function(res){ L.load(cfg.url,function(gl){ try{ ENV_GLB[k]=prepEnvModel(gl,cfg); }catch(e){ console.warn('env model',k,e); } res(); },undefined,function(){ res(); }); }); });
+  return Promise.race([Promise.all(all.concat(env)), new Promise(function(r){ setTimeout(r,20000); })]);
+}
+/* ---- station set pieces (customs hall, scanner arch, berth module, loader arm) ----
+   Each is kept in its own model units; placement code scales it. Missing files fall back to the procedural build. */
+var ENV_MODELS={
+  hall:{url:'models/customs_hall.glb'},      // tunnel along X, open ends; inner bore z±.183, y -.197..+.097
+  arch:{url:'models/scanner_arch.glb'},      // frame in the YZ plane, thin along X
+  berth:{url:'models/berth.glb'},            // deck along X, back wall at -X, deck top y=-.155
+  arm:{url:'models/loader_arm.glb', split:-.24, pivot:[-.008,-.2]}   // base below split, the rest slews round the pivot
+};
+var ENV_GLB={};
+function prepEnvModel(gl,cfg){
+  gl.scene.updateMatrixWorld(true);
+  var mesh=null; gl.scene.traverse(function(o){ if(o.isMesh && !mesh) mesh=o; });
+  var geo=mesh.geometry.clone(); geo.applyMatrix4(mesh.matrixWorld);
+  var map=mesh.material.map||null; if(map){ map.anisotropy=maxAniso; tud(map).shared=true; }
+  var mat=new THREE.MeshStandardMaterial({map:map, roughness:.62, metalness:.28, envMapIntensity:.9});
+  var D={geo:geo, mat:mat};
+  if(cfg.split!=null){
+    var pos=geo.attributes.position, idx=geo.index.array, lo=[], hi=[];
+    for(var i=0;i<idx.length;i+=3){ var y=(pos.getY(idx[i])+pos.getY(idx[i+1])+pos.getY(idx[i+2]))/3; (y<cfg.split?lo:hi).push(idx[i],idx[i+1],idx[i+2]); }
+    function part(list,dx,dz){ var g=new THREE.BufferGeometry(); g.setAttribute('position',pos.clone()); g.setAttribute('normal',geo.attributes.normal); if(geo.attributes.uv) g.setAttribute('uv',geo.attributes.uv); g.setIndex(list); g.translate(dx,0,dz); g.computeBoundingSphere(); tud(g).shared=true; return g; }
+    D.base=part(lo,0,0); D.top=part(hi,-cfg.pivot[0],-cfg.pivot[1]); D.pivot=cfg.pivot;
+  }
+  tud(geo).shared=true;
+  return D;
+}
+// one set piece as a group: model scaled (sx,sy,sz) then turned by rotY
+function envPiece(k,sx,sy,sz,rotY){
+  var D=ENV_GLB[k], g=new THREE.Group(), inner=new THREE.Group(); inner.scale.set(sx,sy,sz); inner.rotation.y=rotY||0; g.add(inner);
+  function add(geo){ var m=new THREE.Mesh(geo,D.mat); m.castShadow=m.receiveShadow=true; inner.add(m); return m; }
+  if(D.top){ add(D.base); var piv=new THREE.Group(); piv.position.set(D.pivot[0],0,D.pivot[1]); inner.add(piv); var t=new THREE.Mesh(D.top,D.mat); t.castShadow=t.receiveShadow=true; piv.add(t); g.userData.slew=piv; }
+  else add(D.geo);
+  return g;
 }
 function prepShipModel(gl,cfg){
   gl.scene.updateMatrixWorld(true);
@@ -3511,22 +3546,32 @@ function buildStation(st, parent){
     rail.push({g:rg, ph:r/5}); }
   // four berths: cradles, clamps, beacons, lifts, boarding tubes
   var clamps=[], berthBeacons=[], lifts=[];
+  var BM=!!ENV_GLB.berth, arms=[];
   BX.forEach(function(bx,i){
+    if(BM){
+      // modelled berth module: back wall on the spine, conveyor deck running out to the mouth
+      var bm=envPiece('berth',24,24,35,-Math.PI/2); bm.position.set(bx,PY+.25+.155*24,30); g.add(bm);
+      box(4,1.2,20,bx,PY-3.2,31,dark);
+    } else {
     box(3,1.8,28,bx,PY-1.6,28,dark);
     var dk=new THREE.Mesh(new THREE.PlaneGeometry(26,10),deckM); dk.rotation.x=-Math.PI/2; dk.rotation.z=Math.PI/2; dk.position.set(bx,PY+.25,28); g.add(dk);
     [-1,1].forEach(function(sd){ var ed=new THREE.Mesh(new THREE.PlaneGeometry(.7,26),edgeM); ed.material=edgeM; ed.rotation.x=-Math.PI/2; ed.rotation.z=Math.PI/2; ed.rotation.set(-Math.PI/2,0,Math.PI/2); ed.position.set(bx+sd*4.6,PY+.27,28); ed.scale.set(1,1,1); g.add(ed); });
     var ft=new THREE.Mesh(new THREE.PlaneGeometry(10,.8),edgeM); ft.rotation.x=-Math.PI/2; ft.position.set(bx,PY+.27,41); g.add(ft);
     [-1,1].forEach(function(s){ box(.6,.6,26,bx+s*5.2,PY+.5,28,yellowM); });
-    [20,28,36].forEach(function(z){ [-1,1].forEach(function(s){ var cgp=new THREE.Group(); cgp.position.set(bx+s*5.4,PY+.4,z); g.add(cgp);
+    }
+    // robot loader arms in the gaps between berths
+    if(ENV_GLB.arm && i<BX.length-1 && i!==PLAYER_BERTH){ var ax=(bx+BX[i+1])/2, am=envPiece('arm',8,8,8,i%2?Math.PI:0); am.position.set(ax,PY+.457*8+.6,37); g.add(am);
+      box(7,1.2,7,ax,PY,37,dark); box(2,10,2,ax,PY-5.5,37,dark); arms.push({s:am.userData.slew, ph:i*1.9}); }
+    (BM?[25,31,37]:[20,28,36]).forEach(function(z){ [-1,1].forEach(function(s){ var cgp=new THREE.Group(); cgp.position.set(bx+s*5.4,PY+.4,z); g.add(cgp);
       var p1=new THREE.Mesh(new THREE.BoxGeometry(.8,4.6,1.4),yellowM); p1.position.y=2.1; cgp.add(p1);
       var p2=new THREE.Mesh(new THREE.BoxGeometry(2,.8,1.4),yellowM); p2.position.set(-s*.8,4.2,0); cgp.add(p2);
       clamps.push({g:cgp, s:s, b:i}); }); });
     [-1,1].forEach(function(s){ var bl=new THREE.Mesh(new THREE.SphereGeometry(.45,10,8),new THREE.MeshBasicMaterial({color:new THREE.Color(.3,3.4,.9)})); bl.position.set(bx+s*5.2,PY+.9,41.5); g.add(bl); berthBeacons.push({m:bl, b:i, k:berthBeacons.length}); });
     var nm=new THREE.Mesh(new THREE.PlaneGeometry(7,2.4),new THREE.MeshBasicMaterial({map:signTex('BERTH '+(i+1),i===PLAYER_BERTH?'ASSIGNED TO YOU':'FREIGHT'), color:new THREE.Color(1.3,1.3,1.3)}));
     nm.rotation.x=-Math.PI/2; nm.position.set(bx,PY+.3,17); g.add(nm);
-    box(2.4,18,2.4,bx-7.5,PY+9,17,dark); var lf=new THREE.Group(); g.add(lf);
+    box(2.4,18,2.4,bx-7.5,PY+9,BM?16.4:17,dark); var lf=new THREE.Group(); g.add(lf);
     var lp=new THREE.Mesh(new THREE.BoxGeometry(2.2,.3,2.2),yellowM); lf.add(lp); var lcr=new THREE.Mesh(new THREE.BoxGeometry(1.8,1.6,1.8),new THREE.MeshStandardMaterial({color:lin(CRC[(i+2)%5]), map:hullTextures().rib, metalness:.45, roughness:.55})); lcr.position.y=.95; lf.add(lcr);
-    lifts.push({g:lf, x:bx-7.5, ph:i*.27});
+    lifts.push({g:lf, x:bx-7.5, z:BM?16.4:17, ph:i*.27});
     var tb=new THREE.Mesh(new THREE.CylinderGeometry(1.2,1.2,8,18,1,true),tubeM); tb.rotation.x=Math.PI/2; tb.position.set(bx+7.2,-27.5,19); g.add(tb);
     [15,19,23].forEach(function(z){ var tr=new THREE.Mesh(new THREE.TorusGeometry(1.25,.14,8,22),dark); tr.position.set(bx+7.2,-27.5,z); g.add(tr); });
     box(2.6,2.6,1.4,bx+7.2,-27.5,23.4,dark);
@@ -3549,7 +3594,7 @@ function buildStation(st, parent){
   var mouthW=g.localToWorld(new THREE.Vector3(BX[PLAYER_BERTH],PY,42)), insideW=g.localToWorld(new THREE.Vector3(BX[PLAYER_BERTH],PY,28)), dirW=new THREE.Vector3(Math.sin(st.yaw),0,Math.cos(st.yaw));
   station={st:st, group:g, ring:ringG, blink:blink, traffic:traffic, center:st.pos.clone(), mouthW:mouthW, insideW:insideW, dirW:dirW,
     pier:{clamps:clamps, beacons:berthBeacons, lifts:lifts, rail:rail, crew:crew, lane:lane, inbound:inbound, parked:parked, board:{c:bc, t:bTex, last:-1}, PY:PY, BX:BX, player:PLAYER_BERTH,
-      floods:floods, vents:vents, weld:weld}};
+      floods:floods, vents:vents, weld:weld, arms:arms}};
   drawPierBoard(true);
   return station;
 }
@@ -3593,7 +3638,8 @@ function updatePier(dt){
     c.g.rotation.z+=((closed?0:c.s*.7)-c.g.rotation.z)*Math.min(1,dt*3); });
   P.beacons.forEach(function(L){ var on=((t*(L.b===P.player&&K?2.5:1)+L.k*.13)%1)<.22, free=(L.b===P.player&&!mineClosed)||(L.b===3&&ph==='OPEN');
     L.m.material.color.setRGB(free?4:.3,free?2.4:3.4,free?.6:.9).multiplyScalar(on?1:.12); });
-  P.lifts.forEach(function(l){ var u=((t*.14+l.ph)%1); l.g.position.set(l.x,P.PY+.4+Math.sin(u*Math.PI)*16,17); });
+  P.lifts.forEach(function(l){ var u=((t*.14+l.ph)%1); l.g.position.set(l.x,P.PY+.4+Math.sin(u*Math.PI)*16,l.z); });
+  (P.arms||[]).forEach(function(a){ if(a.s) a.s.rotation.y=Math.sin(t*.23+a.ph)*.9+Math.sin(t*.61+a.ph*2)*.25; });
   P.rail.forEach(function(r){ var f=((t*.025+r.ph)%1); r.g.position.x=-48+f*96; });
   P.crew.forEach(function(c){ c.g.position.x=c.x0+Math.sin(t*.22+c.ph)*4; c.g.rotation.y=Math.cos(t*.22+c.ph)>0?Math.PI/2:-Math.PI/2; });
   var laneOn=!mineClosed; P.lane.forEach(function(l,i){ var on=laneOn && ((t*1.4-i*.09)%1+1)%1<.16; l.material.color.setRGB(3.2,3.0,2.7).multiplyScalar(on?1:.08); });
@@ -4816,6 +4862,7 @@ function buildCustomsGate(parent){
   var dist=150, pos=new THREE.Vector3();
   for(var k=0;k<20;k++){ pos.copy(arr).addScaledVector(dir,dist); if(pos.distanceTo(station.center)>105) break; dist+=20; }
   var g=new THREE.Group(); g.position.copy(pos); g.lookAt(V3.copy(pos).add(dir)); parent.add(g);
+  if(ENV_GLB.hall) return buildCustomsGateGLB(g,pos,dir);
   var T=stationTextures(), W=HALL.W, H=HALL.H, L=HALL.L, th=HALL.T, W2=W/2, H2=H/2, L2=L/2;
   var hull=plated(new THREE.MeshStandardMaterial({color:0xc9ced6, map:texRep(T.plate,3,2), metalness:.45, roughness:.5}),.55);
   var dark=new THREE.MeshStandardMaterial({color:0x2c3038, metalness:.8, roughness:.45});
@@ -4842,6 +4889,43 @@ function buildCustomsGate(parent){
   station.gate={group:g, pos:g.localToWorld(new THREE.Vector3(0,0,-L2)), center:pos.clone(), dir:dir, yaw:Math.atan2(dir.x,dir.z), lights:lights, arches:arches, archMat:archMat, cutter:cut, mastLamp:mastLamp,
     boxes:[{c:new THREE.Vector3(0,H2+th/2,0), e:new THREE.Vector3(W2+th,th/2,L2)},{c:new THREE.Vector3(0,-H2-th/2,0), e:new THREE.Vector3(W2+th,th/2,L2)},
       {c:new THREE.Vector3(-(W2+th/2),0,0), e:new THREE.Vector3(th/2,H2,L2)},{c:new THREE.Vector3(W2+th/2,0,0), e:new THREE.Vector3(th/2,H2,L2)}]};
+}
+// modelled hall: one uniform scale, the bore centred on the group origin so the drive-through logic is unchanged
+var HALL_S=92, HALL_BORE={z:.183, yb:-.197, yt:.097, oz:.246, ot:.237, ob:-.236};
+function buildCustomsGateGLB(g,pos,dir){
+  var s=HALL_S, B=HALL_BORE, yc=(B.yb+B.yt)/2;
+  HALL.W=2*B.z*s; HALL.H=(B.yt-B.yb)*s; HALL.L=s; HALL.T=(B.oz-B.z)*s;
+  var W2=HALL.W/2, H2=HALL.H/2, L2=HALL.L/2, top=(B.ot-yc)*s, bot=(B.ob-yc)*s, side=B.oz*s;
+  var shell=envPiece('hall',s,s,s,Math.PI/2); shell.position.y=-yc*s; g.add(shell);
+  var dark=new THREE.MeshStandardMaterial({color:0x2c3038, metalness:.8, roughness:.45});
+  function box(w,h,d,m,x,y,z){ var b=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),m); b.position.set(x,y,z); g.add(b); return b; }
+  function bulb(col,r,x,y,z){ var m=new THREE.Mesh(new THREE.SphereGeometry(r,12,8),new THREE.MeshBasicMaterial({color:col.clone()})); m.position.set(x,y,z); g.add(m); return m; }
+  // the scale plate and the scanner arch standing over it
+  var scaleM=new THREE.MeshStandardMaterial({map:hazardTex(), roughness:.6, metalness:.3}); scaleM.map.repeat.set(4,1);
+  var plate=new THREE.Mesh(new THREE.PlaneGeometry(W2*2-6,14),scaleM); plate.rotation.x=-Math.PI/2; plate.position.set(0,-H2+.08,4); g.add(plate);
+  var arches=[], archMat=new THREE.MeshBasicMaterial({color:new THREE.Color(.5,2.2,3.2)}), boxes=[];
+  if(ENV_GLB.arch){
+    var as=Math.min((W2*2-2)/1.0,(H2*2-.5)/.836), ar=envPiece('arch',as,as,as,Math.PI/2); ar.position.set(0,-H2+.418*as,4); g.add(ar);
+    var ix=.28*as, ox=.5*as, ay=-H2+.418*as, aT=.197*as;
+    [-1,1].forEach(function(sd){ arches.push(box(.22,.56*as,.6,archMat,sd*(ix-.12),ay-.025*as,4));
+      boxes.push({c:new THREE.Vector3(sd*(ix+ox)/2,ay,4), e:new THREE.Vector3((ox-ix)/2,.418*as,aT)}); });
+    boxes.push({c:new THREE.Vector3(0,ay+(.28+.418)/2*as,4), e:new THREE.Vector3(ix,(.418-.28)/2*as,aT)});
+  } else {
+    var a=new THREE.Mesh(new THREE.TorusGeometry(W2-.6,.55,8,40,Math.PI),archMat); a.position.set(0,-H2,4); g.add(a); arches.push(a);
+  }
+  var RED=new THREE.Color(3.4,.35,.25), GRN=new THREE.Color(.4,3,.8);
+  var lights={inR:bulb(RED,1.1,-4,H2-2,-L2-.7), inG:bulb(GRN,1.1,4,H2-2,-L2-.7), outR:bulb(RED,1.1,-4,H2-2,L2+.7), outG:bulb(GRN,1.1,4,H2-2,L2+.7)};
+  var sign=new THREE.Mesh(new THREE.PlaneGeometry(26,6.5),new THREE.MeshBasicMaterial({map:hallSignTex(), side:THREE.DoubleSide})); sign.position.set(0,top+4.5,-L2+1); sign.rotation.y=Math.PI; g.add(sign);
+  box(1,4,1,dark,-9,top+2,-L2+1); box(1,4,1,dark,9,top+2,-L2+1);
+  // patrol cutter parked on the roof pad
+  var cut=buildHull(0,false); cut.scale.setScalar(.55); cut.userData.flames.concat(cut.userData.glows).forEach(function(f){ f.visible=false; }); cut.userData.legs.forEach(function(l){ l.visible=true; });
+  cut.position.set(0,top+hullGear(cut)*.55+.2,0); cut.rotation.y=.5; lightBar(cut,[new THREE.Color(.4,.9,4),new THREE.Color(4,.4,.4)]); g.add(cut);
+  var mast=new THREE.Mesh(new THREE.CylinderGeometry(.35,.6,14,8),dark); mast.position.set(side-3,top+7,L2-6); g.add(mast);
+  var mastLamp=bulb(RED,.7,side-3,top+14.4,L2-6);
+  g.updateMatrixWorld(true);
+  station.gate={group:g, pos:g.localToWorld(new THREE.Vector3(0,0,-L2)), center:pos.clone(), dir:dir, yaw:Math.atan2(dir.x,dir.z), lights:lights, arches:arches, archMat:archMat, cutter:cut, mastLamp:mastLamp,
+    boxes:[{c:new THREE.Vector3(0,(H2+top)/2,0), e:new THREE.Vector3(side,(top-H2)/2,L2)},{c:new THREE.Vector3(0,(-H2+bot)/2,0), e:new THREE.Vector3(side,(bot>-H2?0:(-H2-bot)/2),L2)},
+      {c:new THREE.Vector3(-(W2+side)/2,0,0), e:new THREE.Vector3((side-W2)/2,H2,L2)},{c:new THREE.Vector3((W2+side)/2,0,0), e:new THREE.Vector3((side-W2)/2,H2,L2)}].concat(boxes)};
 }
 var HQ=new THREE.Vector3(), HD=new THREE.Vector3(), HL=new THREE.Vector3();
 function hallCollide(G){
@@ -5842,6 +5926,7 @@ function updateTitle(dt){
 
 var clock=new THREE.Clock(), fpsAcc=0, fpsN=0, fpsT=0, lastResChange=0;
 var SHOWCASE=null;   // test hook: render a hull on its own
+var CAMHOLD=null;    // test hook: pin the camera for screenshots
 function frame(){
   requestAnimationFrame(frame);
   if(SHOWCASE){ renderer.setRenderTarget(null); renderer.toneMapping=THREE.ACESFilmicToneMapping; renderer.outputEncoding=THREE.sRGBEncoding; renderer.render(SHOWCASE.scene,SHOWCASE.cam); return; }
@@ -5864,6 +5949,7 @@ function frame(){
     else pl.setRGB(.9,.88,.84); }
   if(rsc===spaceScene && state.mode!=='title') hullTrouble(dt, ship, spaceScene, false);
   var shk=applyShake(dt);
+  if(CAMHOLD){ camera.position.copy(CAMHOLD.p); camera.lookAt(CAMHOLD.l); }
   composer.render(dt);
   if(shk) camera.quaternion.copy(SHQ);
   $('enFill').style.width=state.energy.toFixed(1)+'%'; $('scFill').style.width=(state.scan*100).toFixed(1)+'%';
@@ -5921,7 +6007,7 @@ async function boot(){
   function prog(p,msg){ lf.style.width=(p*100)+'%'; ld.firstChild.nodeValue=msg; }
   prog(.05,'Generating noise fields…'); await nextFrame();
   buildSharedTextures();
-  prog(.36,'Loading ships…'); await loadShipModels();
+  prog(.36,'Loading models…'); await loadShipModels();
   prog(.4,'Charting star system…'); await nextFrame();
   buildSpaceStatic();
   buildComposer();
@@ -5935,7 +6021,8 @@ async function boot(){
   setTimeout(function(){ ld.style.opacity=0; },400);
   frame();
 }
-window.__nh={show:function(tier,landed,az,el){ if(!SHOWCASE){ var sc=new THREE.Scene(); sc.background=new THREE.Color(.16,.165,.17); sc.environment=spaceScene.environment;
+window.__nh={env:function(){ return {loaded:Object.keys(ENV_GLB), hall:HALL}; }, camHold:function(p,l){ CAMHOLD=p?{p:new THREE.Vector3(p[0],p[1],p[2]), l:new THREE.Vector3(l[0],l[1],l[2])}:null; },
+  show:function(tier,landed,az,el){ if(!SHOWCASE){ var sc=new THREE.Scene(); sc.background=new THREE.Color(.16,.165,.17); sc.environment=spaceScene.environment;
     renderer.toneMappingExposure=.62; var sl=new THREE.DirectionalLight(0xfff4e6,2.2); sl.position.set(-6,10,-8); sc.add(sl); var fl=new THREE.DirectionalLight(0x9fb4d0,.9); fl.position.set(8,4,6); sc.add(fl); sc.add(new THREE.HemisphereLight(0xbfcbd8,0x2a2622,.25));
     var gr=new THREE.Mesh(new THREE.PlaneGeometry(200,200),new THREE.MeshStandardMaterial({color:0x2b2c2e,roughness:.9})); gr.rotation.x=-Math.PI/2; sc.add(gr);
     SHOWCASE={scene:sc, cam:new THREE.PerspectiveCamera(32,innerWidth/innerHeight,.1,500), ground:gr}; }
