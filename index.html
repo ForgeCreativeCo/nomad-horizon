@@ -1535,8 +1535,12 @@ var ENV_MODELS={
   hall:{url:'models/customs_hall.glb'},      // tunnel along X, open ends; inner bore z±.183, y -.197..+.097
   arch:{url:'models/scanner_arch.glb'},      // frame in the YZ plane, thin along X
   berth:{url:'models/berth.glb'},            // deck along X, back wall at -X, deck top y=-.155
-  arm:{url:'models/loader_arm.glb', split:-.24, pivot:[-.008,-.2]}   // base below split, the rest slews round the pivot
+  arm:{url:'models/loader_arm.glb', split:-.24, pivot:[-.008,-.2]},  // base below split, the rest slews round the pivot
+  hub:{url:'models/station_hub.glb'},        // tower, y ±.5, round neck r≈.17 at y≈.3
+  ring:{url:'models/station_ring.glb'}       // wheel in XZ, hole r=.11, rim r≈.38–.5, y ±.072
 };
+// the modelled station core: hub stands behind the pier's concourse, the wheel spins round its neck
+var STN={hubS:160, hubZ:-31, ringS:260, ringY:50};
 var ENV_GLB={};
 function prepEnvModel(gl,cfg){
   gl.scene.updateMatrixWorld(true);
@@ -3480,12 +3484,21 @@ function buildStation(st, parent){
   var ringWin=weather(new THREE.MeshStandardMaterial({color:lin('#8a8b86'), map:texRep(T.plate,26,1), emissive:new THREE.Color(1,.82,.6), emissiveMap:T.win, emissiveIntensity:1.6, metalness:.5, roughness:.55}),.9,{u:SW,paint:.8});
   var solar=new THREE.MeshStandardMaterial({color:lin('#4a4f58'), map:texRep(T.solar,6,2), metalness:.5, roughness:.35, envMapIntensity:1.2});
   function box(w,h,d,x,y,z,mat){ var m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat); m.position.set(x,y,z); g.add(m); return m; }
+  var BIG=!!(ENV_GLB.hub && ENV_GLB.ring), ringG=new THREE.Group(), blink=[];
+  function beacon(x,y,z,col,phase,par){ var s=new THREE.Mesh(new THREE.SphereGeometry(BIG?1.6:.6,10,8),new THREE.MeshBasicMaterial({color:col})); s.position.set(x,y,z); (par||g).add(s); blink.push({m:s, base:col.clone(), ph:phase}); }
+  if(BIG){
+    var hb=envPiece('hub',STN.hubS,STN.hubS,STN.hubS,0); hb.position.set(0,0,STN.hubZ); g.add(hb);
+    ringG.position.set(0,STN.ringY,STN.hubZ); g.add(ringG); ringG.add(envPiece('ring',STN.ringS,STN.ringS,STN.ringS,0));
+    var RR=.5*STN.ringS;
+    beacon(0,STN.hubS*.5+14,STN.hubZ,new THREE.Color(4,.3,.2),0); beacon(0,-STN.hubS*.5-2,STN.hubZ,new THREE.Color(4,.3,.2),.5);
+    [0,1,2,3].forEach(function(k){ var a=k/4*TAU+Math.PI/4; beacon(Math.cos(a)*(RR+1),0,Math.sin(a)*(RR+1),k%2?new THREE.Color(.3,3,.6):new THREE.Color(4,.3,.2),k*.25,ringG); });
+  } else {
   var hub=new THREE.Mesh(new THREE.CylinderGeometry(12,12,56,40,1),hubWin); g.add(hub);
   var capT=new THREE.Mesh(new THREE.ConeGeometry(12,10,40),hull); capT.position.y=33; g.add(capT);
   var capB=new THREE.Mesh(new THREE.ConeGeometry(12,10,40),hull); capB.rotation.x=Math.PI; capB.position.y=-33; g.add(capB);
   [-18,0,18].forEach(function(yy){ var band=new THREE.Mesh(new THREE.TorusGeometry(12.3,.5,8,48),dark); band.rotation.x=Math.PI/2; band.position.y=yy; g.add(band); });
   // rotating habitat ring
-  var ringG=new THREE.Group(); ringG.position.y=10; g.add(ringG);
+  ringG.position.y=10; g.add(ringG);
   var torus=new THREE.Mesh(new THREE.TorusGeometry(46,3.6,20,140),ringWin); torus.rotation.x=Math.PI/2; ringG.add(torus);
   for(var i=0;i<4;i++){ var a=i/4*TAU, sp=new THREE.Mesh(new THREE.CylinderGeometry(1.1,1.1,34,12),dark); sp.rotation.z=Math.PI/2; sp.rotation.y=a; sp.position.set(Math.cos(a)*29,0,-Math.sin(a)*29); ringG.add(sp); }
   for(var k=0;k<10;k++){ var a2=k/10*TAU+.3, md=new THREE.Mesh(new THREE.BoxGeometry(7,5.5,9),hull); md.position.set(Math.cos(a2)*46,0,-Math.sin(a2)*46); md.rotation.y=a2; ringG.add(md); }
@@ -3494,10 +3507,9 @@ function buildStation(st, parent){
   [-1,1].forEach(function(sx){ var arm=new THREE.Mesh(new THREE.BoxGeometry(14,.8,.8),dark); arm.position.set(sx*7,55,0); g.add(arm);
     var pnl=new THREE.Mesh(new THREE.BoxGeometry(34,.35,11),solar); pnl.position.set(sx*30,55,0); pnl.rotation.x=.35; g.add(pnl); });
   var ant=new THREE.Mesh(new THREE.CylinderGeometry(.25,.25,22,6),dark); ant.position.y=-46; g.add(ant);
-  var blink=[];
-  function beacon(x,y,z,col,phase){ var s=new THREE.Mesh(new THREE.SphereGeometry(.6,10,8),new THREE.MeshBasicMaterial({color:col})); s.position.set(x,y,z); g.add(s); blink.push({m:s, base:col.clone(), ph:phase}); }
   beacon(0,61,0,new THREE.Color(4,.3,.2),0); beacon(0,-57,0,new THREE.Color(4,.3,.2),.5);
   beacon(47,10,0,new THREE.Color(.3,3,.6),.2); beacon(-47,10,0,new THREE.Color(4,.3,.2),.7);
+  }
   // ---- orbital freight pier (replaces the old enclosed bay) ----
   var PY=-34, BX=[-36,-12,12,36], PLAYER_BERTH=1;
   var plate2=plated(new THREE.MeshStandardMaterial({color:lin('#4d4f52'), map:texRep(T.plate,4,4), metalness:.65, roughness:.6}),.9,{u:SW,paint:.4});
@@ -3591,10 +3603,10 @@ function buildStation(st, parent){
   [0,2].forEach(function(bi,k){ if(Q.flora<1 && k>0) return; var h=buildHull(fleetTierAt(k,(tr0+k)%4),false); h.scale.setScalar(HULL_SPACE); h.userData.flames.concat(h.userData.glows).forEach(function(f){ f.visible=false; });
     h.position.set(BX[bi],PY+hullGear(h)*.75+.4,28); h.rotation.y=Math.PI; g.add(h); parked.push({h:h, b:bi}); });
   var inbound=buildHull(fleetTierAt(2,(tr0+2)%4),false); inbound.scale.setScalar(HULL_SPACE); inbound.rotation.y=Math.PI; g.add(inbound);
-  var traffic=[]; var orb=buildHull((tr0+3)%4,false); orb.scale.setScalar(.5); parent.add(orb); traffic.push({obj:orb, r:110, ph:1.2, sp:.1, tilt:.25});
+  var traffic=[]; var orb=buildHull((tr0+3)%4,false); orb.scale.setScalar(.5); parent.add(orb); traffic.push({obj:orb, r:BIG?200:110, ph:1.2, sp:BIG?.06:.1, tilt:BIG?.12:.25});
   g.updateMatrixWorld(true);
   var mouthW=g.localToWorld(new THREE.Vector3(BX[PLAYER_BERTH],PY,42)), insideW=g.localToWorld(new THREE.Vector3(BX[PLAYER_BERTH],PY,28)), dirW=new THREE.Vector3(Math.sin(st.yaw),0,Math.cos(st.yaw));
-  station={st:st, group:g, ring:ringG, blink:blink, traffic:traffic, center:st.pos.clone(), mouthW:mouthW, insideW:insideW, dirW:dirW,
+  station={st:st, group:g, ring:ringG, big:BIG, wheelW:g.localToWorld(new THREE.Vector3(0,STN.ringY,STN.hubZ)), wheelR:STN.ringS*.5+12, blink:blink, traffic:traffic, center:st.pos.clone(), mouthW:mouthW, insideW:insideW, dirW:dirW,
     pier:{clamps:clamps, beacons:berthBeacons, lifts:lifts, rail:rail, crew:crew, lane:lane, inbound:inbound, parked:parked, board:{c:bc, t:bTex, last:-1}, PY:PY, BX:BX, player:PLAYER_BERTH,
       floods:floods, vents:vents, weld:weld}};
   drawPierBoard(true);
@@ -3698,6 +3710,17 @@ function dockArrived(){
   piratesLeave('');
   if(secOf(SYS.seed).customs && (!isCleared()||isWanted())) customsScan('dock',function(){ if(state.dock && state.dock.phase==='docked') openTerminal(stationLoc()); });
   else openTerminal(stationLoc());
+}
+// modelled hub: a tall round-cornered block behind the concourse; push the ship out sideways or over the top
+var HC=new THREE.Vector3();
+function hubCollide(){
+  var g=station.group, lp=g.worldToLocal(HC.copy(ship.position)), r=STN.hubS*.235+4, top=STN.hubS*.5+4, bot=-STN.hubS*.5-4;
+  var dx=lp.x, dz=lp.z-STN.hubZ, d=Math.hypot(dx,dz);
+  if(d<r && lp.y<top && lp.y>bot){
+    var up=top-lp.y, out=r-d;
+    if(up<out){ lp.y=top; } else { var k=d>1e-3?r/d:1; lp.x=dx*k; lp.z=STN.hubZ+(d>1e-3?dz*k:r); }
+    ship.position.copy(g.localToWorld(lp)); cargoImpact(state.vel.length()*.6); state.vel.multiplyScalar(.3);
+  }
 }
 function startDock(){
   if(state.dock||!station) return;
@@ -4108,8 +4131,8 @@ function updateAutopilot(dt){
     if(!station){ apOff(''); return; }
     var mouth=station.mouthW.clone().addScaledVector(station.dirW,50), sd=ship.position.distanceTo(station.center);
     dist=Math.max(0,sd-60);
-    aim=avoidSphere(ship.position, mouth, station.center, 95);
-    if(sd<130 && !state.dockCool){ apOff(''); startDock(); return; }
+    aim=station.big?avoidSphere(ship.position, mouth, station.wheelW, station.wheelR):avoidSphere(ship.position, mouth, station.center, 95);
+    if((station.big?ship.position.distanceTo(mouth)<70:sd<130) && !state.dockCool){ apOff(''); startDock(); return; }
   } else {
     var ab=apAbove(A), p=ab.p, r=p.radius, above=p.pos.clone().addScaledVector(ab.n,r*1.7);
     dist=Math.max(0,ship.position.distanceTo(p.pos)-r);
@@ -4117,7 +4140,7 @@ function updateAutopilot(dt){
     above=p.pos.clone().addScaledVector(ab.n,r*1.45);
     if(ship.position.distanceTo(above)>r*.4) aim=avoidSphere(ship.position, above, p.pos, r*1.3);
     else aim=p.pos.clone().addScaledVector(ab.n,r*.4);
-    if(station && ship.position.distanceTo(station.center)<500) aim=avoidSphere(ship.position, aim, station.center, 110);
+    if(station && ship.position.distanceTo(station.center)<500) aim=station.big?avoidSphere(ship.position, aim, station.wheelW, station.wheelR):avoidSphere(ship.position, aim, station.center, 110);
   }
   A.dist=dist;
   // never fly through a world on the way (e.g. heading for the station right after leaving a planet)
@@ -4372,10 +4395,11 @@ function updateSpace(dt){
     var FXs=sceneFX(spaceScene); if(Math.random()<heat*Q.fx*1.5) sparks(FXs.add, ship.position.x+(Math.random()-.5)*2, ship.position.y-.5, ship.position.z+(Math.random()-.5)*2, 2, {v:3, vx:-state.vel.x*.5, vy:-state.vel.y*.5, vz:-state.vel.z*.5, grav:0, size:.35}); }
   else finalPass.uniforms.heatK.value=0;
   var sd=station?ship.position.distanceTo(station.center):1e9;
-  if(sd<56 && ship.position.y>station.center.y-14){ cargoImpact(state.vel.length()*.6); ship.position.sub(station.center).setLength(56).add(station.center); state.vel.multiplyScalar(.3); }
+  if(station && station.big){ hubCollide(); }
+  else if(sd<56 && ship.position.y>station.center.y-14){ cargoImpact(state.vel.length()*.6); ship.position.sub(station.center).setLength(56).add(station.center); state.vel.multiplyScalar(.3); }
   pierCollide();
   state.dockCool=Math.max(0,(state.dockCool||0)-dt);
-  if(sd<DOCK_RANGE && !state.dockCool && $('warpPanel').hidden) setPrompt('DOCK · '+SYS.station.name,'TRADE · UPGRADES · CONTRACTS',startDock);
+  if(station && (station.big?ship.position.distanceTo(V3.copy(station.mouthW).addScaledVector(station.dirW,30))<DOCK_RANGE+10:sd<DOCK_RANGE) && !state.dockCool && $('warpPanel').hidden) setPrompt('DOCK · '+SYS.station.name,'TRADE · UPGRADES · CONTRACTS',startDock);
   else if(hasMod('flares') && state.flares>0 && lawActors.some(function(a){ return a.kind==='pirate' && a.mode==='attack'; })) setPrompt('DROP FLARES',state.flares+' LEFT',dropFlares);
   else setPrompt(null);
   spaceAmbient(dt);
@@ -4862,7 +4886,7 @@ function buildCustomsGate(parent){
   var arr=SYS.arrival.clone(), near=planets.reduce(function(a,p){ return (!a||p.pos.distanceTo(arr)<a.pos.distanceTo(arr))?p:a; },null);
   var dir=near.pos.clone().sub(arr); dir.y=0; dir.normalize();
   var dist=150, pos=new THREE.Vector3();
-  for(var k=0;k<20;k++){ pos.copy(arr).addScaledVector(dir,dist); if(pos.distanceTo(station.center)>105) break; dist+=20; }
+  for(var k=0;k<20;k++){ pos.copy(arr).addScaledVector(dir,dist); if(pos.distanceTo(station.center)>(station.big?230:105)) break; dist+=20; }
   var g=new THREE.Group(); g.position.copy(pos); g.lookAt(V3.copy(pos).add(dir)); parent.add(g);
   if(ENV_GLB.hall) return buildCustomsGateGLB(g,pos,dir);
   var T=stationTextures(), W=HALL.W, H=HALL.H, L=HALL.L, th=HALL.T, W2=W/2, H2=H/2, L2=L/2;
