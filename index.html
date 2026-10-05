@@ -1520,6 +1520,9 @@ var SHIP_MODELS={
   // Longhaul: cab toward +Z, long trailer spine, four side thrusters and twin fins at the tail
   2:{url:'models/longhaul.glb', scale:22, rotY:Math.PI, legY:-.09,
      engines:[[-.108,.005,-.49,.026],[.108,.005,-.49,.026],[-.108,-.05,-.49,.026],[.108,-.05,-.49,.026]], tips:[[.1,.15,-.47],[-.1,.15,-.47]]},
+  // Rook Twin-Boom: the file holds two copies (a turnaround sheet); keep the upper, level one. Nose toward +Z.
+  4:{url:'models/rook_twinboom.glb', scale:17, rotY:Math.PI, legY:-.12, clipY:[.004,1], center:[.0001,.2028,.0564],
+     engines:[[0,-.045,-.44,.04],[-.16,-.01,-.44,.025],[.16,-.01,-.44,.025],[-.16,-.07,-.44,.025],[.16,-.07,-.44,.025]], tips:[[.22,-.03,-.38],[-.22,-.03,-.38]]},
   // Atlas: nose (cab) toward +X in the file; the four pods are cut out by position so they can tilt
   3:{url:'models/atlas.glb', scale:17.5, rotY:Math.PI/2, legY:-.05,
      engines:[[-.497,.016,-.072,.028],[-.497,.016,.072,.028]], tips:[],
@@ -1576,7 +1579,12 @@ function prepShipModel(gl,cfg){
   gl.scene.updateMatrixWorld(true);
   var mesh=null; gl.scene.traverse(function(o){ if(o.isMesh && !mesh) mesh=o; });
   var geo=mesh.geometry.clone(); geo.applyMatrix4(mesh.matrixWorld);
-  var bb0=new THREE.Box3().setFromBufferAttribute(geo.attributes.position);
+  // some exports are turnaround sheets with two copies: keep one (clipY) and centre it (center)
+  if(cfg.clipY){ var p0=geo.attributes.position, ix=geo.index.array, keep=[];
+    for(var q=0;q<ix.length;q+=3){ var cy=(p0.getY(ix[q])+p0.getY(ix[q+1])+p0.getY(ix[q+2]))/3; if(cy>cfg.clipY[0] && cy<cfg.clipY[1]) keep.push(ix[q],ix[q+1],ix[q+2]); }
+    geo.setIndex(keep); }
+  if(cfg.center) geo.translate(-cfg.center[0],-cfg.center[1],-cfg.center[2]);
+  var bb0=new THREE.Box3(), pp=geo.attributes.position, ia=geo.index.array; for(var q2=0;q2<ia.length;q2++) bb0.expandByPoint(V3.fromBufferAttribute(pp,ia[q2]));
   var pos=geo.attributes.position, idx=geo.index.array, body=[], legs=[], pods=(cfg.pods||[]).map(function(){ return []; });
   for(var i=0;i<idx.length;i+=3){
     var a=idx[i], b=idx[i+1], c=idx[i+2], cx=(pos.getX(a)+pos.getX(b)+pos.getX(c))/3, y=(pos.getY(a)+pos.getY(b)+pos.getY(c))/3, cz=(pos.getZ(a)+pos.getZ(b)+pos.getZ(c))/3, put=null;
