@@ -1639,7 +1639,9 @@ function buildHullGLB(tier, landed, wearU){
     sp.scale.setScalar(r*2.2); sp.position.set(x,y,z+.2); g.add(sp); glows.push(sp);
   });
   D.tips.forEach(function(t,i){ var m=new THREE.Mesh(new THREE.SphereGeometry(.11,8,6),new THREE.MeshBasicMaterial({color:i?new THREE.Color(.25,2.6,.7):new THREE.Color(3.5,.25,.12)})); m.position.copy(t); g.add(m); });
-  var bb=new THREE.Box3().setFromObject(g), size=bb.getSize(new THREE.Vector3());
+  // size from the hull itself (body + pods), not the flame cones and glow sprites, which made big rigs look huge to collisions
+  var bb=D.body.boundingBox.clone(); D.pods.forEach(function(pd){ if(!pd.geo.boundingBox) pd.geo.computeBoundingBox(); var pb=pd.geo.boundingBox.clone().translate(pd.c); bb.union(pb); });
+  var size=bb.getSize(new THREE.Vector3());
   g.userData={flames:flames, glows:glows, legs:legs, tilts:tilts, cargo:[], tier:tier, gear:D.gear, len:size.z, beam:size.x, height:bb.max.y, throat:throat, modelled:true};
   legs.forEach(function(l){ l.visible=!!landed; });
   flames.concat(glows).forEach(function(f){ f.visible=!landed; });
@@ -4150,6 +4152,8 @@ function updateAutopilot(dt){
     if(station && ship.position.distanceTo(station.center)<500) aim=station.big?avoidSphere(ship.position, aim, station.wheelW, station.wheelR):avoidSphere(ship.position, aim, station.center, 110);
   }
   A.dist=dist;
+  // swing wide of the customs hall (e.g. a U-turn right after rolling out of it)
+  if(A.kind!=='customs' && station && station.gate && station.gate.group.visible && ship.position.distanceTo(station.gate.center)<400) aim=avoidSphere(ship.position, aim, station.gate.center, HALL.L*.75);
   // never fly through a world on the way (e.g. heading for the station right after leaving a planet)
   var nbp=nearestBody(ship.position); if(nbp.p && nbp.d<nbp.p.radius*3 && !(A.kind==='planet' && A.idx===nbp.p.index)) aim=avoidSphere(ship.position, aim, nbp.p.pos, nbp.p.radius*1.35);
   var D=V3.copy(aim).sub(ship.position).normalize();
@@ -4293,7 +4297,9 @@ function routeTick(dt){
   if(hostileNow()){ if(!R.paused){ R.paused=true; if(state.ap) apOff(''); toast('ROUTE PAUSED · YOU HAVE CONTROL'); } R.clearT=0; return; }
   if(R.paused){ R.clearT+=.4; if(R.clearT<(R.scaled?1.2:3)) return; R.paused=false; toast((R.scaled&&isCleared()?'CUSTOMS CLEARED · ':'')+'ROUTE RESUMED · '+L.name,'life'); R.scaled=false; }
   if(state.ap) return;   // a leg is already flying
-  if(state.mode==='space' && inCustomsHall() && state.vel.length()>3) return;   // roll out the far end before turning for the drop
+  if(state.mode==='space' && inCustomsHall()){   // roll out the far end before turning for the drop
+    var G=station.gate; if(state.vel.length()<6){ state.yaw=angLerp(state.yaw,G.yaw,.5); state.pitch*=.5; setThrottle(.5); state.vel.copy(G.dir).multiplyScalar(10); }
+    return; }
   if(state.mode==='space'){
     if(L.sys!==SYS.seed){
       var ly=lightYears(SYS.seed,L.sys), need=warpFuel(ly);
@@ -6083,7 +6089,7 @@ async function boot(){
   setTimeout(function(){ ld.style.opacity=0; },400);
   frame();
 }
-window.__nh={lineup:function(){ var sc=new THREE.Scene(); sc.background=new THREE.Color(.16,.165,.17); sc.environment=spaceScene.environment;
+window.__nh={stationLoc:function(){ return stationLoc(); }, lineup:function(){ var sc=new THREE.Scene(); sc.background=new THREE.Color(.16,.165,.17); sc.environment=spaceScene.environment;
     sc.add(new THREE.HemisphereLight(0xdfe6ee,0x30302c,.8)); var dl=new THREE.DirectionalLight(0xffffff,2.2); dl.position.set(-30,50,40); sc.add(dl);
     var x=0; [0,1,4,2,3].forEach(function(t){ var h=buildHull(t,true,{value:.4}); var bb=new THREE.Box3().setFromObject(h); h.position.set(x-bb.min.x,-h.userData.gear,0); x+=bb.max.x-bb.min.x+3; sc.add(h); });
     var cam=new THREE.PerspectiveCamera(30,innerWidth/innerHeight,.1,1000); cam.position.set(x/2,22,x*.95); cam.lookAt(x/2,0,0); SHOWCASE={scene:sc, cam:cam, ground:new THREE.Object3D()}; },
