@@ -1514,6 +1514,9 @@ function hullProfile(pts,width,bevel){
 var SHIP_MODELS={
   0:{url:'models/skiff.glb', scale:11.5, rotY:Math.PI, legY:-.082,
      engines:[[-.293,.036,-.415,.055],[.293,.036,-.415,.055]], tips:[[-.49,.042,-.27],[.49,.042,-.27]]},
+  // Mule: cab toward +X, 2x2 thruster block at -X, four splayed legs
+  1:{url:'models/mule.glb', scale:13.5, rotY:Math.PI/2, legY:-.128,
+     engines:[[-.5,.095,-.058,.05],[-.5,.095,.058,.05],[-.5,-.035,-.058,.05],[-.5,-.035,.058,.05]], tips:[[.3,.15,-.145],[.3,.15,.145]]},
   // Atlas: nose (cab) toward +X in the file; the four pods are cut out by position so they can tilt
   3:{url:'models/atlas.glb', scale:17.5, rotY:Math.PI/2, legY:-.05,
      engines:[[-.497,.016,-.072,.028],[-.497,.016,.072,.028]], tips:[],
