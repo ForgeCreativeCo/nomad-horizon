@@ -4094,6 +4094,7 @@ function apTargets(){
 }
 function apAbove(t){ var p=planets[t.idx], st=planetTerrain(p.biome).sites[t.site||0], n=st?normalFromSurf(st.x,st.z):new THREE.Vector3(0,1,0); return {p:p, n:n}; }
 function apDist(t){
+  if(t.kind==='customs'){ var G=station&&station.gate; return G?ship.position.distanceTo(G.center):0; }
   if(t.kind==='station') return station?Math.max(0,ship.position.distanceTo(station.center)-60):0;
   var a=apAbove(t); return Math.max(0,ship.position.distanceTo(a.p.pos)-a.p.radius);
 }
@@ -4125,9 +4126,17 @@ function updateAutopilot(dt){
   if(state.law||state.chase||pirateActive()){ apOff(state.route?'':'AUTOPILOT OFF · YOU HAVE CONTROL'); return; }
   var manual=Math.abs(joy.x)>.35||Math.abs(joy.y)>.35||keys.KeyA||keys.KeyD||keys.ArrowLeft||keys.ArrowRight||keys.ArrowUp||keys.ArrowDown;
   if(manual){ apOff('AUTOPILOT OFF · MANUAL CONTROL'); cancelRoute('ROUTE CANCELLED'); if(state.pulse) dropPulse(''); return; }
+  if(state.scale){ apOff(''); return; }   // the scale has us; the route picks up after release
   A.t+=dt;
   var aim, dist;
-  if(A.kind==='station'){
+  if(A.kind==='customs'){
+    var G=station&&station.gate; if(!G){ apOff(''); return; }
+    var hL=HALL.L/2, ent=G.group.localToWorld(new THREE.Vector3(0,0,-hL-90)), ext=G.group.localToWorld(new THREE.Vector3(0,0,hL+80));
+    if(!A.thru && ship.position.distanceTo(ent)<28) A.thru=true;
+    if(A.thru){ aim=ext; dist=ship.position.distanceTo(ext);
+      var lp=G.group.worldToLocal(ship.position.clone()); if(lp.z>hL+50){ apOff(''); return; } }
+    else { aim=avoidSphere(ship.position, ent, G.center, HALL.L*.8); dist=ship.position.distanceTo(ent)+HALL.L; }
+  } else if(A.kind==='station'){
     if(!station){ apOff(''); return; }
     var mouth=station.mouthW.clone().addScaledVector(station.dirW,50), sd=ship.position.distanceTo(station.center);
     dist=Math.max(0,sd-60);
@@ -4149,7 +4158,7 @@ function updateAutopilot(dt){
   var wantYaw=Math.atan2(D.x,D.z), wantPitch=clamp(Math.asin(clamp(D.y,-1,1)),-1.2,1.2);
   var eY=wrapA(wantYaw-state.yaw), eP=wantPitch-state.pitch, slow=state.pulse&&state.pulse.phase==='on'?2.5:4;
   state.apAxes={x:-clamp(eY*slow,-1,1), y:(INVERT_PITCH?1:-1)*clamp(eP*slow,-1,1)};
-  setThrottle(1);
+  setThrottle(A.kind==='customs'?(A.thru?.45:(dist<HALL.L+140?.7:1)):1);
   var fwd=V1.set(Math.sin(state.yaw)*Math.cos(state.pitch),Math.sin(state.pitch),Math.cos(state.yaw)*Math.cos(state.pitch));
   if(!state.pulse && dist>AP_PULSE_MIN && fwd.dot(D)>.985 && !pulseBlock()) engagePulse(true);
 }
@@ -4165,7 +4174,7 @@ function updateApChip(force){
   apChipT-=1/60; if(!force && apChipT>0) return; apChipT=.25;
   var d=A.dist==null?apDist(A):A.dist, ph=state.pulse?(state.pulse.phase==='spool'?'PULSE SPOOLING':state.pulse.phase==='on'?'PULSE':'DROPPING OUT'):(d>AP_PULSE_MIN?'ALIGNING':'APPROACH');
   el.hidden=false;
-  $('apName').textContent=state.route&&state.route.loc.sys===SYS.seed?state.route.loc.name:A.name; $('apInfo').textContent=ph+' · '+shortKm(d)+' · ETA '+clockStr(apEta(d));
+  $('apName').textContent=A.kind==='customs'?'CUSTOMS HALL':(state.route&&state.route.loc.sys===SYS.seed?state.route.loc.name:A.name); $('apInfo').textContent=ph+' · '+shortKm(d)+' · ETA '+clockStr(apEta(d));
 }
 /* the system nav list (tap the radar in space) */
 function openNav(){
@@ -4243,6 +4252,20 @@ function startRoute(loc){
   if(state.mode==='surface') toast('BOARD YOUR SHIP AND THE AUTOPILOT TAKES IT FROM THERE');
   routeT=0; renderInv(); cbEvent('route',loc);
 }
+function inCustomsHall(){
+  var G=station&&station.gate; if(!G || !G.group.visible) return false;
+  var lp=G.group.worldToLocal(V3.copy(ship.position));
+  return Math.abs(lp.x)<HALL.W/2+6 && Math.abs(lp.y)<HALL.H/2+6 && Math.abs(lp.z)<HALL.L/2+30;
+}
+// carrying hot cargo into a customs system: run the hall or go straight to the drop?
+function askSkipCustoms(R){
+  var cb=contrabandAboard(), n=cb.reduce(function(a,c){ return a+c.crates; },0);
+  if(state.ap) apOff('');
+  showLaw({type:'routeask', tone:'warn', eye:'ROUTE · '+SYS.name+' · '+secOf(SYS.seed).name, title:'Customs checkpoint ahead',
+    body:'<p>You are carrying '+n+' crate'+(n>1?'s':'')+' of contraband. The hall scanner may find '+(n>1?'them':'it')+'.</p><p>Skip the hall and fly straight to '+R.loc.name+'? Patrols may stop you on the way.</p>',
+    buttons:[{label:'SKIP CUSTOMS', cls:'pri', fn:function(){ if(state.route===R){ R.cust[SYS.seed]='skip'; toast('ROUTE · STRAIGHT TO '+R.loc.name,'life'); } }},
+             {label:'GO THROUGH CUSTOMS', fn:function(){ if(state.route===R) R.cust[SYS.seed]='go'; }}]});
+}
 function cancelRoute(msg){ if(!state.route) return; state.route=null; if(msg) toast(msg); renderInv(); }
 function routeDone(msg){ var R=state.route; state.route=null; renderInv(); toast(msg||'ARRIVED','life'); cbEvent('arrive',R&&R.loc); }
 function hostileNow(){ return !!(state.law||state.chase||state.scale||(typeof pirateActive==='function'&&pirateActive())); }
@@ -4263,10 +4286,16 @@ function routeTick(dt){
     return;
   }
   if(state.mode==='atmo' && state.landing){ return; }
+  if(R.cust && R.cust[SYS.seed]==='ask'){            // waiting on the skip-customs question
+    if(state.law && state.law.type==='routeask') return;
+    if(hostileNow()) return; delete R.cust[SYS.seed];  // something else took the panel: ask again once it's quiet
+  }
+  if(state.scale){ R.paused=true; R.clearT=0; R.scaled=true; return; }   // on the customs scale: not a hostile pause
   // hostiles pause the route; it picks up again once things are quiet
   if(hostileNow()){ if(!R.paused){ R.paused=true; if(state.ap) apOff(''); toast('ROUTE PAUSED · YOU HAVE CONTROL'); } R.clearT=0; return; }
-  if(R.paused){ R.clearT+=.4; if(R.clearT<3) return; R.paused=false; toast('ROUTE RESUMED · '+L.name,'life'); }
+  if(R.paused){ R.clearT+=.4; if(R.clearT<(R.scaled?1.2:3)) return; R.paused=false; toast((R.scaled&&isCleared()?'CUSTOMS CLEARED · ':'')+'ROUTE RESUMED · '+L.name,'life'); R.scaled=false; }
   if(state.ap) return;   // a leg is already flying
+  if(state.mode==='space' && inCustomsHall() && state.vel.length()>3) return;   // roll out the far end before turning for the drop
   if(state.mode==='space'){
     if(L.sys!==SYS.seed){
       var ly=lightYears(SYS.seed,L.sys), need=warpFuel(ly);
@@ -4274,7 +4303,16 @@ function routeTick(dt){
       if(!R.note['w'+L.sys]){ R.note['w'+L.sys]=1; toast('ROUTE · WARPING TO '+L.sysName); startWarp(L.sys); }
       return;
     }
-    if(!R.note['c'+SYS.seed] && secOf(SYS.seed).customs && !isCleared()){ R.note['c'+SYS.seed]=1; toast('NOT CHECKED IN AT CUSTOMS · PATROLS MAY STOP YOU'); }
+    if(secOf(SYS.seed).customs && !isCleared() && !isWanted() && station && station.gate){
+      R.cust=R.cust||{}; var ch=R.cust[SYS.seed];
+      if(!ch && contrabandAboard().length){ R.cust[SYS.seed]='ask'; askSkipCustoms(R); return; }
+      if(ch!=='skip' && (R.note['t'+SYS.seed]||0)<4){
+        R.note['t'+SYS.seed]=(R.note['t'+SYS.seed]||0)+1;
+        if(!R.note['g'+SYS.seed]){ R.note['g'+SYS.seed]=1; toast('ROUTE · CLEARING CUSTOMS FIRST','life'); }
+        startAutopilot({kind:'customs', name:'CUSTOMS HALL'}); if(state.ap) state.ap.route=true; return;
+      }
+      if(!R.note['c'+SYS.seed]){ R.note['c'+SYS.seed]=1; toast('SKIPPING CUSTOMS · PATROLS MAY STOP YOU'); }
+    }
     if(L.kind==='station') startAutopilot({kind:'station', name:SYS.station.name});
     else startAutopilot({kind:'planet', idx:L.planet, site:L.site||0, name:SYS.biomes[L.planet].name});
     if(state.ap) state.ap.route=true;
@@ -6047,7 +6085,7 @@ async function boot(){
   setTimeout(function(){ ld.style.opacity=0; },400);
   frame();
 }
-window.__nh={env:function(){ return {loaded:Object.keys(ENV_GLB), hall:HALL}; }, camHold:function(p,l){ CAMHOLD=p?{p:new THREE.Vector3(p[0],p[1],p[2]), l:new THREE.Vector3(l[0],l[1],l[2])}:null; },
+window.__nh={siteLoc:function(i,j){ return siteLoc(SYS,i,j||0); }, env:function(){ return {loaded:Object.keys(ENV_GLB), hall:HALL}; }, camHold:function(p,l){ CAMHOLD=p?{p:new THREE.Vector3(p[0],p[1],p[2]), l:new THREE.Vector3(l[0],l[1],l[2])}:null; },
   show:function(tier,landed,az,el){ if(!SHOWCASE){ var sc=new THREE.Scene(); sc.background=new THREE.Color(.16,.165,.17); sc.environment=spaceScene.environment;
     renderer.toneMappingExposure=.62; var sl=new THREE.DirectionalLight(0xfff4e6,2.2); sl.position.set(-6,10,-8); sc.add(sl); var fl=new THREE.DirectionalLight(0x9fb4d0,.9); fl.position.set(8,4,6); sc.add(fl); sc.add(new THREE.HemisphereLight(0xbfcbd8,0x2a2622,.25));
     var gr=new THREE.Mesh(new THREE.PlaneGeometry(200,200),new THREE.MeshStandardMaterial({color:0x2b2c2e,roughness:.9})); gr.rotation.x=-Math.PI/2; sc.add(gr);
