@@ -1,6 +1,6 @@
 /* Nomad Horizon service worker: offline play + fast reloads.
    Bump VERSION on every release so installed copies pick up the new game. */
-const VERSION = 'nh-2026-10-05-muleglb';
+const VERSION = 'nh-2026-10-05-longhaulglb';
 const MUSIC_CACHE = 'nh-music-1';   // kept across releases so music downloads once
 const THREE_BASE = 'https://cdn.jsdelivr.net/npm/three@0.128.0/';
 const CORE = [
@@ -15,7 +15,7 @@ const CORE = [
   THREE_BASE + 'examples/js/postprocessing/RenderPass.js',
   THREE_BASE + 'examples/js/postprocessing/UnrealBloomPass.js',
   THREE_BASE + 'examples/js/loaders/GLTFLoader.js',
-  './models/skiff.glb', './models/mule.glb', './models/atlas.glb', './models/customs_hall.glb', './models/scanner_arch.glb', './models/berth.glb', './models/loader_arm.glb', './models/station_hub.glb', './models/station_ring.glb'
+  './models/skiff.glb', './models/mule.glb', './models/longhaul.glb', './models/atlas.glb', './models/customs_hall.glb', './models/scanner_arch.glb', './models/berth.glb', './models/loader_arm.glb', './models/station_hub.glb', './models/station_ring.glb'
 ];
 
 self.addEventListener('install', (e) => {
