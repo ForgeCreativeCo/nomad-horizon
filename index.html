@@ -196,6 +196,18 @@ button:focus-visible{outline:2px solid var(--cyan);outline-offset:3px;}
 .toast.life{border-left-color:#9dff6a;}
 .jobline{font-family:var(--font-mono);font-size:.6rem;letter-spacing:.06em;color:var(--amber);text-shadow:0 1px 4px rgba(0,0,0,.9);max-width:15rem;}
 .jobline.late{color:#ff7a5a;}
+.jobline{pointer-events:auto;cursor:pointer;padding:.12rem 0;}
+.jobline .go{display:inline-block;margin-left:.4rem;padding:0 .35rem;border:1px solid rgba(255,178,77,.55);border-radius:99px;font-size:.52rem;letter-spacing:.12em;}
+.jobline.on .go{background:var(--amber);color:#170c02;border-color:var(--amber);}
+#cbBtn{position:absolute;right:11.2rem;top:calc(3.4rem + env(safe-area-inset-top,0px));pointer-events:auto;width:2.2rem;height:2.2rem;padding:0;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;color:var(--cyan);cursor:pointer;font-family:var(--font-display);font-weight:700;font-size:.6rem;letter-spacing:.04em;}
+#cbBtn.off{color:var(--ink-dim);text-decoration:line-through;}
+@media (max-width:560px){ #cbBtn{right:9.7rem;} }
+#cbMsg{position:absolute;left:50%;bottom:calc(1rem + env(safe-area-inset-bottom,0px));transform:translate(-50%,8px);max-width:min(46vw,25rem);z-index:12;
+  font-family:var(--font-mono);font-size:.66rem;line-height:1.35;color:var(--ink);background:rgba(6,12,22,.66);border-left:3px solid var(--amber);
+  padding:.4rem .7rem;border-radius:.3rem;opacity:0;transition:opacity .4s ease,transform .4s ease;pointer-events:none;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);}
+#cbMsg b{display:block;font-weight:400;font-size:.55rem;letter-spacing:.16em;color:var(--amber);margin-bottom:.1rem;}
+#cbMsg.show{opacity:1;transform:translate(-50%,0);}
 .hold{display:flex;align-items:center;gap:.6rem;font-family:var(--font-mono);font-size:.62rem;letter-spacing:.14em;color:var(--ink-dim);}
 .hold .slots{display:flex;gap:.2rem;flex:1;flex-wrap:wrap;} .hold .slots i{flex:1;max-width:1.6rem;min-width:.6rem;height:.5rem;border-radius:1px;background:rgba(255,255,255,.1);}
 .hold .slots i.on{background:var(--amber);box-shadow:0 0 6px var(--amber);} .hold b{color:var(--ink);font-weight:400;font-variant-numeric:tabular-nums;}
@@ -371,6 +383,8 @@ body.mapopen #joywrap,body.mapopen #actions,body.mapopen #throttle{visibility:hi
     <button id="pitchBtn" class="panel" type="button" aria-pressed="true">PITCH <b id="pitchName">INV</b></button>
     <button id="gfxBtn" class="panel" type="button">GFX <b id="gfxName">HIGH</b></button>
     <button id="sndBtn" class="panel" type="button" aria-pressed="true" aria-label="Sound on or off"><svg viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9z"/><path class="w" d="M16 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12"/><path class="x" d="M16 9l5 6M21 9l-5 6"/></svg></button>
+    <button id="cbBtn" class="panel" type="button" aria-pressed="true" aria-label="CB radio on or off">CB</button>
+    <div id="cbMsg"></div>
     <button id="musBtn" class="panel" type="button" aria-pressed="true" aria-label="Music on or off"><svg viewBox="0 0 24 24"><path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/><path class="x" d="M3 3l18 18"/></svg></button>
     <div id="radarWrap" role="button" aria-label="Open planet map"><canvas id="radar" width="200" height="200"></canvas><div id="radarCap"></div><div class="maptap">TAP · MAP</div></div>
     <div id="fps"></div>
@@ -2502,7 +2516,7 @@ window.addEventListener('mouseup',function(){ setHold(false); });
 /* =========================================================================
    Game state + HUD
    ========================================================================= */
-var state={throttle:0, yawRate:0, pitchRate:0, mode:'title', yaw:Math.PI, pitch:0, vel:new THREE.Vector3(), energy:100, scan:1, credits:0, inv:{}, found:{}, sysSeed:0, up:{}, cargo:[], taken:{}, boardGen:{}, delivered:0, dock:null, mods:[], modsOwned:{}, lic:{}, fuel:null, hull:100, company:null, hullSel:null, rooks:{}, pulse:null, pulseK:0, ap:null, apAxes:null, fits:{}, fuelReserve:0, cleared:0, heat:{}, flares:3, food:100, rest:100, rations:2, fedT:0, restedT:0, needsOff:false, blinkT:0, sleeping:false, law:null, chase:null, arrivedT:0, pirateT:30,
+var state={throttle:0, yawRate:0, pitchRate:0, mode:'title', yaw:Math.PI, pitch:0, vel:new THREE.Vector3(), energy:100, scan:1, credits:0, inv:{}, found:{}, sysSeed:0, up:{}, cargo:[], taken:{}, boardGen:{}, delivered:0, dock:null, mods:[], modsOwned:{}, lic:{}, fuel:null, hull:100, company:null, hullSel:null, rooks:{}, pulse:null, pulseK:0, ap:null, apAxes:null, route:null, fits:{}, fuelReserve:0, cleared:0, heat:{}, flares:3, food:100, rest:100, rations:2, fedT:0, restedT:0, needsOff:false, blinkT:0, sleeping:false, law:null, chase:null, arrivedT:0, pirateT:30,
   pos:new THREE.Vector3(), vy:0, grounded:true, bob:0, fovKick:0, exposure:1, exposureTarget:1, t:0, warp:null};
 var OLD_KEYS={'CINDER REACH':'PYRITE','GLASSWATER':'CYANITE','VERDANT HOLLOW':'AMETHINE','PALE SILICATE':'AURUM'};
 try{
@@ -2529,8 +2543,10 @@ function renderInv(){
   var groups={};
   state.cargo.forEach(function(c){ var k=c.dest.key; if(!groups[k]) groups[k]={d:c.dest, n:0, tl:'', frag:false}; var g=groups[k]; g.n+=c.crates;
     var tl=timeLeft(c); if(tl && (!g.tl || tl<g.tl)) g.tl=tl; if(c.kind==='fragile') g.frag=true; });
-  Object.keys(groups).forEach(function(k){ var g=groups[k], c=document.createElement('div'); c.className='jobline'+(g.tl==='LATE'?' late':'');
+  Object.keys(groups).forEach(function(k){ var g=groups[k], c=document.createElement('div'), on=state.route && state.route.loc.key===g.d.key; c.className='jobline'+(g.tl==='LATE'?' late':'')+(on?' on':'');
     c.textContent='\u25b8 '+g.n+' \u2192 '+g.d.name+(SYS && g.d.sys!==SYS.seed?' ('+g.d.sysName+')':'')+(g.tl?' \u00b7 '+g.tl:'');
+    var go=document.createElement('span'); go.className='go'; go.textContent=on?'ROUTE ON':'AUTO'; c.appendChild(go);
+    c.addEventListener('click',function(e){ e.stopPropagation(); if(state.route && state.route.loc.key===g.d.key){ apOff(''); cancelRoute('ROUTE CANCELLED'); } else startRoute(g.d); });
     row.appendChild(c); });
   $('holdVal').textContent=holdUsed()+'/'+holdCap();
   if(state.fuel==null) state.fuel=fuelCap();
@@ -2657,7 +2673,7 @@ function enterAtmosphere(p){
   updateHullCargo();
   state.entryNormal=ship.position.clone().sub(p.pos).normalize(); wearHull(.4); if(AU.buf.reentry){ sfx('reentry',.95); sfx('whoosh',.25,1.35); } else sfx('whoosh',.55,1.35);
   setDayFromElevation(S, state.entryNormal.dot(V3.copy(SPACE_SUN).sub(p.pos).normalize()));
-  if(state.ap) apOff('AUTOPILOT OFF · YOU HAVE CONTROL'); state.pulse=null; state.pulseK=0;
+  if(state.ap) apOff(state.route?'':'AUTOPILOT OFF · YOU HAVE CONTROL'); state.pulse=null; state.pulseK=0;
   state.mode='atmo'; setScene(S.scene); setModeUI('atmo');
   var fx=Math.sin(state.yaw), fz=Math.cos(state.yaw), spot=surfFromNormal(state.entryNormal), lim=WORLD_E-260;
   var tx=clamp(spot.x,-lim,lim), tz=clamp(spot.z,-lim,lim);
@@ -2677,7 +2693,7 @@ function enterAtmosphere(p){
   showBanner('ENTERING ATMOSPHERE', S.biome.name, S.biome.meta);
 }
 function exitAtmosphere(){
-  if(state.ap && state.ap.kind==='orbit'){ apOff(''); setTimeout(function(){ toast('IN ORBIT · TAP THE RADAR FOR SYSTEM NAV'); },900); }
+  if(state.ap && state.ap.kind==='orbit'){ apOff(''); if(!state.route) setTimeout(function(){ toast('IN ORBIT · TAP THE RADAR FOR SYSTEM NAV'); },900); }
   if(state.ap && state.ap.kind==='town') apOff('');
   var p=planets[S.idx], n=normalFromSurf(S.ship.position.x,S.ship.position.z); state.entryNormal=n; sfx('whoosh',.45,1.2);
   ship.position.copy(p.pos).addScaledVector(n,p.radius*1.95);
@@ -3640,9 +3656,9 @@ function apOff(msg){ if(!state.ap) return; state.ap=null; state.apAxes=null; upd
 function updateAutopilot(dt){
   var A=state.ap; if(!A) return;
   if(state.mode!=='space'||state.warp||state.dock){ apOff(''); return; }
-  if(state.law||state.chase||pirateActive()){ apOff('AUTOPILOT OFF · YOU HAVE CONTROL'); return; }
+  if(state.law||state.chase||pirateActive()){ apOff(state.route?'':'AUTOPILOT OFF · YOU HAVE CONTROL'); return; }
   var manual=Math.abs(joy.x)>.35||Math.abs(joy.y)>.35||keys.KeyA||keys.KeyD||keys.ArrowLeft||keys.ArrowRight||keys.ArrowUp||keys.ArrowDown;
-  if(manual){ apOff('AUTOPILOT OFF · MANUAL CONTROL'); if(state.pulse) dropPulse(''); return; }
+  if(manual){ apOff('AUTOPILOT OFF · MANUAL CONTROL'); cancelRoute('ROUTE CANCELLED'); if(state.pulse) dropPulse(''); return; }
   A.t+=dt;
   var aim, dist;
   if(A.kind==='station'){
@@ -3650,7 +3666,7 @@ function updateAutopilot(dt){
     var mouth=station.mouthW.clone().addScaledVector(station.dirW,50), sd=ship.position.distanceTo(station.center);
     dist=Math.max(0,sd-60);
     aim=avoidSphere(ship.position, mouth, station.center, 95);
-    if(sd<DOCK_RANGE && !state.dockCool){ apOff(''); startDock(); return; }
+    if(sd<130 && !state.dockCool){ apOff(''); startDock(); return; }
   } else {
     var ab=apAbove(A), p=ab.p, r=p.radius, above=p.pos.clone().addScaledVector(ab.n,r*1.7);
     dist=Math.max(0,ship.position.distanceTo(p.pos)-r);
@@ -3661,6 +3677,8 @@ function updateAutopilot(dt){
     if(station && ship.position.distanceTo(station.center)<500) aim=avoidSphere(ship.position, aim, station.center, 110);
   }
   A.dist=dist;
+  // never fly through a world on the way (e.g. heading for the station right after leaving a planet)
+  var nbp=nearestBody(ship.position); if(nbp.p && nbp.d<nbp.p.radius*3 && !(A.kind==='planet' && A.idx===nbp.p.index)) aim=avoidSphere(ship.position, aim, nbp.p.pos, nbp.p.radius*1.35);
   var D=V3.copy(aim).sub(ship.position).normalize();
   var wantYaw=Math.atan2(D.x,D.z), wantPitch=clamp(Math.asin(clamp(D.y,-1,1)),-1.2,1.2);
   var eY=wrapA(wantYaw-state.yaw), eP=wantPitch-state.pitch, slow=state.pulse&&state.pulse.phase==='on'?2.5:4;
@@ -3681,7 +3699,7 @@ function updateApChip(force){
   apChipT-=1/60; if(!force && apChipT>0) return; apChipT=.25;
   var d=A.dist==null?apDist(A):A.dist, ph=state.pulse?(state.pulse.phase==='spool'?'PULSE SPOOLING':state.pulse.phase==='on'?'PULSE':'DROPPING OUT'):(d>AP_PULSE_MIN?'ALIGNING':'APPROACH');
   el.hidden=false;
-  $('apName').textContent=A.name; $('apInfo').textContent=ph+' · '+shortKm(d)+' · ETA '+clockStr(apEta(d));
+  $('apName').textContent=state.route&&state.route.loc.sys===SYS.seed?state.route.loc.name:A.name; $('apInfo').textContent=ph+' · '+shortKm(d)+' · ETA '+clockStr(apEta(d));
 }
 /* the system nav list (tap the radar in space) */
 function openNav(){
@@ -3695,17 +3713,17 @@ function openNav(){
       '<span class="wp-name">'+t.name+(on?' · <span style="color:var(--cyan)">ENGAGED</span>':'')+'</span><span class="wp-dist">'+shortKm(t.dist)+' · ETA '+clockStr(apEta(t.dist))+'</span>'+
       (t.drop?'<span class="wp-drop">▸ DROP · '+t.drop+' CRATE'+(t.drop>1?'S':'')+' FOR '+t.dropTo+'</span>':'')+
       '<span class="wp-meta">'+t.meta+'</span>';
-    row.addEventListener('click',function(){ startAutopilot(t); });
+    row.addEventListener('click',function(){ startRoute(t.kind==='station'?stationLoc():siteLoc(SYS,t.idx,t.site||0)); });
     list.appendChild(row);
   });
   $('nvSys').textContent=SYS.name+' · FUEL '+Math.floor(state.fuel)+'/'+fuelCap();
-  $('nvOff').hidden=!state.ap;
+  $('nvOff').hidden=!state.ap && !state.route;
   $('navPanel').hidden=false;
 }
 function closeNav(){ $('navPanel').hidden=true; }
 $('nvX').addEventListener('click',closeNav); $('nvClose').addEventListener('click',closeNav);
-$('nvOff').addEventListener('click',function(){ apOff('AUTOPILOT OFF'); if(state.pulse) dropPulse(''); closeNav(); });
-$('apChip').addEventListener('click',function(){ apOff('AUTOPILOT OFF'); if(state.pulse) dropPulse(''); });
+$('nvOff').addEventListener('click',function(){ apOff('AUTOPILOT OFF'); cancelRoute(''); if(state.pulse) dropPulse(''); closeNav(); });
+$('apChip').addEventListener('click',function(){ apOff('AUTOPILOT OFF'); cancelRoute('ROUTE CANCELLED'); if(state.pulse) dropPulse(''); });
 $('btnPulse').addEventListener('click',function(e){ e.stopPropagation(); togglePulse(); });
 ['pointerdown','touchstart'].forEach(function(ev){ $('btnPulse').addEventListener(ev,function(e){ e.stopPropagation(); },{passive:true}); });
 window.addEventListener('keydown',function(e){
@@ -3742,6 +3760,135 @@ function scaledSpace(){
   if(spaceSunMesh){ ssPlace(spaceSunMesh,SPACE_SUN,cam); if(spaceSunMesh.userData.glow) spaceSunMesh.userData.glow.quaternion.copy(camera.quaternion); }
 }
 
+/* =========================================================================
+   Delivery routes: one tap chains every autopilot leg to a drop-off
+   (warp → pulse → planet → town pad, or → station dock). Hostiles pause
+   the route; touching the stick cancels it.
+   ========================================================================= */
+var routeT=0;
+function sameLoc(a,b){ return a && b && a.key===b.key; }
+function startRoute(loc){
+  if(!loc) return;
+  if(state.ap) apOff('');
+  state.route={loc:loc, paused:false, clearT:0, note:{}};
+  closeNav(); if(mapOpen) closeMap();
+  var far=SYS && loc.sys!==SYS.seed;
+  toast('ROUTE SET · '+loc.name+(far?' ('+loc.sysName+')':''),'life');
+  if(state.mode==='surface') toast('BOARD YOUR SHIP AND THE AUTOPILOT TAKES IT FROM THERE');
+  routeT=0; renderInv(); cbEvent('route',loc);
+}
+function cancelRoute(msg){ if(!state.route) return; state.route=null; if(msg) toast(msg); renderInv(); }
+function routeDone(msg){ var R=state.route; state.route=null; renderInv(); toast(msg||'ARRIVED','life'); cbEvent('arrive',R&&R.loc); }
+function hostileNow(){ return !!(state.law||state.chase||state.scale||(typeof pirateActive==='function'&&pirateActive())); }
+function routeTick(dt){
+  var R=state.route; if(!R || state.mode==='title') return;
+  routeT-=dt; if(routeT>0) return; routeT=.4;
+  var L=R.loc;
+  // arrived?
+  if(state.dock && state.dock.phase==='docked'){
+    if(L.kind==='station' && L.sys===SYS.seed){ routeDone('ARRIVED · '+L.name); return; }
+    if(!R.note.dock){ R.note.dock=1; toast('ROUTE WAITING · UNDOCK TO CONTINUE TO '+L.name); }
+    return;
+  }
+  if(state.dock || state.warp || state.spool) return;
+  if(state.mode==='surface'){
+    var nt=S && nearestTown(state.pos.x,state.pos.z);
+    if(nt && nt.T.key===L.key && nt.d<40){ routeDone('ARRIVED · '+L.name+' · DELIVER AT THE TERMINAL'); }
+    return;
+  }
+  if(state.mode==='atmo' && state.landing){ return; }
+  // hostiles pause the route; it picks up again once things are quiet
+  if(hostileNow()){ if(!R.paused){ R.paused=true; if(state.ap) apOff(''); toast('ROUTE PAUSED · YOU HAVE CONTROL'); } R.clearT=0; return; }
+  if(R.paused){ R.clearT+=.4; if(R.clearT<3) return; R.paused=false; toast('ROUTE RESUMED · '+L.name,'life'); }
+  if(state.ap) return;   // a leg is already flying
+  if(state.mode==='space'){
+    if(L.sys!==SYS.seed){
+      var ly=lightYears(SYS.seed,L.sys), need=warpFuel(ly);
+      if(state.fuel<need){ cancelRoute('ROUTE STOPPED · NEED '+need+' FUEL TO WARP, HAVE '+Math.floor(state.fuel)); return; }
+      if(!R.note['w'+L.sys]){ R.note['w'+L.sys]=1; toast('ROUTE · WARPING TO '+L.sysName); startWarp(L.sys); }
+      return;
+    }
+    if(!R.note['c'+SYS.seed] && secOf(SYS.seed).customs && !isCleared()){ R.note['c'+SYS.seed]=1; toast('NOT CHECKED IN AT CUSTOMS · PATROLS MAY STOP YOU'); }
+    if(L.kind==='station') startAutopilot({kind:'station', name:SYS.station.name});
+    else startAutopilot({kind:'planet', idx:L.planet, site:L.site||0, name:SYS.biomes[L.planet].name});
+    if(state.ap) state.ap.route=true;
+    return;
+  }
+  if(state.mode==='atmo'){
+    if(L.sys===SYS.seed && L.kind==='town' && S && S.idx===L.planet){ startAtmoAutopilot(townByKey(L.key)); if(state.ap) state.ap.route=true; }
+    else { startOrbitAutopilot(); if(state.ap) state.ap.route=true; }
+  }
+}
+
+/* =========================================================================
+   CB radio: other drivers, patrol and raider warnings, town gossip
+   ========================================================================= */
+var CB={on:true, t:25, el:null, hideT:0, last:''};
+try{ CB.on=localStorage.getItem('nh_cb')!=='0'; }catch(e){}
+var CB_HANDLES=['DUST DEVIL','LUGNUT','NIGHT OWL','RUSTBUCKET','GRAVEL GERTIE','SLINGSHOT','BIG KETTLE','MOONSHINE','TUMBLEWEED','HOT SAUCE','PAPA BEAR','STARDUST','ROADKILL','SIDEWINDER','QUIET RIOT','THE DEACON','GRANNY GEAR','DOC VOLT','SNOWBLIND','CHROME DOME'];
+function cbPick(a,r){ return a[Math.floor((r||Math.random)()*a.length)]; }
+function cbContext(){
+  var c={sys:SYS?SYS.name:'', sec:SYS?secOf(SYS.seed):null, planets:SYS?SYS.biomes.map(function(b){ return b.name; }):[], towns:[], station:SYS&&SYS.station?SYS.station.name:'THE STATION'};
+  if(SYS) c.towns=sysSiteLocs(SYS).map(function(l){ return l.name; });
+  if(SYS && SYS.station){ var best=null; Object.keys(SYS.station.demand).forEach(function(el){ if(!best||SYS.station.demand[el]>SYS.station.demand[best]) best=el; }); c.hot=best; }
+  return c;
+}
+function cbLine(){
+  var c=cbContext(), P=function(){ return cbPick(c.planets)||'the lane'; }, T=function(){ return cbPick(c.towns)||c.station; }, lines=[];
+  lines.push(
+    'Breaker one-nine, anybody got ears on out here?',
+    'Coffee at '+T()+' tastes like reactor coolant. Still drinking it.',
+    'Hauling '+cbPick(['habitat panels','seed vaults','water filters','tool crates','ration packs'])+' to '+T()+'. Long night.',
+    'Keep your eyes peeled near '+P()+', rock fields are drifting again.',
+    'That new kid in the Mule nearly clipped my boom at '+c.station+'.',
+    'Who keeps leaving the pad lights on at '+T()+'?',
+    'Ten-four on the weather, storm wall over '+T()+'.',
+    'Just did '+c.sys+' end to end on autopilot. Slept like a baby.',
+    'Pulse drive is singing tonight. Smooth hauling, drivers.',
+    'Anybody know a good mechanic? My hull sounds like a tin of bolts.');
+  if(c.hot) lines.push(c.station+' is paying top units for '+c.hot.toLowerCase()+' right now.', 'Word is '+c.hot.toLowerCase()+' prices jumped at '+c.station+'. Dump it while it lasts.');
+  if(c.sec){
+    if(c.sec.patrols>0) lines.push('Smokey’s parked on the '+P()+' lane, keep it legal.', 'Patrol cutter sniffing round '+c.station+', mind your manifest.', 'Customs hall is backed up, bring a snack.');
+    if(c.sec.pirates>.5) lines.push('Raiders working the lane past '+P()+'. Flares ready, drivers.', 'Got jumped near '+P()+'. Lost two crates. Watch yourselves.', 'Lot of dark hulls on scope out here. Don’t haul alone.');
+    if(c.sec.key==='lawless') lines.push('No law out here, just us and whatever’s hungry.', 'If you’re hauling the hot stuff, this is the place. Just keep moving.');
+    if(c.sec.key==='high') lines.push('Quiet sector. Patrols everywhere. Boring as a bulkhead.');
+  }
+  if(typeof contrabandAboard==='function' && contrabandAboard().length) lines.push('Somebody on this channel is running hot. Scanners don’t lie, friend.', 'Heard the inspectors are extra jumpy today. Just saying.');
+  if(state.hull<45) lines.push('That rig of yours is leaking sparks, driver. Get it patched.');
+  if(state.mode==='atmo' && S) lines.push('Nice flying over '+S.biome.name+'. Watch the ridges.', 'Wind’s picking up down here. Hold her steady.');
+  var line;
+  for(var i=0;i<6;i++){ line=cbPick(lines); if(line!==CB.last) break; }
+  CB.last=line; return line;
+}
+function cbSay(line, who){
+  if(!CB.on || !$('stationPanel').hidden || termLoc) return;
+  var el=$('cbMsg'); el.innerHTML='<b>CH19 · '+(who||cbPick(CB_HANDLES))+'</b>'+line;
+  el.classList.remove('show'); void el.offsetWidth; el.classList.add('show');
+  CB.hideT=6.5+line.length*.035; cbSquelch();
+}
+function cbSquelch(){
+  if(!AU.ctx || !AU.on) return;
+  var c=AU.ctx, t=c.currentTime+.01, s=c.createBufferSource(), f=c.createBiquadFilter(), g=c.createGain();
+  s.buffer=AU.white; f.type='bandpass'; f.frequency.value=1900; f.Q.value=.8;
+  g.gain.setValueAtTime(0,t); g.gain.linearRampToValueAtTime(.09,t+.02); g.gain.setValueAtTime(.09,t+.16); g.gain.exponentialRampToValueAtTime(.0005,t+.32);
+  s.connect(f); f.connect(g); g.connect(AU.sfx); s.start(t); s.stop(t+.36);
+  tones([1250],.06,'square',.02,.05);
+}
+function cbEvent(kind, loc){
+  if(!CB.on) return;
+  var who=cbPick(CB_HANDLES);
+  if(kind==='route' && loc && Math.random()<.6) setTimeout(function(){ cbSay(cbPick(['Heading for '+loc.name+'? Road’s clear far as I know.','Copy that, driver. Safe run to '+loc.name+'.','Autopilot run to '+loc.name+'? Kick back, I’ll holler if Smokey shows.']),who); },2200);
+  if(kind==='arrive' && loc && Math.random()<.6) setTimeout(function(){ cbSay(cbPick(['Nice run, driver. Go get paid.','Made it to '+loc.name+' in one piece. Respect.','That’s a clean delivery. Drinks are on you.']),who); },3500);
+  if(kind==='pirates') setTimeout(function(){ cbSay(cbPick(['Raiders on you! Burn hard, driver!','Dark hulls closing, drop flares if you got ’em!','Mayday on the lane, somebody’s getting jumped!']),who); },1200);
+  if(kind==='patrol') setTimeout(function(){ cbSay(cbPick(['Smokey lit somebody up. Hope your papers are clean.','Cutter’s got a driver pulled over. Slow and easy, folks.']),who); },1500);
+}
+function cbTick(dt){
+  if(CB.hideT>0){ CB.hideT-=dt; if(CB.hideT<=0) $('cbMsg').classList.remove('show'); }
+  if(!CB.on || state.mode==='title' || state.sleeping || state.law || termLoc || state.dock) return;
+  CB.t-=dt*(state.ap?1.6:1);
+  if(CB.t<=0){ CB.t=40+Math.random()*50; cbSay(cbLine()); }
+}
+function setCB(on){ CB.on=on; try{ localStorage.setItem('nh_cb',on?'1':'0'); }catch(e){} $('cbBtn').classList.toggle('off',!on); $('cbBtn').setAttribute('aria-pressed',on?'true':'false'); if(!on) $('cbMsg').classList.remove('show'); }
 /* =========================================================================
    Update: space
    ========================================================================= */
@@ -4389,6 +4536,7 @@ function startChase(a){ if(!isWanted()) goWanted(); a.mode='chase'; a.caught=0; 
 /* ---------- pirates ---------- */
 function cargoValue(){ return state.cargo.reduce(function(a,c){ return a+c.reward; },0); }
 function spawnPirates(){
+  cbEvent('pirates');
   var sec=secOf(SYS.seed), n=sec.key==='lawless'&&Math.random()<.5?2:1, fwd=V1.set(Math.sin(state.yaw),0,Math.cos(state.yaw));
   for(var i=0;i<n;i++){
     var h=buildHull(1+Math.floor(Math.random()*2),false); h.scale.setScalar(.6);
@@ -4683,7 +4831,7 @@ function updateAtmoAutopilot(dt){
   var A=state.ap; if(!A || (A.kind!=='town' && A.kind!=='orbit')) return;
   if(A.kind==='orbit'){
     if(state.mode!=='atmo' || state.landing){ apOff(''); return; }
-    if(Math.abs(joy.x)>.35||Math.abs(joy.y)>.35||keys.KeyA||keys.KeyD||keys.ArrowLeft||keys.ArrowRight||keys.ArrowUp||keys.ArrowDown){ apOff('AUTOPILOT OFF · MANUAL CONTROL'); return; }
+    if(Math.abs(joy.x)>.35||Math.abs(joy.y)>.35||keys.KeyA||keys.KeyD||keys.ArrowLeft||keys.ArrowRight||keys.ArrowUp||keys.ArrowDown){ apOff('AUTOPILOT OFF · MANUAL CONTROL'); cancelRoute('ROUTE CANCELLED'); return; }
     var op=S.ship.position; A.dist=Math.max(0,300-op.y);
     var eP0=clamp(.75-state.pitch,-1,1);
     state.apAxes={x:-clamp(-state.yawRate*.5,-.2,.2), y:(INVERT_PITCH?1:-1)*clamp(eP0*3,-1,1)};
@@ -4692,7 +4840,7 @@ function updateAtmoAutopilot(dt){
   }
   if(state.mode!=='atmo' || state.landing){ apOff(''); return; }
   var manual=Math.abs(joy.x)>.35||Math.abs(joy.y)>.35||keys.KeyA||keys.KeyD||keys.ArrowLeft||keys.ArrowRight||keys.ArrowUp||keys.ArrowDown;
-  if(manual){ apOff('AUTOPILOT OFF · MANUAL CONTROL'); return; }
+  if(manual){ apOff('AUTOPILOT OFF · MANUAL CONTROL'); cancelRoute('ROUTE CANCELLED'); return; }
   var T=townByKey(A.key); if(!T){ apOff(''); return; }
   var sh=S.ship, p=sh.position, dx=T.x-p.x, dz=T.z-p.z, dh=Math.hypot(dx,dz); A.dist=dh;
   // look ahead along the path for the highest ground, keep clear of it
@@ -4911,7 +5059,7 @@ function renderMapList(){
       row.innerHTML='<span class="mp-ico" style="background:'+col+'"></span><span class="wp-name">'+T.name+'</span><span class="wp-dist">'+fmtDist(o.d)+'</span>'+
         (o.dest?'<span class="wp-drop">▸ DROP · '+o.dest.crates+' CRATE'+(o.dest.crates>1?'S':'')+'</span>':'')+
         '<span class="wp-meta">'+T.label+(flying?(apOn?' · <span style="color:var(--cyan)">AUTOPILOT ENGAGED</span>':' · TAP TO FLY HERE ON AUTOPILOT · ETA '+clockStr(o.d/Math.max(1,atmoCruise())+4)):(state.waypoint===T.key?' · WAYPOINT SET':' · TAP TO SET WAYPOINT'))+'</span>';
-      row.addEventListener('click',function(){ if(flying){ startAtmoAutopilot(T); return; } state.waypoint=state.waypoint===T.key?null:T.key; toast(state.waypoint?'WAYPOINT · '+T.name:'WAYPOINT CLEARED'); renderMapList(); drawMap(); });
+      row.addEventListener('click',function(){ if(flying){ startRoute(townLoc(S.idx,T.j||0)); return; } state.waypoint=state.waypoint===T.key?null:T.key; toast(state.waypoint?'WAYPOINT · '+T.name:'WAYPOINT CLEARED'); renderMapList(); drawMap(); });
       list.appendChild(row);
     });
 }
@@ -4940,6 +5088,8 @@ function drawMap(){
 $('foodBtn').addEventListener('click',eatRation);
 $('sndBtn').addEventListener('click',function(){ audioStart(); setSound(!AU.on); toast(AU.on?'SOUND ON':'SOUND OFF'); });
 setSound(AU.on);
+$('cbBtn').addEventListener('click',function(){ setCB(!CB.on); toast(CB.on?'CB RADIO ON':'CB RADIO OFF'); if(CB.on){ audioStart(); cbSay('Radio check, you\u2019re coming in loud and clear.'); } });
+setCB(CB.on);
 $('musBtn').addEventListener('click',function(){ audioStart(); setMusic(!MU.on); toast(MU.on?'MUSIC ON':'MUSIC OFF'); });
 setMusic(MU.on);
 $('restBtn').addEventListener('click',tapSleep);
@@ -5073,7 +5223,7 @@ function frame(){
   else if(state.mode==='space') updateSpace(dt);
   else if(state.mode==='atmo' && S) updateAtmo(dt);
   else if(state.mode==='surface' && S) updateSurface(dt);
-  if(state.mode!=='title'){ updateLaw(dt); updateNeeds(dt); updateSpool(dt); }
+  if(state.mode!=='title'){ updateLaw(dt); updateNeeds(dt); updateSpool(dt); routeTick(dt); cbTick(dt); }
   audioUpdate(dt);
   state.exposure=lerp(state.exposure,state.exposureTarget,1-Math.pow(.25,dt));
   var u=finalPass.uniforms; u.exposure.value=state.exposure; u.time.value=state.t;
@@ -5147,7 +5297,7 @@ async function boot(){
   setTimeout(function(){ ld.style.opacity=0; },400);
   frame();
 }
-window.__nh={gfx:{foot:function(){ var T=S.towns[0], x=T.x+40, z=T.z+40; S.ship.position.set(x,S.heightAt(x,z)+hullGear(S.ship),z); state.landing=null; disembark(); state.camFrom=null; }, chunks:function(x,z){ if(S) updateChunks(S,x,z,true); }, day:function(ph){ if(S){ S.day.phase=ph; updateDay(0); state.exposure=state.exposureTarget; } }, Q:function(){ return Q; }}, step:function(n,dt){ dt=dt||.05; for(var i=0;i<n;i++){ state.t+=dt; if(state.mode==='space') updateSpace(dt); else if(state.mode==='atmo'&&S) updateAtmo(dt); updateLaw(dt); updateSpool(dt); } }, pulse:{engage:function(){ return engagePulse(false); }, drop:function(){ dropPulse(''); }, block:function(){ return pulseBlock(); }, targets:function(){ return apTargets(); }, ap:function(i){ startAutopilot(apTargets()[i]); }, apTo:function(kind,idx){ startAutopilot(apTargets().filter(function(t){ return t.kind===kind && (kind==='station'||t.idx===idx); })[0]); }, nav:function(){ openNav(); }, orbit:function(){ startOrbitAutopilot(); }, atmoTo:function(i){ var T=S.towns.slice().sort(function(a,b){ return Math.hypot(b.x-S.ship.position.x,b.z-S.ship.position.z)-Math.hypot(a.x-S.ship.position.x,a.z-S.ship.position.z); })[i||0]; startAtmoAutopilot(T); return T.name; }, speed:function(){ return pulseSpeed(); }}, fx:{hasMod:hasMod, modSlots:modSlots, holdCap:holdCap, fuelCap:fuelCap, kindNeeds:kindNeeds, wearHull:wearHull, save:save, swap:swapPlayerHull}, enterPlanet:function(i){ enterAtmosphere(planets[i]); }, ready:function(i){ return !!surfaces[i]; }, land:land, board:board, exitAtmo:exitAtmosphere,
+window.__nh={gfx:{foot:function(){ var T=S.towns[0], x=T.x+40, z=T.z+40; S.ship.position.set(x,S.heightAt(x,z)+hullGear(S.ship),z); state.landing=null; disembark(); state.camFrom=null; }, chunks:function(x,z){ if(S) updateChunks(S,x,z,true); }, day:function(ph){ if(S){ S.day.phase=ph; updateDay(0); state.exposure=state.exposureTarget; } }, Q:function(){ return Q; }}, step:function(n,dt){ dt=dt||.05; for(var i=0;i<n;i++){ state.t+=dt; if(state.mode==='space') updateSpace(dt); else if(state.mode==='atmo'&&S) updateAtmo(dt); else if(state.mode==='surface'&&S) updateSurface(dt); updateLaw(dt); updateSpool(dt); routeTick(dt); }  }, pulse:{engage:function(){ return engagePulse(false); }, drop:function(){ dropPulse(''); }, block:function(){ return pulseBlock(); }, targets:function(){ return apTargets(); }, ap:function(i){ startAutopilot(apTargets()[i]); }, apTo:function(kind,idx){ startAutopilot(apTargets().filter(function(t){ return t.kind===kind && (kind==='station'||t.idx===idx); })[0]); }, nav:function(){ openNav(); }, orbit:function(){ startOrbitAutopilot(); }, route:function(loc){ startRoute(loc); }, inv:function(){ renderInv(); }, remote:function(){ var ns=neighbourSeeds(SYS.seed,3)[0], sy=sysInfo(ns); return {key:ns+':S', kind:'station', name:sy.station.name, planet:-1, sys:ns, sysName:sy.name}; }, cb:function(){ return CB; }, cbLine:function(){ return cbLine(); }, atmoTo:function(i){ var T=S.towns.slice().sort(function(a,b){ return Math.hypot(b.x-S.ship.position.x,b.z-S.ship.position.z)-Math.hypot(a.x-S.ship.position.x,a.z-S.ship.position.z); })[i||0]; startAtmoAutopilot(T); return T.name; }, speed:function(){ return pulseSpeed(); }}, fx:{hasMod:hasMod, modSlots:modSlots, holdCap:holdCap, fuelCap:fuelCap, kindNeeds:kindNeeds, wearHull:wearHull, save:save, swap:swapPlayerHull}, enterPlanet:function(i){ enterAtmosphere(planets[i]); }, ready:function(i){ return !!surfaces[i]; }, land:land, board:board, exitAtmo:exitAtmosphere,
   warp:startWarp, dock:startDock, cam:function(){ return camera; }, station:function(){ return station; }, ship:function(){ return ship; }, state:state, getS:function(){ return S; }, sys:function(){ return SYS; }, enter:function(){ $('enterBtn').click(); },
   queue:queueSurface, terrain:planetTerrain, normalFromSurf:normalFromSurf, openMap:openMap, chunkBuilder:chunkBuilder, planets:function(){ return planets; }, offers:boardOffers, townLoc:townLoc,
   au:function(){ return AU; }, mu:function(){ return MU; }, law:{hall:function(){ return station&&station.gate; }, spawnPirates:spawnPirates, scan:customsScan, actors:function(){ return lawActors; }, heat:heatOf, sec:secOf}};
