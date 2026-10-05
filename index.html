@@ -1523,80 +1523,121 @@ function buildHull(tier, landed, wearU){
     var sc=new THREE.Mesh(new THREE.RingGeometry(r*.95,r*1.6,24),SOOT_MAT); sc.position.set(x,y,z+len/2-.02); par.add(sc);
   }
   function leg(x,z,len,thick){
-    var t=thick||.14, lg=new THREE.Group(); lg.position.set(x,0,z); g.add(lg);
-    M(new THREE.CylinderGeometry(t,t*1.2,len,10),MT.dark,0,-len/2,0,lg);
-    M(new THREE.CylinderGeometry(t*1.25,t*1.25,len*.22,10),MT.haz,0,-len*.62,0,lg,false);
-    M(new THREE.CylinderGeometry(t*3,t*3.4,.14,16),MT.dark,0,-len,0,lg);
+    // jointed walker strut: hip block, painted thigh, knee pin, hydraulic shin, wide foot pad
+    var t=thick||.16, lg=new THREE.Group(); lg.position.set(x,0,z); g.add(lg);
+    box(t*3.4,t*2,t*3.4,MT.dark,0,-t*.4,0,lg);
+    box(t*2.1,len*.46,t*2.1,MT.paint,0,-t-len*.2,0,lg);
+    M(new THREE.CylinderGeometry(t*1.3,t*1.3,len*.12,10),MT.haz,0,-t-len*.28,0,lg,false);
+    var kn=M(new THREE.CylinderGeometry(t*1.25,t*1.25,t*2.8,12),MT.dark,0,-len*.5,0,lg); kn.rotation.z=Math.PI/2;
+    M(new THREE.CylinderGeometry(t*.75,t*.95,len*.42,10),MT.frame,0,-len*.72,0,lg);
+    var hy=M(new THREE.CylinderGeometry(t*.32,t*.32,len*.6,8),MT.dark,t*1.3,-len*.45,0,lg,false); hy.rotation.z=.12;
+    M(new THREE.CylinderGeometry(t*3.6,t*4,.18,18),MT.dark,0,-len+.02,0,lg);
+    M(new THREE.TorusGeometry(t*3.7,t*.25,6,18),MT.frame,0,-len+.12,0,lg,false).rotation.x=Math.PI/2;
     legs.push(lg);
   }
   function crate(w,h,d,x,y,z,i){ cargo.push(box(w,h,d,MT.crates[i%MT.crates.length],x,y,z)); box(w+.06,.12,.12,MT.frame,x,y+h/2,z-d/2+.06,g,false); box(w+.06,.12,.12,MT.frame,x,y+h/2,z+d/2-.06,g,false); }
   function nav(xs,y,z){ M(new THREE.SphereGeometry(.12,8,6),MT.red,-xs,y,z,g,false); M(new THREE.SphereGeometry(.12,8,6),MT.green,xs,y,z,g,false); }
+  function cyl(rt,rb,len,mat,x,y,z,seg){ var c=M(new THREE.CylinderGeometry(rt,rb,len,seg||20),mat,x,y,z); c.rotation.x=Math.PI/2; return c; }
+  function band(r,x,y,z,mat){ return M(new THREE.TorusGeometry(r,r*.07,6,24),mat||MT.dark,x,y,z,g,false); }
+  function stripe(w,h,d,x,y,z){ return box(w,h,d,MT.trim,x,y,z,g,false); }
   var gear;
-  if(tier===4||tier===5){ gear=buildRookParts(tier,g,MT,{M:M,box:box,prof:prof,nozzle:nozzle,leg:leg,crate:crate,nav:nav}); }
+  if(tier===4||tier===5){ gear=buildRookParts(tier,g,MT,{M:M,box:box,prof:prof,nozzle:nozzle,leg:leg,crate:crate,nav:nav,cyl:cyl}); }
   else if(tier===0){
-    prof([[-4.4,.1],[-4.4,.75],[-3.3,1.55],[-1.3,1.8],[.6,1.72],[.9,.2],[-.4,-.35],[-3.6,-.25]],2.6,.12,MT.paint);
-    prof([[-4.05,.8],[-3.2,1.5],[-2.05,1.68],[-2.4,.98]],2.72,.03,MT.glass);
-    box(2.64,.07,2.4,MT.trim,0,1.78,-.5,g,false);
-    box(1.05,.85,5.6,MT.dark,0,.55,3.3);
-    crate(2.1,2.0,5.4,0,-.75,3.5,0);
-    [1.3,3.5,5.7].forEach(function(z){ box(2.4,.22,.32,MT.frame,0,.32,z,g,false); });
-    [-1,1].forEach(function(s){ box(1.7,.18,1.8,MT.trim,s*1.45,.62,4.4); var n=M(new THREE.CylinderGeometry(.58,.62,3.2,20),MT.paint,s*2.25,.62,4.7); n.rotation.x=Math.PI/2; nozzle(.5,.5,s*2.25,.62,6.45); });
-    nav(2.85,.62,3.4);
-    leg(0,-3.2,1.5); leg(-1.6,4.4,1.5); leg(1.6,4.4,1.5); gear=1.55;
-  } else if(tier===1){
-    prof([[-5.5,0],[-5.5,1.4],[-5.0,2.65],[-3.0,2.95],[-2.1,2.95],[-2.1,-.6],[-5.1,-.6]],3.3,.14,MT.paint);
-    prof([[-5.44,1.5],[-4.92,2.58],[-3.6,2.8],[-3.95,1.62]],3.42,.03,MT.glass);
-    box(3.1,.55,.35,MT.dark,0,.15,-5.55); [-1.05,1.05].forEach(function(x){ box(.6,.22,.08,MT.lamp,x,.62,-5.62,g,false); });
-    box(2.4,.16,.3,MT.lamp,0,3.05,-3.7,g,false); box(3.32,.1,3.4,MT.trim,0,1.2,-3.8,g,false);
-    box(1.3,1.3,9.4,MT.dark,0,.95,2.6);
-    [-1.25,1.25,3.75,6.25].forEach(function(z){ [-1,1].forEach(function(s){ box(.22,3.4,.22,MT.frame,s*2.25,.95,z); }); box(4.7,.22,.22,MT.frame,0,2.6,z); box(4.7,.22,.22,MT.frame,0,-.7,z); });
-    [-1,1].forEach(function(s){ box(.2,.2,7.7,MT.frame,s*2.25,2.6,2.5,g,false); box(.2,.2,7.7,MT.frame,s*2.25,-.7,2.5,g,false); });
-    var i1=0; [0,2.5,5].forEach(function(z){ [-1.1,1.1].forEach(function(x){ crate(1.95,3.0,2.25,x,.95,z,i1++); }); });
-    prof([[6.6,-.4],[6.6,2.2],[7.4,2.6],[8.9,2.4],[8.9,-.4]],3.6,.12,MT.paint);
-    box(3.62,.12,2.3,MT.trim,0,1.6,7.8,g,false);
-    [-.95,.95].forEach(function(x){ nozzle(.72,.9,x,.95,9.3); });
-    nav(1.82,2.3,8.2);
-    leg(-1.4,-4.2,1.6); leg(1.4,-4.2,1.6); leg(-1.6,7.6,1.6); leg(1.6,7.6,1.6); gear=2.25;
-  } else if(tier===2){
-    prof([[-10.4,.2],[-10.4,1.25],[-9.6,2.3],[-7.6,2.55],[-6.6,2.3],[-6.6,-.55],[-10,-.55]],3.0,.14,MT.paint);
-    prof([[-10.33,1.3],[-9.55,2.22],[-8.3,2.42],[-8.7,1.38]],3.12,.03,MT.glass);
-    box(3.02,.1,1.6,MT.trim,0,1.65,-8.4,g,false);
-    [-1,1].forEach(function(s){ var n=M(new THREE.CylinderGeometry(.5,.55,2.4,18),MT.paint,s*1.95,.6,-7.6); n.rotation.x=Math.PI/2; nozzle(.42,.4,s*1.95,.6,-6.2); });
-    var Z0=-6.6, Z1=10.8, L=Z1-Z0, zc=(Z0+Z1)/2;
-    [[-.55,0],[.55,0],[-.55,1.1],[.55,1.1]].forEach(function(q){ var rr=M(new THREE.CylinderGeometry(.12,.12,L,8),MT.frame,q[0],q[1]+.05,zc); rr.rotation.x=Math.PI/2; });
-    for(var z=Z0+1;z<Z1;z+=1.6){ box(1.25,.08,.08,MT.frame,0,.6,z,g,false).rotation.z=.8; box(.08,1.2,.08,MT.frame,-.55,.6,z+.8,g,false); box(.08,1.2,.08,MT.frame,.55,.6,z+.8,g,false); }
-    var i2=0; [-2.6,2.4,7.4].forEach(function(zz){
-      box(1.6,1.6,.5,MT.dark,0,.6,zz-2.2); box(1.6,1.6,.5,MT.dark,0,.6,zz+2.2);
-      crate(1.7,1.7,4.3,-1.75,.55,zz,i2++); crate(1.7,1.7,4.3,1.75,.55,zz,i2++); crate(1.7,1.7,4.3,0,2.3,zz,i2++);
+    // SKIFF: capsule cab with wraparound glass, one strapped container in a cage, high side engine pods on stub wings
+    M(hullProfile([[-5.3,.25],[-5.3,.85],[-4.8,1.45],[-3.7,2.05],[-1.7,2.3],[-.5,2.15],[-.3,.05],[-1.0,-.55],[-4.7,-.5]],2.7,.32),MT.paint,0,0,0);
+    M(hullProfile([[-5.0,.95],[-4.55,1.55],[-3.5,2.12],[-2.0,2.3],[-2.25,1.3],[-4.2,.92]],2.84,.05),MT.glass,0,0,0);
+    stripe(.05,.1,4.6,-1.38,.82,-2.7); stripe(.05,.1,4.6,1.38,.82,-2.7);
+    stripe(1.6,.06,1.0,0,2.27,-1.1);
+    [-.85,.85].forEach(function(x){ box(.4,.16,.1,MT.lamp,x,.35,-5.33,g,false); });
+    // cage + container
+    [-1,1].forEach(function(s){ box(.2,.2,6.0,MT.frame,s*1.32,2.05,2.4); box(.2,.2,6.0,MT.frame,s*1.32,-.5,2.4);
+      [-.4,5.2].forEach(function(z){ box(.22,2.75,.22,MT.frame,s*1.32,.78,z); }); });
+    [-.4,5.2].forEach(function(z){ box(2.86,.2,.22,MT.frame,0,2.05,z,g,false); });
+    crate(2.3,2.1,5.0,0,.78,2.4,0);
+    [.8,2.4,4.0].forEach(function(z){ cargo.push(box(2.42,2.22,.32,MT.trim,0,.78,z,g,false)); });
+    // tail block, high engine pods on stub wings
+    M(hullProfile([[5.2,-.4],[5.2,2.0],[5.9,2.1],[6.8,1.7],[6.8,-.2]],2.6,.14),MT.paint,0,0,0);
+    [-1,1].forEach(function(s){
+      box(1.1,.32,1.6,MT.frame,s*1.75,1.35,5.6);
+      cyl(.72,.78,3.2,MT.paint,s*2.55,1.35,5.4); band(.79,s*2.55,1.35,4.3); band(.79,s*2.55,1.35,5.9,MT.trim);
+      nozzle(.6,.6,s*2.55,1.35,7.15);
+      box(1.7,.12,1.3,MT.paint,s*3.85,1.15,6.1); stripe(.5,.13,1.32,s*4.5,1.15,6.1);
     });
-    prof([[10.6,-.9],[10.6,2.0],[11.4,2.6],[14,2.4],[14,-.9]],3.6,.14,MT.paint);
-    [-1,1].forEach(function(s){ M(hullProfile([[11.4,2.2],[12.4,4.0],[13.6,4.0],[14,2.2]],.16,0),MT.trim,s*1.5,0,0); });
-    [[-1,.25],[1,.25],[0,1.55]].forEach(function(q){ nozzle(.62,.8,q[0]*.95,q[1],14.4); });
-    nav(1.85,1.9,12.5);
-    leg(-1.2,-8.6,1.7); leg(1.2,-8.6,1.7); leg(-1.6,12.4,1.4); leg(1.6,12.4,1.4); gear=2.4;
+    nav(4.7,1.15,6.1);
+    leg(0,-3.6,1.55,.15); leg(-1.6,5.4,1.55,.15); leg(1.6,5.4,1.55,.15); gear=1.62;
+  } else if(tier===1){
+    // MULE: cab-over freight truck, roof light bar, six crates in a two-high cage, twin stacked thrusters
+    M(hullProfile([[-6.1,-.6],[-6.1,1.3],[-5.75,2.95],[-2.3,3.1],[-2.3,-.6]],3.7,.14),MT.paint,0,0,0);
+    M(hullProfile([[-6.08,1.4],[-5.76,2.8],[-4.8,2.86],[-5.1,1.45]],3.4,.03),MT.glass,0,0,0);
+    [-1,1].forEach(function(s){ box(.06,1.0,1.2,MT.glass,s*1.86,2.15,-3.9,g,false); box(.06,1.4,.9,MT.glass,s*1.86,1.8,-2.8,g,false); });
+    box(3.8,.75,.5,MT.dark,0,-.25,-6.2); box(2.0,.35,.1,MT.frame,0,.15,-6.47,g,false);
+    [-1.45,1.45].forEach(function(x){ box(.42,.32,.1,MT.lamp,x,.2,-6.47,g,false); });
+    [-.7,.75].forEach(function(x){ stripe(.16,1.5,.06,x,.85,-6.16); });
+    [-1,1].forEach(function(s){ stripe(.05,3.0,.22,s*1.87,1.1,-2.75); });
+    box(2.9,.32,.6,MT.dark,0,3.3,-4.6); [-1.05,-.35,.35,1.05].forEach(function(x){ box(.5,.2,.08,MT.lamp,x,3.3,-4.93,g,false); });
+    box(3.5,.75,9.8,MT.paint,0,-.55,2.5); box(3.55,.12,9.85,MT.dark,0,-.95,2.5,g,false);
+    [-1,1].forEach(function(s){ [-2.1,.75,3.6,6.45].forEach(function(z){ box(.24,3.6,.26,MT.frame,s*1.72,1.25,z); });
+      box(.22,.22,8.8,MT.frame,s*1.72,3.0,2.2,g,false); box(.22,.22,8.8,MT.frame,s*1.72,1.25,2.2,g,false); });
+    [-2.1,.75,3.6,6.45].forEach(function(z){ box(3.6,.22,.24,MT.frame,0,3.0,z,g,false); });
+    var i1=0; [1.95,.5].forEach(function(y,row){ [-.7,2.15,5.0].forEach(function(z){ crate(3.05,1.35,2.55,0,y+(row?0:.05),z,i1++); }); });
+    M(hullProfile([[6.7,-.9],[6.7,3.3],[8.4,3.3],[8.9,2.6],[8.9,-.9]],3.6,.14),MT.paint,0,0,0);
+    [-1,1].forEach(function(s){ stripe(.05,3.6,.12,s*1.82,1.2,7.3); stripe(.05,3.6,.12,s*1.82,1.2,7.6); });
+    var ex=M(new THREE.TorusGeometry(.5,.08,6,12,Math.PI),MT.frame,0,3.3,7.2,g,false); ex.rotation.y=Math.PI/2;
+    [.35,2.15].forEach(function(y){ cyl(.85,.92,1.2,MT.dark,0,y,9.3); band(.93,0,y,9.0,MT.frame); nozzle(.8,.7,0,y,10.1); });
+    nav(1.9,2.9,7.8);
+    leg(-1.5,-4.2,1.7,.18); leg(1.5,-4.2,1.7,.18); leg(-1.5,6.0,1.7,.18); leg(1.5,6.0,1.7,.18); gear=2.32;
+  } else if(tier===2){
+    // LONGHAUL: small cab with headlight pods, long lattice truss, three cargo clusters, finned tail, three thrusters
+    M(hullProfile([[-10.6,-.1],[-10.6,1.0],[-10.0,1.95],[-7.7,2.25],[-6.8,2.05],[-6.8,-.6],[-10.3,-.6]],2.9,.18),MT.paint,0,0,0);
+    M(hullProfile([[-10.52,1.05],[-9.95,1.88],[-8.6,2.12],[-8.95,1.12]],3.04,.03),MT.glass,0,0,0);
+    stripe(2.92,.08,1.2,0,2.18,-8.2); [-1,1].forEach(function(s){ stripe(.05,.1,3.6,s*1.47,.7,-8.6); });
+    [-1,1].forEach(function(s){ cyl(.42,.46,2.6,MT.paint,s*1.85,.05,-8.6); band(.47,s*1.85,.05,-8.0,MT.trim);
+      box(.5,.42,.12,MT.dark,s*1.85,.05,-9.95,g,false); box(.3,.14,.06,MT.lamp,s*1.85,.12,-10.02,g,false); });
+    var Z0=-6.8, Z1=11.0, L=Z1-Z0, zc=(Z0+Z1)/2;
+    [[-.75,-.35],[.75,-.35],[-.75,.75],[.75,.75]].forEach(function(q){ box(.2,.2,L,MT.frame,q[0],q[1],zc); });
+    [-1,1].forEach(function(s){ stripe(.04,.07,L,s*.86,.2,zc); });
+    for(var z=Z0+.8;z<Z1;z+=1.5){ [-1,1].forEach(function(s){ box(.07,1.25,.07,MT.frame,s*.78,.2,z,g,false).rotation.x=(Math.floor((z-Z0)/1.5)%2?.75:-.75); }); }
+    var i2=0; [-3.3,1.9,7.1].forEach(function(zz){
+      [-2.25,2.25].forEach(function(o){ box(3.9,2.7,.38,MT.dark,0,1.5,zz+o); box(3.9,.16,.4,MT.trim,0,2.88,zz+o,g,false); });
+      box(3.8,.18,4.3,MT.frame,0,.15,zz,g,false);
+      crate(1.75,1.25,4.0,-.92,.9,zz,i2++); crate(1.75,1.25,4.0,.92,.9,zz,i2++); crate(1.75,1.2,4.0,0,2.15,zz,i2++);
+    });
+    M(hullProfile([[11.0,-.9],[11.0,2.1],[11.8,2.5],[14.1,2.3],[14.3,-.9]],3.2,.16),MT.paint,0,0,0);
+    [-1,1].forEach(function(s){ M(hullProfile([[11.6,2.2],[13.0,4.6],[14.1,4.6],[14.2,2.2]],.16,0),MT.paint,s*1.2,0,0); stripe(.18,.16,1.12,s*1.2,4.62,13.55); });
+    [[-1,.0],[1,.0],[0,1.45]].forEach(function(q){ cyl(.7,.75,.8,MT.dark,q[0]*.82,q[1],14.5); nozzle(.6,.7,q[0]*.82,q[1],15.1); });
+    nav(1.65,1.9,12.6);
+    leg(-1.15,-8.4,1.7,.16); leg(1.15,-8.4,1.7,.16); leg(-1.5,12.6,1.5,.16); leg(1.5,12.6,1.5,.16); gear=2.42;
   } else {
-    prof([[-8.2,-.2],[-8.2,.7],[-7.6,1.0],[8.2,1.0],[8.6,.4],[8.2,-.6],[-7.4,-.6]],7.6,.16,MT.paint);
-    box(7.62,.12,15.2,MT.dark,0,1.02,.4,g,false);
-    [-1,1].forEach(function(s){ box(.3,.5,15.4,MT.trim,s*3.72,1.25,.4); });
-    prof([[-8.4,.9],[-8.4,2.2],[-7.7,3.5],[-5.6,3.75],[-4.9,3.6],[-4.9,.9]],3.8,.14,MT.paint);
-    prof([[-8.33,2.25],[-7.65,3.42],[-6.4,3.62],[-6.8,2.35]],3.92,.03,MT.glass);
-    box(3.82,.1,1.4,MT.trim,0,2.8,-6.2,g,false); box(2.6,.15,.3,MT.lamp,0,3.82,-5.9,g,false);
-    var i3=0; [-2.6,.4,3.4,6.4].forEach(function(zz){ [-2.35,0,2.35].forEach(function(x){ crate(2.05,1.9,2.7,x,2.03,zz,i3++); }); });
-    [-1,1].forEach(function(sx){ [-5.6,6.4].forEach(function(zz){
-      box(1.2,.5,1.2,MT.dark,sx*4.4,.3,zz);
-      var piv=new THREE.Group(); piv.position.set(sx*5.35,.35,zz); g.add(piv);
-      M(new THREE.CylinderGeometry(.9,.95,2.6,22),MT.paint,0,0,0,piv);
-      M(new THREE.TorusGeometry(.95,.14,10,28),MT.trim,0,1.2,0,piv,false).rotation.x=Math.PI/2;
-      var nz=new THREE.Group(); nz.rotation.x=Math.PI/2; nz.position.set(0,-1.3,0); piv.add(nz); nozzle(.72,.4,0,0,0,nz);
+    // ATLAS: flying flatbed, guard rails, 4 x 3 crates, offset cab, four tilting pods on outrigger arms
+    M(hullProfile([[-6.6,-.5],[-6.6,.45],[8.1,.45],[8.6,-.05],[8.2,-.75],[-6.3,-.75]],7.2,.16),MT.paint,0,0,0);
+    box(6.9,.1,14.2,MT.dark,0,.5,.8,g,false);
+    [-1,1].forEach(function(s){ box(.08,.7,3.0,MT.trim,s*3.62,-.15,-1.5,g,false); box(.08,.5,2.6,MT.paint,s*3.66,-.15,-1.5,g,false);
+      for(var pz=-5.6;pz<=8.0;pz+=1.7){ M(new THREE.CylinderGeometry(.05,.05,1.1,6),MT.trim,s*3.45,1.05,pz,g,false); }
+      box(.09,.09,13.8,MT.trim,s*3.45,1.6,1.2,g,false); box(.07,.07,13.8,MT.trim,s*3.45,1.15,1.2,g,false); });
+    var i3=0; [-3.9,-1.15,1.6,4.35].forEach(function(zz){ [-2.2,0,2.2].forEach(function(x){ crate(2.0,1.35,2.45,x,1.25,zz,i3++); }); });
+    M(hullProfile([[-8.7,-.2],[-8.7,1.5],[-8.1,3.0],[-5.4,3.2],[-4.9,2.8],[-4.9,-.2]],3.9,.16),MT.paint,-1.5,0,0);
+    M(hullProfile([[-8.64,1.6],[-8.08,2.85],[-6.6,3.05],[-7.0,1.7]],4.02,.03),MT.glass,-1.5,0,0);
+    box(.06,1.1,1.4,MT.glass,-3.53,2.1,-6.0,g,false);
+    box(2.6,.25,.5,MT.dark,-1.5,3.38,-6.6); for(var lx=-2.6;lx<=-.4;lx+=.37) box(.24,.14,.06,MT.lamp,lx,3.38,-6.86,g,false);
+    [-2.9,-.1].forEach(function(x){ box(.5,.35,.08,MT.lamp,x,.55,-8.75,g,false); });
+    stripe(3.92,.1,.4,-1.5,1.4,-8.62);
+    box(3.0,1.2,1.2,MT.frame,2.0,.5,-5.6);
+    [-1,1].forEach(function(sx){ [-5.4,6.9].forEach(function(zz){
+      var arm=box(2.2,.45,.8,MT.frame,sx*4.5,.55,zz); arm.rotation.z=sx*-.12;
+      var piv=new THREE.Group(); piv.position.set(sx*5.55,.75,zz); g.add(piv);
+      M(new THREE.CylinderGeometry(.95,1.0,2.8,22),MT.paint,0,0,0,piv);
+      [-.95,.3,1.25].forEach(function(y,k){ M(new THREE.TorusGeometry(1.0,.13,8,28),k===2?MT.trim:MT.dark,0,y,0,piv,false).rotation.x=Math.PI/2; });
+      M(new THREE.CylinderGeometry(1.0,1.0,.5,22),MT.dark,0,-1.1,0,piv);
+      var nz=new THREE.Group(); nz.rotation.x=Math.PI/2; nz.position.set(0,-1.45,0); piv.add(nz); nozzle(.74,.4,0,0,0,nz);
       tilts.push(piv);
     }); });
-    [-1.6,1.6].forEach(function(x){ nozzle(.75,.8,x,.2,8.9); });
-    nav(3.9,1.3,-7.8);
-    [[-2.8,-6],[2.8,-6],[-2.8,6.6],[2.8,6.6]].forEach(function(q){ leg(q[0],q[1],1.4,.22); }); gear=2.0;
+    [-1.7,1.7].forEach(function(x){ cyl(.7,.75,.8,MT.dark,x,.0,8.8); nozzle(.6,.6,x,.0,9.45); });
+    nav(3.7,1.6,8.2);
+    [[-2.6,-5.6],[2.6,-5.6],[-2.6,6.4],[2.6,6.4]].forEach(function(q){ leg(q[0],q[1],1.5,.22); }); gear=1.92;
   }
   // hull number stencils on the cab sides
-  var CAB={0:[1.32,.95,-2.0,2.2],1:[1.67,.75,-3.4,2.4],2:[1.52,.55,-8.1,2.2],3:[1.92,1.55,-6.5,2.2]}[tier];
-  if(CAB) [-1,1].forEach(function(sd){ var dm=M(new THREE.PlaneGeometry(CAB[3],CAB[3]*.31),MT.stencil,sd*(CAB[0]+.01),CAB[1],CAB[2],g,false); dm.rotation.y=sd*Math.PI/2; });
+  var CAB={0:[1.4,1.0,-1.2,1.4],1:[1.88,1.1,-2.75,1.8],2:[1.5,1.2,-7.5,1.5],3:[.48,2.1,-6.9,1.9]}[tier];
+  if(CAB) [-1,1].forEach(function(sd){ if(tier===3 && sd>0) return; var dm=M(new THREE.PlaneGeometry(CAB[3],CAB[3]*.31),MT.stencil,(tier===3?-1.5:0)+sd*(tier===3?1.97:CAB[0]+.01),CAB[1],CAB[2],g,false); dm.rotation.y=sd*Math.PI/2; });
   var bb=new THREE.Box3().setFromObject(g), size=bb.getSize(new THREE.Vector3());
   g.userData={flames:flames, glows:glows, legs:legs, tilts:tilts, cargo:cargo, tier:tier, gear:gear, len:size.z, beam:size.x, height:bb.max.y, throat:MT.glow};
   legs.forEach(function(l){ l.visible=!!landed; });
@@ -1637,36 +1678,44 @@ function buildRookParts(tier,g,MT,H){
   function scorch(n,face){ for(var i=0;i<n;i++){ var p=face(R), sz=.4+R()*1.1, m=new THREE.Mesh(new THREE.CircleGeometry(sz,14),RM.scorch); m.position.set(p[0],p[1],p[2]); m.rotation.x=-Math.PI/2; m.scale.set(1,.6+R()*.6,1); g.add(m); } }
   function bellyHatch(w,d,y,z){ box(w,.06,d,RM.belly,0,y,z,g,false); [-1,1].forEach(function(s){ box(w+.2,.07,.16,RM.haz,0,y-.01,z+s*d/2,g,false); box(.16,.07,d,RM.haz,s*w/2,y-.01,z,g,false); }); }
   function decal(w,h,x,y,z,ry){ var m=M(new THREE.PlaneGeometry(w,h),RM.num,x,y,z,g,false); m.rotation.y=ry||0; return m; }
+  function band(r,x,y,z,mat){ return M(new THREE.TorusGeometry(r,r*.07,6,24),mat||MT.dark,x,y,z,g,false); }
+  function stripe(w,h,d,x,y,z){ return box(w,h,d,MT.trim,x,y,z,g,false); }
+  var nozzle=H.nozzle;
   if(tier===4){
-    // TWIN-BOOM: cargo spine, high bridge, two booms with mismatched engines
-    prof([[-6.6,-.2],[-6.6,.5],[-5.6,1.25],[4.8,1.35],[5.4,.8],[5.4,-.55],[-5.8,-.7]],2.8,.12,MT.paint);
-    prof([[-5.9,1.2],[-5.9,1.9],[-5.0,2.95],[-2.6,3.1],[-2.2,2.6],[-2.2,1.2]],2.0,.12,MT.paint);
-    prof([[-5.84,1.95],[-4.98,2.86],[-4.0,2.98],[-4.5,1.98]],2.1,.03,MT.glass);
-    box(2.02,.08,1.2,MT.trim,0,2.4,-3.4,g,false);
-    M(new THREE.CylinderGeometry(.04,.06,1.6,6),MT.dark,.6,3.9,-2.8); M(new THREE.SphereGeometry(.09,8,6),MT.red,.6,4.7,-2.8,g,false);
-    box(2.3,.12,6.2,MT.dark,0,1.38,1.2,g,false);
-    [-1,1].forEach(function(s){ box(.18,.55,6.4,MT.frame,s*1.28,1.6,1.2); });
-    var i=0; [-1.4,.35,2.1,3.85].forEach(function(z){ [-.55,.55].forEach(function(x){ H.crate(1.0,.9,1.6,x,1.9,z,i++); }); });
+    // TWIN-BOOM: wedge-nosed body, raised bridge with mast, cargo trench, side nacelles, mismatched burners
+    prof([[-7.0,-.3],[-7.0,.35],[-6.3,1.0],[-3.6,1.75],[5.4,1.8],[6.0,1.3],[6.0,-.6],[-6.6,-.7]],3.0,.14,MT.paint);
+    box(1.6,.5,.12,MT.dark,0,.05,-7.02,g,false); for(var gi=-.6;gi<=.6;gi+=.2) box(.06,.42,.06,MT.frame,gi,.05,-7.09,g,false);
+    box(3.02,.1,.9,MT.trim,0,.62,-6.6,g,false).rotation.x=-.75;
+    prof([[-4.6,1.65],[-4.2,2.65],[-1.7,2.75],[-1.2,1.65]],2.0,.1,MT.paint);
+    prof([[-4.55,1.95],[-4.25,2.58],[-3.4,2.62],[-3.6,1.98]],2.1,.03,MT.glass);
+    [-1,1].forEach(function(s){ box(.05,.38,1.2,MT.glass,s*1.03,2.25,-2.6,g,false); });
+    box(2.04,.08,1.4,MT.trim,0,2.78,-3.0,g,false);
+    M(new THREE.CylinderGeometry(.04,.07,1.7,6),MT.dark,.45,3.6,-2.0); for(var mk=0;mk<4;mk++) M(new THREE.CylinderGeometry(.09,.09,.06,8),MT.frame,.45,3.0+mk*.35,-2.0,g,false);
+    M(new THREE.SphereGeometry(.09,8,6),MT.red,.45,4.5,-2.0,g,false);
+    // cargo trench behind the bridge (eight crates, two rows of four)
+    box(2.3,.1,6.0,MT.dark,0,1.82,2.0,g,false);
+    [-1,1].forEach(function(s){ box(.25,.75,6.2,MT.paint,s*1.3,2.15,2.0); stripe(.26,.08,6.2,s*1.3,2.55,2.0); });
+    var i=0; [-.25,1.2,2.65,4.1].forEach(function(z){ [-.52,.52].forEach(function(x){ H.crate(.98,.85,1.3,x,2.3,z,i++); }); });
+    // side nacelles with glowing intakes
     [-1,1].forEach(function(s){
-      M(hullProfile([[.6,-.25],[1.2,.35],[4.2,.35],[4.6,-.25]],1.0,.08),MT.paint,s*2.2,0,0);
-      box(2.6,.32,3.2,MT.paint,s*2.1,.05,2.4);
-      var boom=M(new THREE.CylinderGeometry(.62,.72,7.2,14),s<0?MT.paint:RM.patch[2],s*3.55,.05,2.2); boom.rotation.x=Math.PI/2;
-      box(1.0,.25,6.6,MT.trim,s*3.55,.72,2.4,g,false);
+      H.cyl(.68,.74,6.4,s<0?MT.paint:RM.patch[3],s*1.95,.1,2.0); band(.75,s*1.95,.1,.0); band(.75,s*1.95,.1,4.2,MT.trim);
+      M(new THREE.CircleGeometry(.5,20),MT.glow,s*1.95,.1,-1.22,g,false).rotation.y=Math.PI;
+      M(new THREE.TorusGeometry(.6,.1,8,20),MT.dark,s*1.95,.1,-1.2,g,false);
     });
-    var cowl=M(new THREE.CylinderGeometry(1.0,.9,1.8,22),MT.dark,-3.55,.05,6.2); cowl.rotation.x=Math.PI/2;
-    H.nozzle(.85,.7,-3.55,.05,7.3);
-    box(1.6,2.1,2.0,RM.patch[0],3.55,.35,6.0);
-    H.nozzle(.5,.5,3.55,.85,7.2); H.nozzle(.5,.5,3.55,-.2,7.2);
-    box(.5,.5,.5,MT.dark,4.3,.9,5.6);
-    H.nozzle(.42,.4,0,.35,5.75);
-    bellyHatch(1.6,3.0,-.74,0);
-    patches(9,function(R){ return [(R()-.5)*2.2,1.38,-5+R()*9.5]; });
-    var side=function(R){ return [(R()<.5?-1:1)*1.42,.2+R()*.8,-5.5+R()*10]; }; side.vert=true; patches(7,side);
-    scorch(6,function(R){ return [(R()-.5)*2.4,1.39,-5+R()*10]; });
-    decal(1.7,.85,-1.43,.75,-1.0,-Math.PI/2); decal(1.7,.85,1.43,.75,-1.0,Math.PI/2);
-    H.nav(4.2,.3,2.2);
-    H.leg(-1.0,-4.8,1.5); H.leg(1.0,-4.8,1.5); H.leg(-3.55,4.6,1.6); H.leg(3.55,4.6,1.6);
-    return 1.6;
+    // mismatched burners: big round burner left, boxy twin unit right
+    H.cyl(1.05,.95,1.6,MT.dark,-1.5,.55,6.6); band(1.06,-1.5,.55,6.1,MT.frame); nozzle(.9,.6,-1.5,.55,7.5);
+    box(1.7,2.1,1.6,RM.patch[0],1.45,.7,6.6); box(1.72,.1,1.62,MT.dark,1.45,1.75,6.6,g,false);
+    H.nozzle(.42,.45,1.45,1.2,7.6); H.nozzle(.42,.45,1.45,.2,7.6);
+    box(.12,1.6,.3,MT.frame,2.33,.7,6.6,g,false);
+    bellyHatch(1.6,2.8,-.74,.8);
+    patches(9,function(R){ return [(R()-.5)*2.2,1.81,-3+R()*8]; });
+    var side=function(R){ return [(R()<.5?-1:1)*1.51,.1+R()*1.3,-6+R()*11]; }; side.vert=true; patches(9,side);
+    scorch(6,function(R){ return [(R()-.5)*2.4,1.82,-3+R()*9]; });
+    decal(1.9,.95,-1.52,.95,-.4,-Math.PI/2); decal(1.9,.95,1.52,.95,-.4,Math.PI/2);
+    decal(1.5,.75,-1.52,.85,-5.0,-Math.PI/2); decal(1.5,.75,1.52,.85,-5.0,Math.PI/2);
+    H.nav(2.7,.1,4.6);
+    H.leg(-1.1,-4.8,1.5,.16); H.leg(1.1,-4.8,1.5,.16); H.leg(-1.4,4.4,1.5,.16); H.leg(1.4,4.4,1.5,.16);
+    return 1.57;
   }
   // WEDGE RUNNER: flat arrowhead, squat cab, three salvaged engines across the tail
   M(plan([[0,-7.4],[1.6,-3.4],[4.6,3.6],[4.2,5.6],[-4.2,5.6],[-4.6,3.6],[-1.6,-3.4]],1.1,.18),MT.paint,0,.35,0);
@@ -1686,9 +1735,10 @@ function buildRookParts(tier,g,MT,H){
   patches(10,function(R){ return [(R()-.5)*5,1.47,-2+R()*7]; });
   scorch(7,function(R){ return [(R()-.5)*6,1.48,-3+R()*8]; });
   decal(1.5,.75,0,1.49,-4.3,0).rotation.x=-Math.PI/2;
+  [-1,1].forEach(function(sd){ var dd=decal(1.5,.62,sd*2.86,.38,-.6,sd*Math.PI/2); dd.rotation.y=sd*(Math.PI/2-.38); });
   H.nav(4.4,.4,4.4);
-  H.leg(0,-4.6,1.5); H.leg(-3.0,3.8,1.5); H.leg(3.0,3.8,1.5);
-  return 1.75;
+  H.leg(0,-4.4,1.65,.17); H.leg(-2.7,3.6,1.65,.17); H.leg(2.7,3.6,1.65,.17);
+  return 1.85;
 }
 function hullTier(){ var top=Math.min(lvl('hold'),3), sel=state.hullSel; if(isRookTier(sel) && state.rooks && state.rooks[sel]) return sel; return (sel==null||sel>top||sel<0)?top:sel; }
 function ownsHull(t){ return isRookTier(t)?!!(state.rooks&&state.rooks[t]):t<=Math.min(lvl('hold'),3); }
@@ -5706,8 +5756,10 @@ function updateTitle(dt){
 }
 
 var clock=new THREE.Clock(), fpsAcc=0, fpsN=0, fpsT=0, lastResChange=0;
+var SHOWCASE=null;   // test hook: render a hull on its own
 function frame(){
   requestAnimationFrame(frame);
+  if(SHOWCASE){ renderer.setRenderTarget(null); renderer.toneMapping=THREE.ACESFilmicToneMapping; renderer.outputEncoding=THREE.sRGBEncoding; renderer.render(SHOWCASE.scene,SHOWCASE.cam); return; }
   var dt=Math.min(.05,clock.getDelta()); state.t+=dt;
   navSet=false; ENTRY_HEAT.value=0;
   if(state.mode==='title') updateTitle(dt);
@@ -5797,7 +5849,16 @@ async function boot(){
   setTimeout(function(){ ld.style.opacity=0; },400);
   frame();
 }
-window.__nh={wx:function(k){ if(S){ if(!S.wx) buildWeather(S); S.wx.k=S.wx.target=k; S.wx.timer=999; } }, gfx:{foot:function(){ var T=S.towns[0], x=T.x+40, z=T.z+40; S.ship.position.set(x,S.heightAt(x,z)+hullGear(S.ship),z); state.landing=null; disembark(); state.camFrom=null; }, chunks:function(x,z){ if(S) updateChunks(S,x,z,true); }, day:function(ph){ if(S){ S.day.phase=ph; updateDay(0); state.exposure=state.exposureTarget; } }, Q:function(){ return Q; }}, step:function(n,dt){ dt=dt||.05; for(var i=0;i<n;i++){ state.t+=dt; if(state.mode==='space') updateSpace(dt); else if(state.mode==='atmo'&&S) updateAtmo(dt); else if(state.mode==='surface'&&S) updateSurface(dt); updateLaw(dt); updateSpool(dt); routeTick(dt); }  }, pulse:{engage:function(){ return engagePulse(false); }, drop:function(){ dropPulse(''); }, block:function(){ return pulseBlock(); }, targets:function(){ return apTargets(); }, ap:function(i){ startAutopilot(apTargets()[i]); }, apTo:function(kind,idx){ startAutopilot(apTargets().filter(function(t){ return t.kind===kind && (kind==='station'||t.idx===idx); })[0]); }, nav:function(){ openNav(); }, orbit:function(){ startOrbitAutopilot(); }, route:function(loc){ startRoute(loc); }, inv:function(){ renderInv(); }, remote:function(){ var ns=neighbourSeeds(SYS.seed,3)[0], sy=sysInfo(ns); return {key:ns+':S', kind:'station', name:sy.station.name, planet:-1, sys:ns, sysName:sy.name}; }, cb:function(){ return CB; }, cbLine:function(){ return cbLine(); }, atmoTo:function(i){ var T=S.towns.slice().sort(function(a,b){ return Math.hypot(b.x-S.ship.position.x,b.z-S.ship.position.z)-Math.hypot(a.x-S.ship.position.x,a.z-S.ship.position.z); })[i||0]; startAtmoAutopilot(T); return T.name; }, speed:function(){ return pulseSpeed(); }}, fx:{hasMod:hasMod, modSlots:modSlots, holdCap:holdCap, fuelCap:fuelCap, kindNeeds:kindNeeds, wearHull:wearHull, save:save, swap:swapPlayerHull}, enterPlanet:function(i){ enterAtmosphere(planets[i]); }, ready:function(i){ return !!surfaces[i]; }, land:land, board:board, exitAtmo:exitAtmosphere,
+window.__nh={show:function(tier,landed,az,el){ if(!SHOWCASE){ var sc=new THREE.Scene(); sc.background=new THREE.Color(.16,.165,.17); sc.environment=spaceScene.environment;
+    renderer.toneMappingExposure=.62; var sl=new THREE.DirectionalLight(0xfff4e6,2.2); sl.position.set(-6,10,-8); sc.add(sl); var fl=new THREE.DirectionalLight(0x9fb4d0,.9); fl.position.set(8,4,6); sc.add(fl); sc.add(new THREE.HemisphereLight(0xbfcbd8,0x2a2622,.25));
+    var gr=new THREE.Mesh(new THREE.PlaneGeometry(200,200),new THREE.MeshStandardMaterial({color:0x2b2c2e,roughness:.9})); gr.rotation.x=-Math.PI/2; sc.add(gr);
+    SHOWCASE={scene:sc, cam:new THREE.PerspectiveCamera(32,innerWidth/innerHeight,.1,500), ground:gr}; }
+  if(SHOWCASE.hull){ SHOWCASE.scene.remove(SHOWCASE.hull); }
+  var h=buildHull(tier,landed!==false,{value:.45}); setThroat(h,true); SHOWCASE.scene.add(h); SHOWCASE.hull=h; h.userData.cargo.forEach(function(m){ m.visible=true; });
+  SHOWCASE.ground.position.y=landed!==false?-h.userData.gear:-h.userData.gear-2;
+  var R=Math.max(h.userData.len,h.userData.beam)*1.55, a=az==null?-2.35:az, e=el==null?.32:el; SHOWCASE.cam.position.set(Math.sin(a)*Math.cos(e)*R,Math.sin(e)*R,Math.cos(a)*Math.cos(e)*R); SHOWCASE.cam.lookAt(0,.3,0);
+  return {len:+h.userData.len.toFixed(1), beam:+h.userData.beam.toFixed(1), height:+h.userData.height.toFixed(1), gear:h.userData.gear, crates:h.userData.cargo.length}; },
+  wx:function(k){ if(S){ if(!S.wx) buildWeather(S); S.wx.k=S.wx.target=k; S.wx.timer=999; } }, gfx:{foot:function(){ var T=S.towns[0], x=T.x+40, z=T.z+40; S.ship.position.set(x,S.heightAt(x,z)+hullGear(S.ship),z); state.landing=null; disembark(); state.camFrom=null; }, chunks:function(x,z){ if(S) updateChunks(S,x,z,true); }, day:function(ph){ if(S){ S.day.phase=ph; updateDay(0); state.exposure=state.exposureTarget; } }, Q:function(){ return Q; }}, step:function(n,dt){ dt=dt||.05; for(var i=0;i<n;i++){ state.t+=dt; if(state.mode==='space') updateSpace(dt); else if(state.mode==='atmo'&&S) updateAtmo(dt); else if(state.mode==='surface'&&S) updateSurface(dt); updateLaw(dt); updateSpool(dt); routeTick(dt); }  }, pulse:{engage:function(){ return engagePulse(false); }, drop:function(){ dropPulse(''); }, block:function(){ return pulseBlock(); }, targets:function(){ return apTargets(); }, ap:function(i){ startAutopilot(apTargets()[i]); }, apTo:function(kind,idx){ startAutopilot(apTargets().filter(function(t){ return t.kind===kind && (kind==='station'||t.idx===idx); })[0]); }, nav:function(){ openNav(); }, orbit:function(){ startOrbitAutopilot(); }, route:function(loc){ startRoute(loc); }, inv:function(){ renderInv(); }, remote:function(){ var ns=neighbourSeeds(SYS.seed,3)[0], sy=sysInfo(ns); return {key:ns+':S', kind:'station', name:sy.station.name, planet:-1, sys:ns, sysName:sy.name}; }, cb:function(){ return CB; }, cbLine:function(){ return cbLine(); }, atmoTo:function(i){ var T=S.towns.slice().sort(function(a,b){ return Math.hypot(b.x-S.ship.position.x,b.z-S.ship.position.z)-Math.hypot(a.x-S.ship.position.x,a.z-S.ship.position.z); })[i||0]; startAtmoAutopilot(T); return T.name; }, speed:function(){ return pulseSpeed(); }}, fx:{hasMod:hasMod, modSlots:modSlots, holdCap:holdCap, fuelCap:fuelCap, kindNeeds:kindNeeds, wearHull:wearHull, save:save, swap:swapPlayerHull}, enterPlanet:function(i){ enterAtmosphere(planets[i]); }, ready:function(i){ return !!surfaces[i]; }, land:land, board:board, exitAtmo:exitAtmosphere,
   warp:startWarp, dock:startDock, cam:function(){ return camera; }, station:function(){ return station; }, ship:function(){ return ship; }, state:state, getS:function(){ return S; }, sys:function(){ return SYS; }, enter:function(){ $('enterBtn').click(); },
   queue:queueSurface, terrain:planetTerrain, normalFromSurf:normalFromSurf, openMap:openMap, chunkBuilder:chunkBuilder, planets:function(){ return planets; }, offers:boardOffers, townLoc:townLoc,
   au:function(){ return AU; }, mu:function(){ return MU; }, law:{hall:function(){ return station&&station.gate; }, spawnPirates:spawnPirates, scan:customsScan, actors:function(){ return lawActors; }, heat:heatOf, sec:secOf}};
