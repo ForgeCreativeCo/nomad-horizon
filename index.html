@@ -1513,7 +1513,11 @@ function hullProfile(pts,width,bevel){
    ========================================================================= */
 var SHIP_MODELS={
   0:{url:'models/skiff.glb', scale:11.5, rotY:Math.PI, legY:-.082,
-     engines:[[-.293,.036,-.415,.055],[.293,.036,-.415,.055]], tips:[[-.49,.042,-.27],[.49,.042,-.27]]}
+     engines:[[-.293,.036,-.415,.055],[.293,.036,-.415,.055]], tips:[[-.49,.042,-.27],[.49,.042,-.27]]},
+  // Atlas: nose (cab) toward +X in the file; the four pods are cut out by position so they can tilt
+  3:{url:'models/atlas.glb', scale:17.5, rotY:Math.PI/2, legY:-.05,
+     engines:[[-.497,.016,-.072,.028],[-.497,.016,.072,.028]], tips:[],
+     pods:[[.193,.011,-.329,-.065,.052],[.193,.011,.329,-.065,.052],[-.273,.028,-.31,-.045,.052],[-.273,.028,.32,-.045,.052]]}
 };
 var SHIP_GLB={};
 function loadShipModels(){
@@ -1528,14 +1532,19 @@ function prepShipModel(gl,cfg){
   var mesh=null; gl.scene.traverse(function(o){ if(o.isMesh && !mesh) mesh=o; });
   var geo=mesh.geometry.clone(); geo.applyMatrix4(mesh.matrixWorld);
   var bb0=new THREE.Box3().setFromBufferAttribute(geo.attributes.position);
-  var pos=geo.attributes.position, idx=geo.index.array, body=[], legs=[];
-  for(var i=0;i<idx.length;i+=3){ var y=(pos.getY(idx[i])+pos.getY(idx[i+1])+pos.getY(idx[i+2]))/3; (y<cfg.legY?legs:body).push(idx[i],idx[i+1],idx[i+2]); }
+  var pos=geo.attributes.position, idx=geo.index.array, body=[], legs=[], pods=(cfg.pods||[]).map(function(){ return []; });
+  for(var i=0;i<idx.length;i+=3){
+    var a=idx[i], b=idx[i+1], c=idx[i+2], cx=(pos.getX(a)+pos.getX(b)+pos.getX(c))/3, y=(pos.getY(a)+pos.getY(b)+pos.getY(c))/3, cz=(pos.getZ(a)+pos.getZ(b)+pos.getZ(c))/3, put=null;
+    (cfg.pods||[]).forEach(function(pd,k){ if(!put && Math.hypot(cx-pd[0],cz-pd[2])<pd[4]*1.12) put=pods[k]; });
+    (put||(y<cfg.legY?legs:body)).push(a,b,c);
+  }
   var X=new THREE.Matrix4().makeRotationY(cfg.rotY||0).multiply(new THREE.Matrix4().makeScale(cfg.scale,cfg.scale,cfg.scale));
   geo.applyMatrix4(X);
   function part(list){ var g=new THREE.BufferGeometry(); g.setAttribute('position',geo.attributes.position); g.setAttribute('normal',geo.attributes.normal); if(geo.attributes.uv) g.setAttribute('uv',geo.attributes.uv); g.setIndex(list); g.computeBoundingSphere(); g.computeBoundingBox(); return g; }
   var map=mesh.material.map||null; if(map){ map.anisotropy=maxAniso; tud(map).shared=true; }
   var P=function(v){ return new THREE.Vector3(v[0],v[1],v[2]).applyMatrix4(X); };
   var D={body:part(body), legs:part(legs), map:map, cfg:cfg, gear:-bb0.min.y*cfg.scale,
+    pods:(cfg.pods||[]).map(function(pd,k){ var c=P(pd), gq=part(pods[k]).clone(); gq.translate(-c.x,-c.y,-c.z); gq.computeBoundingSphere(); tud(gq).shared=true; return {geo:gq, c:c, drop:(pd[1]-pd[3])*cfg.scale, r:pd[4]*cfg.scale*.6}; }),
     engines:cfg.engines.map(function(e){ return {p:P(e), r:e[3]*cfg.scale}; }), tips:(cfg.tips||[]).map(P)};
   tud(D.body).shared=true; tud(D.legs).shared=true;
   return D;
@@ -1545,8 +1554,23 @@ function buildHullGLB(tier, landed, wearU){
   var mat=weather(new THREE.MeshStandardMaterial({map:D.map, roughness:.6, metalness:.22, envMapIntensity:.9}),.3,{u:wearU||{value:.4},paint:.6});
   var body=new THREE.Mesh(D.body,mat); body.castShadow=body.receiveShadow=true; g.add(body);
   var lg=new THREE.Mesh(D.legs,mat); lg.castShadow=true; lg.receiveShadow=true; g.add(lg); legs.push(lg);
-  var throat=new THREE.MeshBasicMaterial({color:new THREE.Color(.05,.03,.025)});
+  var throat=new THREE.MeshBasicMaterial({color:new THREE.Color(.05,.03,.025)}), tilts=[];
+  function flameAt(par,x,y,z,r){
+    var disc=new THREE.Mesh(new THREE.CircleGeometry(r*.92,24),throat); disc.position.set(x,y,z+.03); par.add(disc);
+    var fm=new THREE.ShaderMaterial({uniforms:THREE.UniformsUtils.clone(FLAME_MAT_SRC.uniforms), vertexShader:FLAME_MAT_SRC.vertexShader, fragmentShader:FLAME_MAT_SRC.fragmentShader,
+      transparent:true, blending:THREE.AdditiveBlending, depthWrite:false, side:THREE.DoubleSide});
+    var fl=new THREE.Mesh(new THREE.ConeGeometry(r*.75,r*4.2,20,1,true),fm); fl.rotation.x=Math.PI/2; fl.position.set(x,y,z+r*2.15); par.add(fl); flames.push(fl);
+    var sp=new THREE.Sprite(new THREE.SpriteMaterial({map:glowTex, color:new THREE.Color(1.3,1.25,1.35), transparent:true, opacity:.55, blending:THREE.AdditiveBlending, depthWrite:false}));
+    sp.scale.setScalar(r*2.2); sp.position.set(x,y,z+.2); par.add(sp); glows.push(sp);
+  }
+  D.pods.forEach(function(pd){
+    var piv=new THREE.Group(); piv.position.copy(pd.c); g.add(piv);
+    var pm=new THREE.Mesh(pd.geo,mat); pm.castShadow=pm.receiveShadow=true; piv.add(pm);
+    var nz=new THREE.Group(); nz.rotation.x=Math.PI/2; nz.position.set(0,-pd.drop,0); piv.add(nz); flameAt(nz,0,0,0,pd.r);
+    tilts.push(piv);
+  });
   D.engines.forEach(function(e){
+    flameAt(g,e.p.x,e.p.y,e.p.z,e.r); return;
     var x=e.p.x, y=e.p.y, z=e.p.z, r=e.r;
     var disc=new THREE.Mesh(new THREE.CircleGeometry(r*.92,24),throat); disc.position.set(x,y,z+.03); g.add(disc);
     var fm=new THREE.ShaderMaterial({uniforms:THREE.UniformsUtils.clone(FLAME_MAT_SRC.uniforms), vertexShader:FLAME_MAT_SRC.vertexShader, fragmentShader:FLAME_MAT_SRC.fragmentShader,
@@ -1557,9 +1581,10 @@ function buildHullGLB(tier, landed, wearU){
   });
   D.tips.forEach(function(t,i){ var m=new THREE.Mesh(new THREE.SphereGeometry(.11,8,6),new THREE.MeshBasicMaterial({color:i?new THREE.Color(.25,2.6,.7):new THREE.Color(3.5,.25,.12)})); m.position.copy(t); g.add(m); });
   var bb=new THREE.Box3().setFromObject(g), size=bb.getSize(new THREE.Vector3());
-  g.userData={flames:flames, glows:glows, legs:legs, tilts:[], cargo:[], tier:tier, gear:D.gear, len:size.z, beam:size.x, height:bb.max.y, throat:throat, modelled:true};
+  g.userData={flames:flames, glows:glows, legs:legs, tilts:tilts, cargo:[], tier:tier, gear:D.gear, len:size.z, beam:size.x, height:bb.max.y, throat:throat, modelled:true};
   legs.forEach(function(l){ l.visible=!!landed; });
   flames.concat(glows).forEach(function(f){ f.visible=!landed; });
+  tilts.forEach(function(p){ p.rotation.x=landed?0:-Math.PI/2; });
   return g;
 }
 function buildHull(tier, landed, wearU){
