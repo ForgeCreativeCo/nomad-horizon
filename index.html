@@ -3853,7 +3853,7 @@ function updatePulse(dt){
     var spd=state.vel.length(), brake=spd*PULSE_DROP*.55, dir=V1.copy(state.vel).normalize();
     if(state.fuel<=0){ dropPulse('OUT OF FUEL · PULSE DRIVE OFFLINE'); return; }
     if(state.throttle<=.05){ dropPulse('PULSE DRIVE DISENGAGED'); return; }
-    if(state.ap && state.ap.dist!=null && state.ap.dist<AP_DROP_AT+brake){ dropPulse('DROPPING OUT · '+shortKm(state.ap.dist)+' TO '+(state.route&&state.route.loc.sys===SYS.seed?state.route.loc.name:state.ap.name)+' · FULL ENGINES'); return; }
+    if(state.ap && state.ap.dist!=null && state.ap.dist<AP_DROP_AT+brake){ dropPulse('DROPPING OUT · '+shortKm(state.ap.dist)+' TO '+(state.route&&state.route.loc.sys===SYS.seed?state.route.loc.name:state.ap.name)+' · FULL THROTTLE'); return; }
     for(var i=0;i<planets.length;i++){ var p=planets[i], to=V2.copy(p.pos).sub(ship.position), dc=to.length(), bd=dc-p.radius;
       if(bd<p.radius*1.8+brake && dir.dot(to.multiplyScalar(1/dc))>.3){
         var mine=state.ap && state.ap.kind==='planet' && state.ap.idx===p.index;
@@ -3892,8 +3892,8 @@ function apDist(t){
   var a=apAbove(t); return Math.max(0,ship.position.distanceTo(a.p.pos)-a.p.radius);
 }
 function apEta(d){
-  if(d<AP_PULSE_MIN) return d/110;
-  return (d-AP_DROP_AT)/pulseSpeed()+PULSE_SPOOL+3+AP_DROP_AT/110+6;
+  if(d<AP_PULSE_MIN) return d/60;
+  return (d-AP_DROP_AT)/pulseSpeed()+PULSE_SPOOL+3+AP_DROP_AT/60+6;
 }
 function clockStr(s){ s=Math.max(0,Math.round(s)); return Math.floor(s/60)+':'+('0'+(s%60)).slice(-2); }
 /* steer around a sphere that sits between us and the goal */
@@ -3942,8 +3942,7 @@ function updateAutopilot(dt){
   var D=V3.copy(aim).sub(ship.position).normalize();
   var wantYaw=Math.atan2(D.x,D.z), wantPitch=clamp(Math.asin(clamp(D.y,-1,1)),-1.2,1.2);
   var eY=wrapA(wantYaw-state.yaw), eP=wantPitch-state.pitch, slow=state.pulse&&state.pulse.phase==='on'?2.5:4;
-  state.apAxes={x:-clamp(eY*slow,-1,1), y:(INVERT_PITCH?1:-1)*clamp(eP*slow,-1,1), hold:!state.pulse && dist<AP_PULSE_MIN && dist>(A.kind==='station'?260:140) && fwd0(D)>.9 && state.energy>(state.apBoost?2:25)};
-  state.apBoost=state.apAxes.hold;
+  state.apAxes={x:-clamp(eY*slow,-1,1), y:(INVERT_PITCH?1:-1)*clamp(eP*slow,-1,1)};
   setThrottle(1);
   var fwd=V1.set(Math.sin(state.yaw)*Math.cos(state.pitch),Math.sin(state.pitch),Math.cos(state.yaw)*Math.cos(state.pitch));
   if(!state.pulse && dist>AP_PULSE_MIN && fwd.dot(D)>.985 && !pulseBlock()) engagePulse(true);
