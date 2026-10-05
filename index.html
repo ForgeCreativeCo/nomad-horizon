@@ -556,6 +556,7 @@ body.mapopen #joywrap,body.mapopen #actions,body.mapopen #throttle{visibility:hi
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/ShaderPass.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/RenderPass.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
 <script>
 (function(){
 'use strict';
@@ -1503,7 +1504,66 @@ function hullProfile(pts,width,bevel){
   var b=bevel==null?.1:bevel, g=new THREE.ExtrudeGeometry(s,{depth:width-b*2, bevelEnabled:b>0, bevelThickness:b, bevelSize:b, bevelSegments:2, curveSegments:2});
   g.rotateY(-Math.PI/2); g.translate((width-b*2)/2,0,0); return g;
 }
+/* =========================================================================
+   Modelled hulls: GLB ships made outside the game. Loaded once at boot and
+   shared by every copy; the legs are split off so they fold away in flight,
+   and the game adds its own engine flames, glow and nav lights. If a file
+   can't load, the built-in procedural hull is used instead.
+   Model axes as exported: nose toward +Z, Y up (rotY turns the nose to -Z).
+   ========================================================================= */
+var SHIP_MODELS={
+  0:{url:'models/skiff.glb', scale:11.5, rotY:Math.PI, legY:-.082,
+     engines:[[-.293,.036,-.415,.055],[.293,.036,-.415,.055]], tips:[[-.49,.042,-.27],[.49,.042,-.27]]}
+};
+var SHIP_GLB={};
+function loadShipModels(){
+  if(!THREE.GLTFLoader) return Promise.resolve();
+  var L=new THREE.GLTFLoader();
+  var all=Object.keys(SHIP_MODELS).map(function(k){ var cfg=SHIP_MODELS[k];
+    return new Promise(function(res){ L.load(cfg.url,function(gl){ try{ SHIP_GLB[k]=prepShipModel(gl,cfg); }catch(e){ console.warn('ship model',k,e); } res(); },undefined,function(){ res(); }); }); });
+  return Promise.race([Promise.all(all), new Promise(function(r){ setTimeout(r,20000); })]);
+}
+function prepShipModel(gl,cfg){
+  gl.scene.updateMatrixWorld(true);
+  var mesh=null; gl.scene.traverse(function(o){ if(o.isMesh && !mesh) mesh=o; });
+  var geo=mesh.geometry.clone(); geo.applyMatrix4(mesh.matrixWorld);
+  var bb0=new THREE.Box3().setFromBufferAttribute(geo.attributes.position);
+  var pos=geo.attributes.position, idx=geo.index.array, body=[], legs=[];
+  for(var i=0;i<idx.length;i+=3){ var y=(pos.getY(idx[i])+pos.getY(idx[i+1])+pos.getY(idx[i+2]))/3; (y<cfg.legY?legs:body).push(idx[i],idx[i+1],idx[i+2]); }
+  var X=new THREE.Matrix4().makeRotationY(cfg.rotY||0).multiply(new THREE.Matrix4().makeScale(cfg.scale,cfg.scale,cfg.scale));
+  geo.applyMatrix4(X);
+  function part(list){ var g=new THREE.BufferGeometry(); g.setAttribute('position',geo.attributes.position); g.setAttribute('normal',geo.attributes.normal); if(geo.attributes.uv) g.setAttribute('uv',geo.attributes.uv); g.setIndex(list); g.computeBoundingSphere(); g.computeBoundingBox(); return g; }
+  var map=mesh.material.map||null; if(map){ map.anisotropy=maxAniso; tud(map).shared=true; }
+  var P=function(v){ return new THREE.Vector3(v[0],v[1],v[2]).applyMatrix4(X); };
+  var D={body:part(body), legs:part(legs), map:map, cfg:cfg, gear:-bb0.min.y*cfg.scale,
+    engines:cfg.engines.map(function(e){ return {p:P(e), r:e[3]*cfg.scale}; }), tips:(cfg.tips||[]).map(P)};
+  tud(D.body).shared=true; tud(D.legs).shared=true;
+  return D;
+}
+function buildHullGLB(tier, landed, wearU){
+  var D=SHIP_GLB[tier], g=new THREE.Group(), flames=[], glows=[], legs=[];
+  var mat=weather(new THREE.MeshStandardMaterial({map:D.map, roughness:.6, metalness:.22, envMapIntensity:.9}),.3,{u:wearU||{value:.4},paint:.6});
+  var body=new THREE.Mesh(D.body,mat); body.castShadow=body.receiveShadow=true; g.add(body);
+  var lg=new THREE.Mesh(D.legs,mat); lg.castShadow=true; lg.receiveShadow=true; g.add(lg); legs.push(lg);
+  var throat=new THREE.MeshBasicMaterial({color:new THREE.Color(.05,.03,.025)});
+  D.engines.forEach(function(e){
+    var x=e.p.x, y=e.p.y, z=e.p.z, r=e.r;
+    var disc=new THREE.Mesh(new THREE.CircleGeometry(r*.92,24),throat); disc.position.set(x,y,z+.03); g.add(disc);
+    var fm=new THREE.ShaderMaterial({uniforms:THREE.UniformsUtils.clone(FLAME_MAT_SRC.uniforms), vertexShader:FLAME_MAT_SRC.vertexShader, fragmentShader:FLAME_MAT_SRC.fragmentShader,
+      transparent:true, blending:THREE.AdditiveBlending, depthWrite:false, side:THREE.DoubleSide});
+    var fl=new THREE.Mesh(new THREE.ConeGeometry(r*.75,r*4.2,20,1,true),fm); fl.rotation.x=Math.PI/2; fl.position.set(x,y,z+r*2.15); g.add(fl); flames.push(fl);
+    var sp=new THREE.Sprite(new THREE.SpriteMaterial({map:glowTex, color:new THREE.Color(1.3,1.25,1.35), transparent:true, opacity:.55, blending:THREE.AdditiveBlending, depthWrite:false}));
+    sp.scale.setScalar(r*2.2); sp.position.set(x,y,z+.2); g.add(sp); glows.push(sp);
+  });
+  D.tips.forEach(function(t,i){ var m=new THREE.Mesh(new THREE.SphereGeometry(.11,8,6),new THREE.MeshBasicMaterial({color:i?new THREE.Color(.25,2.6,.7):new THREE.Color(3.5,.25,.12)})); m.position.copy(t); g.add(m); });
+  var bb=new THREE.Box3().setFromObject(g), size=bb.getSize(new THREE.Vector3());
+  g.userData={flames:flames, glows:glows, legs:legs, tilts:[], cargo:[], tier:tier, gear:D.gear, len:size.z, beam:size.x, height:bb.max.y, throat:throat, modelled:true};
+  legs.forEach(function(l){ l.visible=!!landed; });
+  flames.concat(glows).forEach(function(f){ f.visible=!landed; });
+  return g;
+}
 function buildHull(tier, landed, wearU){
+  if(SHIP_GLB[tier]) return buildHullGLB(tier, landed, wearU);
   if(!wearU) wearU={value:.3+Math.random()*.45};   // other rigs are always a bit beaten up
   var MT=hullMats(wearU), g=new THREE.Group(), flames=[], glows=[], legs=[], tilts=[], cargo=[];
   function M(geo,mat,x,y,z,par,shadow){ var m=new THREE.Mesh(geo,mat); m.position.set(x,y,z); if(shadow!==false){ m.castShadow=true; m.receiveShadow=true; } (par||g).add(m); return m; }
@@ -5836,6 +5896,7 @@ async function boot(){
   function prog(p,msg){ lf.style.width=(p*100)+'%'; ld.firstChild.nodeValue=msg; }
   prog(.05,'Generating noise fields…'); await nextFrame();
   buildSharedTextures();
+  prog(.36,'Loading ships…'); await loadShipModels();
   prog(.4,'Charting star system…'); await nextFrame();
   buildSpaceStatic();
   buildComposer();
