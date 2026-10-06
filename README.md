@@ -48,6 +48,8 @@ Each freighter hull has its own turn rate and weight: the Skiff snaps into turns
 - **Customs on the route:** in a customs system you haven't checked into, the route flies you through the customs hall first, rolls you onto the scale, and carries on to the drop once you're cleared. Carrying contraband? It asks first: skip the hall and go straight to the drop, or take your chances with the scanner. Wanted pilots are never routed into the hall.
 - **Pilot needs:** your pilot gets hungry and tired while you play (never while the game is closed). Eat a hot meal at a diner or cantina, carry ration packs (tap the fork on the HUD), and sleep at a motel, a station bunk or in your cab when landed. Sleeping jumps the clock 8 hours, so perishable deadlines keep running. Running on empty slows energy and scans; exhaustion dims the screen, dulls handling and causes microsleeps, and customs fines you for flying over your hours. Galley and sleeper cab modules help on long hauls, fleet pilots take rest breaks, and a relaxed mode in Services turns it all off.
 
+- **Growing towns:** every crate you deliver to a town or outpost grows it, and **construction** loads (prefab habitats, girders, power cells and more) count triple. Outposts grow into settlements, settlements into towns, towns into cities. A town gets a new district ring of housing and industry blocks with a ring road and traffic; a city adds an outer ring of taller blocks. Bigger towns post more contracts and pay more for deliveries (+8% per stage), and growing towns post more construction loads. The **Town** tab at any town terminal shows its stage and progress. Towns grow in place while you're there.
+
 ### Your rigs
 - **Freighter progression:** start in the Skiff light courier (4 crates) and trade up through the Mule short-hauler (6), Longhaul tractor-trailer (9) and Atlas heavy lifter (12) at any station. Each hull handles heavier than the last: the Skiff snaps into turns, the Atlas swings wide and coasts out of them. Once you own more than one, the Upgrades tab has a hangar where you can switch between them.
 - **The Rook Twin-Boom:** a patched-up smuggler's freighter, sold as a special order in the Upgrades tab (cheaper in lawless systems). 8 crates, 2 module slots, a built-in smuggler's compartment and the fastest handling in the game, but thin plating that takes 60% more damage. No oversize loads.
@@ -106,6 +108,8 @@ Hand-made models live in `models/` as GLB files:
 | `berth.glb`, `loader_arm.glb` | Pier berth module and the robot clamp arm |
 | `customs_hall.glb`, `scanner_arch.glb` | The customs hall shell and the scanner arch over the scale |
 
+The town kit (cores, district blocks and business buildings) is built in code for now; its model prompts are in [docs/town-kit-prompts.md](docs/town-kit-prompts.md), and each piece swaps to a model as soon as its `url` is set in `TOWN_KIT`.
+
 All of them share one look: worn white industrial plating, burnt-orange trim, dark gunmetal frames and hazard striping.
 
 **Adding or replacing a model:**
@@ -123,7 +127,8 @@ The game ships its own engine flames, glows, nav lights and lights, so models do
 
 Planned, roughly in order:
 
-1. **Town growth.** Towns grow from outposts into towns and then cities as you deliver to them. Construction materials, prefab habitats and power cells count most. Each stage adds visible new districts with their own landing pads and businesses that need specific goods: a mining depot (drill heads, explosives), a farm co-op (water, seed stock), a clinic (medical supplies), a shipyard (alloys, engine parts), a market or bar (luxury goods). Bigger towns mean more jobs and better pay.
+1. ~~**Town growth.**~~ Done: outposts grow into settlements, towns and cities with district rings, built in code from a town kit whose pieces each carry a 3D-model prompt ([docs/town-kit-prompts.md](docs/town-kit-prompts.md)) so models can be swapped in later.
+   **Business districts (next):** the lots for lease in each ring get businesses that need specific goods: a mining depot (drill heads, explosives), a farm co-op (water, seed stock), a clinic (medical supplies), a shipyard (alloys, engine parts), a market or cantina (luxury goods), each with its own pad and contracts.
 2. **Investing in towns.** Put credits straight into a town to speed its growth and take a share, earning a small income for your company from the cities you helped build.
 3. **Freighters.** A capital ship that's both your company's headquarters and its biggest hauler:
    - Flown with the same controls as your rigs, but heavy: slow turns, lots of momentum, long braking. Pulse and warp, but it can't enter an atmosphere or dock at a station.

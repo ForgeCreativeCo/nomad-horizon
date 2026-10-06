@@ -257,7 +257,7 @@ button:focus-visible{outline:2px solid var(--cyan);outline-offset:3px;}
 @media (prefers-reduced-motion:reduce){ .need.warn{animation:none;} }
 .st-row.hangar-on{border-color:rgba(231,225,210,.6);background:rgba(231,225,210,.06);}
 .co-log{font-family:var(--font-mono);font-size:.62rem;letter-spacing:.05em;color:var(--ink-dim);line-height:1.6;}
-.tag.k-fragile{color:#04121a;background:var(--cyan);} .tag.k-perishable{color:#0b1a04;background:#a9c27c;} .tag.k-hazardous{color:#fff;background:#d8402a;}
+.tag.k-construction{color:#170c02;background:#c9a24a;} .tag.k-fragile{color:#04121a;background:var(--cyan);} .tag.k-perishable{color:#0b1a04;background:#a9c27c;} .tag.k-hazardous{color:#fff;background:#d8402a;}
 #stationPanel{position:absolute;right:1rem;top:calc(1rem + env(safe-area-inset-top,0px));bottom:calc(1rem + env(safe-area-inset-bottom,0px));z-index:30;
   width:min(calc(100vw - 2rem),31rem);display:flex;flex-direction:column;gap:.6rem;padding:1rem;pointer-events:auto;background:rgba(6,11,22,.84);}
 .st-head{display:flex;justify-content:space-between;align-items:flex-end;gap:1rem;}
@@ -2142,7 +2142,7 @@ function yieldMaybe(){ if(performance.now()-sliceT<9) return null; return new Pr
    Near tiles are full detail with rocks, flora and crystals; the next ring
    is a cheap low-detail mesh. Towns and outposts sit at fixed spots.
    ========================================================================= */
-var WORLD_E=1450, SITE_E=1150, CS=256, CN_HI=64, CN_LO=16, FLAT_R=90, WATER_W=2400;
+var WORLD_E=1450, SITE_E=1150, CS=256, CN_HI=64, CN_LO=16, FLAT_R=185, FLAT_IN=128, WATER_W=2400;
 function makeHeightFn(b, seed){
   var off=(seed%1000)*1.37+11;
   return function(x,z){
@@ -2185,9 +2185,10 @@ function planetTerrain(b){
 }
 function siteHeight(T,x,z){
   var h=T.H(x,z)+T.lift, s=T.sites, k, dx, dz, d2;
-  for(k=0;k<s.length;k++){ dx=x-s[k].x; dz=z-s[k].z; d2=dx*dx+dz*dz; if(d2<FLAT_R*FLAT_R) h=lerp(h,s[k].hs,1-sstep(TOWN_R-2,FLAT_R,Math.sqrt(d2))); }
+  for(k=0;k<s.length;k++){ dx=x-s[k].x; dz=z-s[k].z; d2=dx*dx+dz*dz; if(d2<FLAT_R*FLAT_R) h=lerp(h,s[k].hs,1-sstep(FLAT_IN,FLAT_R,Math.sqrt(d2))); }
   return h;
 }
+function nearSiteR(T,x,z,pad){ var s=T.sites; for(var k=0;k<s.length;k++){ var dx=x-s[k].x, dz=z-s[k].z, r=(s[k].cr||46)+pad; if(dx*dx+dz*dz<r*r) return true; } return false; }
 function nearSite(T,x,z,r){ var s=T.sites; for(var k=0;k<s.length;k++){ var dx=x-s[k].x, dz=z-s[k].z; if(dx*dx+dz*dz<r*r) return true; } return false; }
 /* where on the surface you arrive, from the direction you dive into the planet (and back) */
 function surfFromNormal(n){ var lon=Math.atan2(n.x,n.z), lat=Math.asin(clamp(n.y,-1,1)); return {x:lon/Math.PI*WORLD_E, z:-lat/(Math.PI/2)*WORLD_E}; }
@@ -2259,7 +2260,7 @@ function* chunkBuilder(s, ci, cj, N){
   var sph=new THREE.Sphere(new THREE.Vector3(x0+CS/2,hsum/V,z0+CS/2),CS*.72+60);
   var R=rng(ihash(ihash(b.seed,ci*7919+cj*104729+5),31)), dm=A.dummy, wl=wet?.6:-1e9;
   function hAt(x,z){ return chunkHeight(c,x,z); }
-  function okAt(x,z,ms){ if(nearSite(T,x,z,TOWN_R+8)) return false; if(hAt(x,z)<wl) return false;
+  function okAt(x,z,ms){ if(nearSite(T,x,z,FLAT_IN+4)) return false; if(hAt(x,z)<wl) return false;
     var dx=hAt(x+1.2,z)-hAt(x-1.2,z), dz=hAt(x,z+1.2)-hAt(x,z-1.2); return Math.sqrt(dx*dx+dz*dz)/2.4<ms; }
   function rp(){ return 2+R()*(CS-4); }
   function addIM(im){ im.castShadow=Q.shadows>0; im.receiveShadow=true; grp.add(im); c.ims.push(im); return im; }
@@ -2433,8 +2434,9 @@ async function buildSurface(idx){
   farGround.rotation.x=-Math.PI/2; farGround.position.y=lowH-6; farGround.renderOrder=-5; scene.add(farGround);
   if((w=yieldMaybe())) await w;
 
-  // towns (habitable worlds) or outposts (everywhere else)
-  var towns=ter.sites.map(function(site){ var T=buildTown(scene,b,site); T.key=SYS.seed+':T'+idx+(site.j?'.'+site.j:''); return T; });
+  // towns (habitable worlds) or outposts (everywhere else); any town-kit models with a url load first
+  if(Object.keys(TOWN_KIT).some(function(id){ return TOWN_KIT[id].url && !TOWN_GLB[id] && !TOWN_KIT[id].failed; })) await loadTownKit();
+  var towns=ter.sites.map(function(site){ return buildTown(scene,b,site,SYS.seed+':T'+idx+(site.j?'.'+site.j:'')); });
   if((w=yieldMaybe())) await w;
   // wind-blown grass
   var bladeGeo=new THREE.BufferGeometry(), bw=.05, bh=.75;
@@ -2590,8 +2592,192 @@ function mergeStatic(root){
 var TOWN_SUF=[' LANDING',' CROSSING',"'S REST",' DEPOT',' HAVEN',' POINT',' JUNCTION'];
 function townName(seed){ var r=rng(ihash(seed,8080)); return genWord(r,2).toUpperCase()+TOWN_SUF[Math.floor(r()*TOWN_SUF.length)]; }
 
-function buildTown(scene, b, site){
-  var hs=site.hs, op=site.outpost, T=stationTextures(), R=rng(ihash(b.seed,2626+site.j*131)), g=new THREE.Group(); g.position.set(site.x,0,site.z); scene.add(g);
+/* =========================================================================
+   TOWN KIT: the pieces towns are built from as they grow.
+   SETTLEMENT = the core around the pad. TOWN adds ring 2 (8 straight blocks round an octagon).
+   CITY adds ring 3 (12 taller blocks). Corners between blocks are filled in code.
+   Every piece is built in code today. Each entry carries the prompt for generating its 3D model:
+   drop the GLB in models/, set url (and rotY if the model's street side doesn't face -Z), and the game
+   swaps it in, scaled to the piece's footprint. The full list is also in docs/town-kit-prompts.md.
+   ========================================================================= */
+/*TOWN_KIT_START*/
+var TOWN_STYLE='Gritty frontier-colony sci-fi, hard-surface, game-ready. Worn sun-bleached white and grey prefab panels with burnt-orange trim stripes, dark gunmetal frames and railings, yellow-and-black hazard striping, dust, rust streaks and scuffs, warm lit window strips. Matches a weathered industrial space-trucking world. One single object, flat bottom resting on the ground, centered, no terrain, no ground plane, no vehicles, no people, no turnaround sheet or multiple views.';
+var TOWN_KIT={
+  core_town:{ring:1, w:100, d:100, h:14, url:null, rotY:0, label:'Town core (settlement)',
+    prompt:'A small circular frontier colony town core, seen as one compact cluster about 100 m across: a ring of 1–3 storey prefab habitat blocks, a corrugated quonset warehouse, cylindrical water and fuel tanks, a comms tower with a dish, all arranged in a circle around a large EMPTY round clearing in the exact center (the clearing is about 30 m across and must stay completely empty: the landing pad goes there). Narrow lanes between buildings, cargo containers, street lamps.'},
+  core_outpost:{ring:0, w:76, d:76, h:12, url:null, rotY:0, label:'Outpost core (mining camp / research post / fuel depot)',
+    prompt:'A small remote frontier outpost about 75 m across: a few prefab cabins, a quonset shed, fuel tanks, a drill rig or sensor mast, stacked cargo containers and a tall comms mast, loosely arranged in a ring around an EMPTY round clearing in the exact center about 30 m across (the landing pad goes there). Sparse, utilitarian, isolated.'},
+  r2_res:{ring:2, w:43, d:20, h:11, url:null, rotY:0, label:'Ring 2 block · housing',
+    prompt:'A straight rectangular city block segment for a frontier colony town, about twice as long as it is deep (43 m × 20 m footprint). A row of 2–4 storey prefab habitat buildings joined by enclosed walkways, rooftop water tanks and air units, small balconies, ground-floor shopfronts with lit signs along ONE long side (the street side), a raised concrete-and-steel foundation slab with a sidewalk along that street-side edge. Both short ends are cut flat and clean so copies can be lined up end to end.'},
+  r2_ind:{ring:2, w:43, d:20, h:10, url:null, rotY:0, label:'Ring 2 block · industry',
+    prompt:'A straight rectangular industrial block segment for a frontier colony town, about twice as long as it is deep (43 m × 20 m footprint): a long corrugated quonset warehouse with a roller door, a cluster of cylindrical storage tanks with pipework, a vent stack, stacked shipping containers and a small loading dock, all on a raised concrete-and-steel foundation slab with a sidewalk along ONE long side (the street side). Both short ends cut flat and clean so copies line up end to end.'},
+  r2_plot:{ring:2, w:43, d:20, h:10, url:null, rotY:0, label:'Ring 2 block · business plot',
+    prompt:'A straight rectangular city block segment for a frontier colony town, about twice as long as it is deep (43 m × 20 m footprint). One half has a 2–3 storey prefab habitat building; the other half is an EMPTY fenced lot with a flat paved surface (a business building will be placed there later), a few crates and a small site office cabin at the back. Raised concrete-and-steel foundation slab, sidewalk along ONE long side (the street side). Both short ends cut flat and clean.'},
+  r3_res:{ring:3, w:47, d:24, h:16, url:null, rotY:0, label:'Ring 3 block · city housing',
+    prompt:'A straight rectangular city block segment for a growing frontier colony city, about twice as long as it is deep (47 m × 24 m footprint): taller 4–6 storey stacked prefab apartment towers of varied heights with lit window bands, sky bridges between them, rooftop antennas, water tanks and landing lights, ground-floor shops and a covered arcade along ONE long side (the street side). Raised foundation slab with a sidewalk on the street side. Both short ends cut flat and clean so copies line up end to end.'},
+  r3_ind:{ring:3, w:47, d:24, h:14, url:null, rotY:0, label:'Ring 3 block · city industry',
+    prompt:'A straight rectangular heavy-industry block segment for a frontier colony city, about twice as long as it is deep (47 m × 24 m footprint): a large fabrication hall with a sawtooth roof, a refinery cluster of tanks and pipes, a gantry crane over a container yard, tall exhaust stacks, on a raised concrete-and-steel foundation slab with a sidewalk along ONE long side (the street side). Both short ends cut flat and clean.'},
+  r3_plot:{ring:3, w:47, d:24, h:14, url:null, rotY:0, label:'Ring 3 block · city business plot',
+    prompt:'A straight rectangular city block segment for a frontier colony city, about twice as long as it is deep (47 m × 24 m footprint). One half has a 4–5 storey prefab tower; the other half is an EMPTY fenced paved lot (a business building goes there later) with a site office cabin and stacked crates at the back. Raised foundation slab, sidewalk along ONE long side (the street side). Both short ends cut flat and clean.'},
+  biz_mining:{ring:-1, w:20, d:16, h:12, url:null, rotY:0, label:'Business · mining depot (next step)',
+    prompt:'A frontier mining supply depot building about 20 m × 16 m: a rugged prefab warehouse with a big roller door, an ore hopper and conveyor, racks of drill heads and explosive crates behind a hazard fence, a lit sign reading MINING SUPPLY.'},
+  biz_farm:{ring:-1, w:20, d:16, h:9, url:null, rotY:0, label:'Business · farm co-op (next step)',
+    prompt:'A frontier farm co-op building about 20 m × 16 m: a row of glowing hydroponic greenhouse domes, a seed store with a loading door, water tanks and pipes, a lit sign reading FARM CO-OP.'},
+  biz_clinic:{ring:-1, w:18, d:14, h:9, url:null, rotY:0, label:'Business · clinic (next step)',
+    prompt:'A frontier medical clinic about 18 m × 14 m: a clean white two-storey prefab with a green cross sign, a covered ambulance bay, a small rooftop landing pad for a medevac drone.'},
+  biz_shipyard:{ring:-1, w:22, d:18, h:14, url:null, rotY:0, label:'Business · shipyard (next step)',
+    prompt:'A small frontier shipyard about 22 m × 18 m: an open repair bay with a gantry crane over a cradle, stacked hull plates and engine parts, welding scorch marks, a lit sign reading REPAIRS & REFITS.'},
+  biz_market:{ring:-1, w:18, d:14, h:8, url:null, rotY:0, label:'Business · market / cantina (next step)',
+    prompt:'A frontier market and cantina about 18 m × 14 m: covered stalls under patched awnings, a squat bar building with neon signs, string lights, crates of goods, a few stools.'}
+};
+/*TOWN_KIT_END*/
+var TOWN_GLB={};
+// the generation prompt for one piece, with the shared style
+function kitPrompt(id){ var k=TOWN_KIT[id]; return k?k.prompt+' '+TOWN_STYLE:''; }
+// models listed with a url load when a surface is built; until then (or if they fail) the code version is used
+function loadTownKit(){
+  var ids=Object.keys(TOWN_KIT).filter(function(id){ return TOWN_KIT[id].url && !TOWN_GLB[id] && !TOWN_KIT[id].failed; });
+  return Promise.all(ids.map(function(id){ return loadGLB(TOWN_KIT[id].url).then(function(gl){
+    if(!gl){ TOWN_KIT[id].failed=true; return; }
+    try{ var D=prepEnvModel(gl,{}); D.geo.computeBoundingBox(); D.box=D.geo.boundingBox.clone(); TOWN_GLB[id]=D; }catch(e){ TOWN_KIT[id].failed=true; console.warn('town kit',id,e); } }); }));
+}
+// a kit model fitted to its piece: footprint stretched to w x d, height scaled with it, sitting on y=0, street side to -Z
+function kitModel(id){
+  var K=TOWN_KIT[id], D=TOWN_GLB[id], b=D.box, sz=b.getSize(new THREE.Vector3());
+  var g=new THREE.Group(), inner=new THREE.Group(); inner.rotation.y=K.rotY||0; g.add(inner);
+  var sw=(Math.abs(Math.sin(K.rotY||0))>.7), fx=(sw?K.d:K.w)/sz.x, fz=(sw?K.w:K.d)/sz.z, fy=(fx+fz)/2;
+  var m=new THREE.Mesh(D.geo,D.mat); m.castShadow=m.receiveShadow=true; m.userData.shared=true;
+  m.scale.set(fx,fy,fz); m.position.set(-(b.min.x+b.max.x)/2*fx,-b.min.y*fy,-(b.min.z+b.max.z)/2*fz); inner.add(m);
+  return g;
+}
+
+/* ---- code-built blocks: origin at the middle of the footprint on the ground, long side along X, street side toward -Z ---- */
+function townBlock(id, R, M, out){
+  if(TOWN_GLB[id]) return kitModel(id);
+  var K=TOWN_KIT[id], L=K.w, D=K.d, H=K.h, g=new THREE.Group(), city=K.ring===3;
+  function box(w,h,d,mat,x,y,z,shadow){ var m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat); m.position.set(x,y,z); if(shadow!==false){ m.castShadow=true; m.receiveShadow=true; } g.add(m); return m; }
+  function cyl(r1,r2,h,mat,x,y,z,seg){ var m=new THREE.Mesh(new THREE.CylinderGeometry(r1,r2,h,seg||14),mat); m.position.set(x,y,z); m.castShadow=m.receiveShadow=true; g.add(m); return m; }
+  // foundation slab that runs down into the ground, sidewalk along the street, kerb stripe
+  box(L,4.2,D,M.dark,0,-1.6,0);
+  box(L,.35,D-.2,M.slab,0,.68,0,false);
+  box(L,.2,2.4,M.walk,0,.95,-D/2+1.2,false);
+  box(L,.12,.35,M.haz,0,1.08,-D/2+.18,false);
+  var y0=.85, front=-D/2+2.6;
+  function hab(x,w,d,h,z){
+    // window texture tiles per storey and per 8 m of wall, not stretched over the whole tower
+    var tg=new THREE.BoxGeometry(w,h,d), uv=tg.attributes.uv, fs=[[d,h],[d,h],[w,d],[w,d],[w,h],[w,h]];
+    for(var f=0;f<6;f++) for(var v=0;v<4;v++){ var q=f*4+v; uv.setXY(q,uv.getX(q)*fs[f][0]/8,uv.getY(q)*fs[f][1]/4.2); }
+    var tall=new THREE.Mesh(tg,M.win); tall.position.set(x,y0+h/2,z); tall.castShadow=tall.receiveShadow=true; g.add(tall);
+    box(w+.4,.45,d+.4,M.dark,x,y0+h+.22,z);
+    box(w*.92,.5,.12,M.accent,x,y0+Math.min(3.4,h*.4),z-d/2-.06,false);   // trim band
+    box(1.8,2.4,.25,M.accent,x+(R()-.5)*(w-3),y0+1.2,z-d/2-.1,false);       // door
+    if(R()<.7) cyl(.9,.9,1.6,M.hull,x+w*.25,y0+h+1.2,z+d*.15,10);           // roof tank
+    if(R()<.6) box(1.6,1,1.4,M.dark,x-w*.25,y0+h+.95,z-d*.1);                // air unit
+    out.doors.push(new THREE.Vector3(x,0,z-d/2-1.6));
+    return tall;
+  }
+  if(id==='r2_res' || id==='r3_res'){
+    var n=city?4:3, lot=L/n;
+    for(var i=0;i<n;i++){ var x=-L/2+lot*(i+.5), w=lot-2.2-R()*1.5, d=D*(city?.62:.55), h=(city?.62:.55)*H+R()*H*(city?.38:.42);
+      hab(x,w,d,h,front+d/2+.6);
+      if(i<n-1 && R()<.7) box(2.2,1.6,2,M.dark,x+lot/2,y0+h*.6,front+d/2+.6);   // walkway to the next tower
+    }
+    if(city){ var tx=(R()-.5)*L*.5; cyl(.25,.4,6,M.dark,tx,y0+H+3.5,front+D*.3,6); out.reds.push(new THREE.Vector3(tx,y0+H+6.6,front+D*.3)); }
+  } else if(id==='r2_ind' || id==='r3_ind'){
+    var sl=L*.5, sr=city?5.6:4.4;
+    var q=new THREE.Mesh(new THREE.CylinderGeometry(sr,sr,sl,18,1,true,-Math.PI/2,Math.PI),M.hull); q.material.side=THREE.DoubleSide;
+    q.rotation.z=Math.PI/2; q.position.set(-L*.2,y0,front+sr+.8); q.castShadow=q.receiveShadow=true; g.add(q);
+    box(.25,sr*1.6,sr*2,M.dark,-L*.2-sl/2,y0+sr*.8,front+sr+.8); box(.25,sr*1.6,sr*2,M.dark,-L*.2+sl/2,y0+sr*.8,front+sr+.8);
+    box(3.2,3,.3,M.accent,-L*.2,y0+1.5,front+.75,false);
+    out.doors.push(new THREE.Vector3(-L*.2,0,front-1));
+    var tn=city?4:3; for(var k=0;k<tn;k++){ var tx2=L*.12+k*(city?4.6:4.2), th=(city?7:5)+R()*3;
+      cyl(1.8,1.8,th,k%2?M.accent:M.hull,tx2,y0+th/2,front+D*.45,16); cyl(1.8,.2,1.2,M.hull,tx2,y0+th+.6,front+D*.45,16); }
+    var sx=L*.42, sh=(city?15:11)+R()*3; cyl(.6,.8,sh,M.dark,sx,y0+sh/2,front+D*.2,8); out.vents.push(new THREE.Vector3(sx,y0+sh+.4,front+D*.2));
+    for(var c=0;c<4;c++) box(2.4,2.4,5.6,M.box[c%M.box.length],L*.1+(c%2)*2.7,y0+1.2+Math.floor(c/2)*2.4,front+D*.8,true);
+    if(city){ box(.6,12,.6,M.yellow,L*.05,y0+6,front+2); box(.6,12,.6,M.yellow,L*.05,y0+6,front+D-2); box(.8,.8,D-3,M.yellow,L*.05,y0+12,front+D/2); }
+  } else {   // business plot: one building, one empty fenced lot
+    var bw=L*.42, bd=D*.58, bh=(city?.75:.6)*H+R()*H*.25;
+    hab(-L/2+bw/2+1.2,bw,bd,bh,front+bd/2+.6);
+    var lx=L*.24, lw=L*.46, ld=D-4;
+    box(lw,.08,ld,M.walk,lx,y0+.06,front+ld/2+.2,false);
+    for(var f=0;f<9;f++){ var fx=lx-lw/2+f*lw/8; box(.12,1.6,.12,M.dark,fx,y0+.8,front+ld+.2,false); }
+    box(lw,.08,.06,M.yellow,lx,y0+1.5,front+ld+.2,false); box(.06,.08,ld,M.yellow,lx+lw/2,y0+1.5,front+ld/2+.2,false);
+    box(3.6,2.6,2.6,M.hull,lx+lw/2-2.4,y0+1.3,front+ld-1.6); box(2.4,2.4,2.4,M.box[0],lx-lw/2+1.6,y0+1.2,front+ld-1.6);
+    var sign=new THREE.Mesh(new THREE.PlaneGeometry(6,1.6),M.lotSign); sign.position.set(lx,y0+2.6,front+.4); sign.rotation.y=Math.PI; g.add(sign);
+    box(.15,2.2,.15,M.dark,lx-2.6,y0+1.1,front+.45,false); box(.15,2.2,.15,M.dark,lx+2.6,y0+1.1,front+.45,false);
+    out.plots.push({x:lx, z:front+ld/2+.2, w:lw, d:ld});
+  }
+  // two street lamps on the sidewalk
+  [-L*.3,L*.3].forEach(function(lx2){ box(.1,4,.1,M.dark,lx2,y0+2,-D/2+.6,false); box(.7,.16,.36,M.lamp,lx2,y0+4.05,-D/2+.75,false); out.lamps.push(new THREE.Vector3(lx2,y0,-D/2+1.4)); });
+  return g;
+}
+// the "LOT · FUTURE DEVELOPMENT" board
+var lotSignTex=null;
+function lotSign(){ if(lotSignTex) return lotSignTex; var c=document.createElement('canvas'); c.width=512; c.height=136; var x=c.getContext('2d');
+  x.fillStyle='#e8e2d2'; x.fillRect(0,0,512,136); x.fillStyle='#1b1d21'; x.fillRect(8,8,496,120);
+  x.fillStyle='#ffb000'; x.font='bold 50px "IBM Plex Mono", monospace'; x.textAlign='center'; x.textBaseline='middle'; x.fillText('LOT FOR LEASE',256,52);
+  x.fillStyle='#c9c2b0'; x.font='24px "IBM Plex Mono", monospace'; x.fillText('FUTURE BUSINESS DISTRICT',256,100);
+  lotSignTex=new THREE.CanvasTexture(c); lotSignTex.encoding=THREE.sRGBEncoding; tud(lotSignTex).shared=true; return lotSignTex; }
+
+/* rings: 8 blocks round an octagon for a TOWN, 12 more round a 12-gon for a CITY */
+var TOWN_RINGS={2:{n:8, ri:57, road:[50,56], ids:['r2_res','r2_ind','r2_res','r2_plot','r2_res','r2_ind','r2_res','r2_plot']},
+                3:{n:12, ri:95, road:[88,94], ids:['r3_res','r3_ind','r3_res','r3_plot','r3_res','r3_res','r3_ind','r3_res','r3_plot','r3_res','r3_ind','r3_plot']}};
+function townCityR(lvl){ return lvl>=3?122:lvl>=2?80:46; }
+function buildTownRings(g, hs, lvl, R, M, pools, doors, vents){
+  var out={traffic:[], reds:[], skyH:0};
+  [2,3].forEach(function(ri){ if(lvl<ri) return;
+    var RG=TOWN_RINGS[ri], K0=TOWN_KIT[RG.ids[0]], off=R()*TAU, apo=RG.ri+K0.d/2;
+    // ring road with lane dashes and kerbs
+    var road=new THREE.Mesh(new THREE.RingGeometry(RG.road[0],RG.road[1],96,1),M.road); road.rotation.x=-Math.PI/2; road.position.y=hs+.06; road.receiveShadow=true; g.add(road);
+    var dashN=ri===2?40:64; for(var k=0;k<dashN;k++){ var a=k/dashN*TAU, rm=(RG.road[0]+RG.road[1])/2;
+      var ds=new THREE.Mesh(new THREE.BoxGeometry(.25,.04,2.2),M.dash); ds.position.set(Math.sin(a)*rm,hs+.1,Math.cos(a)*rm); ds.rotation.y=a+Math.PI/2; g.add(ds); }
+    for(var i=0;i<RG.n;i++){
+      var id=RG.ids[(i+Math.floor(R()*2))%RG.ids.length], a2=off+i/RG.n*TAU;
+      var bo={doors:[], lamps:[], vents:[], plots:[], reds:[]};
+      var blk=townBlock(id,R,M,bo); blk.position.set(Math.sin(a2)*apo,hs,Math.cos(a2)*apo); blk.rotation.y=a2; g.add(blk);
+      out.skyH=Math.max(out.skyH,TOWN_KIT[id].h+(ri===3?6:0));
+      var toLocal=function(v){ return v.clone().applyAxisAngle(UP,a2).add(new THREE.Vector3(blk.position.x,0,blk.position.z)); };
+      bo.doors.forEach(function(v){ var w=toLocal(v); doors.push(new THREE.Vector2(w.x,w.z)); });
+      bo.vents.forEach(function(v){ vents.push(toLocal(v).add(new THREE.Vector3(0,hs,0))); });
+      bo.reds.forEach(function(v){ var w=toLocal(v), rm2=new THREE.Mesh(new THREE.SphereGeometry(.3,8,6),M.red); rm2.position.set(w.x,hs+v.y,w.z); rm2.userData.dyn=true; g.add(rm2); out.reds.push(rm2); });
+      bo.lamps.forEach(function(v,li){ var w=toLocal(v); if((i+li)%2===0 || Q.fx>=1) lightPool(g,w.x,hs,w.z,6,M.sod,pools); });
+      // corner plaza between this block and the next: mast lamp, bollards, a kiosk or tank
+      var ac=a2+Math.PI/RG.n, rc=RG.ri+K0.d*.55, cx=Math.sin(ac)*rc, cz=Math.cos(ac)*rc;
+      var pl=new THREE.Mesh(new THREE.CylinderGeometry(K0.d*.42,K0.d*.46,1.1,10),M.slab); pl.position.set(cx,hs+.4,cz); pl.receiveShadow=true; g.add(pl);
+      var mast=new THREE.Mesh(new THREE.CylinderGeometry(.14,.22,ri===3?12:9,8),M.dark); mast.position.set(cx,hs+(ri===3?6:4.5),cz); g.add(mast);
+      var head=new THREE.Mesh(new THREE.BoxGeometry(1.2,.4,.4),M.lamp); head.position.set(cx,hs+(ri===3?12:9),cz); g.add(head);
+      lightPool(g,cx,hs+.95,cz,7,M.work,pools);
+      if(R()<.5){ var tk=new THREE.Mesh(new THREE.CylinderGeometry(1.4,1.4,3.6,14),M.hull); tk.position.set(cx+Math.sin(ac)*3,hs+2.7,cz+Math.cos(ac)*3); tk.castShadow=true; g.add(tk); }
+      else { var ko=new THREE.Mesh(new THREE.BoxGeometry(2.2,2.6,2.2),M.accent); ko.position.set(cx+Math.sin(ac)*3,hs+2.2,cz+Math.cos(ac)*3); ko.castShadow=true; g.add(ko); }
+    }
+    // traffic on the ring road
+    var nt=ri===2?2:3, rm3=(RG.road[0]+RG.road[1])/2;
+    for(var t=0;t<nt;t++){ var cr=new THREE.Group(); cr.userData.dyn=true; g.add(cr);
+      [[0,.8,0,1.9,1.1,3.6,M.dark],[0,1.75,.6,1.7,.9,1.6,M.accent],[0,1.6,-.8,1.8,.6,1.8,M.hull]].forEach(function(b0){ var m=new THREE.Mesh(new THREE.BoxGeometry(b0[3],b0[4],b0[5]),b0[6]); m.position.set(b0[0],b0[1],b0[2]); m.castShadow=true; cr.add(m); });
+      var hl=new THREE.Mesh(new THREE.BoxGeometry(1.4,.18,.08),M.head); hl.position.set(0,1,1.82); cr.add(hl);
+      out.traffic.push({obj:cr, r:rm3+(t%2?1.4:-1.4), ang:R()*TAU, sp:(t%2?-1:1)*(4.5+R()*2)/rm3, hs:hs});
+    }
+  });
+  return out;
+}
+function townMats(T0, M0){
+  var dash=new THREE.MeshBasicMaterial({color:new THREE.Color(.55,.5,.38)});
+  return {hull:M0.hull, win:M0.winMat, dark:M0.dark, accent:M0.accent, lamp:M0.lampMat, red:new THREE.MeshBasicMaterial({color:new THREE.Color(4,.3,.2)}),
+    slab:plated(new THREE.MeshStandardMaterial({color:lin('#6d6b66'), map:texRep(T0.plate,3,1), metalness:.2, roughness:.85}),.9,{u:M0.TW,paint:.4}),
+    walk:new THREE.MeshStandardMaterial({color:lin('#7b776e'), roughness:.9, metalness:.05}),
+    road:new THREE.MeshStandardMaterial({color:lin('#2a2a29'), roughness:.95, metalness:.05}),
+    haz:new THREE.MeshStandardMaterial({map:texRep(hazardTex(),8,1), roughness:.7}),
+    yellow:weather(new THREE.MeshStandardMaterial({color:lin('#6e5a26'), metalness:.4, roughness:.7}),.95,{u:{value:.35},paint:1}),
+    box:['#8e4a32','#3d5670','#a88a3e','#4d6450'].map(function(c){ return new THREE.MeshStandardMaterial({color:lin(c), roughness:.7, metalness:.3}); }),
+    lotSign:new THREE.MeshBasicMaterial({map:lotSign(), color:new THREE.Color(1.2,1.2,1.2)}),
+    head:new THREE.MeshBasicMaterial({color:new THREE.Color(3,2.8,2.4)}),
+    dash:dash, sod:new THREE.Color(.62,.3,.09), work:new THREE.Color(.17,.155,.13)};
+}
+
+function buildTown(scene, b, site, key){
+  var lvl=townRec({key:key, outpost:site.outpost}).lvl, coreId=lvl<1?'core_outpost':'core_town';
+  site.cr=townCityR(lvl);
+  var hs=site.hs, op=lvl<1, T=stationTextures(), R=rng(ihash(b.seed,2626+site.j*131)), g=new THREE.Group(); g.position.set(site.x,0,site.z); scene.add(g);
   // prefab industrial kit: corrugated, sun-bleached, rusting at the seams
   var TW={value:.2+R()*.15};
   var hull=plated(new THREE.MeshStandardMaterial({color:lin(['#8e8a80','#7f8079','#958a76'][Math.floor(R()*3)]), map:texRep(T.plate,2,2), metalness:.35, roughness:.68}),.95,{u:TW,paint:.9});
@@ -2616,7 +2802,8 @@ function buildTown(scene, b, site){
   var occupied=[{x:0,z:0,r:13},{x:kx,z:0,r:2.5},{x:-24,z:-24,r:5}], doors=[];
   function free(x,z,r){ for(var o=0;o<occupied.length;o++){ var q=occupied[o]; if(Math.hypot(x-q.x,z-q.z)<q.r+r+2) return false; } return true; }
   var placed=0;
-  for(var t=0;t<120 && placed<(op?7:15);t++){
+  if(TOWN_GLB[coreId]){ var coreM=kitModel(coreId); coreM.position.y=hs; g.add(coreM); }
+  for(var t=0;t<120 && placed<(TOWN_GLB[coreId]?0:(op?7:15));t++){
     var ang=R()*TAU, rad=18+R()*(op?14:26), x=Math.cos(ang)*rad, z=Math.sin(ang)*rad, w=R(), face=Math.atan2(-x,-z);
     var type=op?(w<.2?'hab':w<.4?'dome':w<.75?'tank':'stack'):(w<.42?'hab':w<.64?'dome':w<.8?'tank':'stack'), size=type==='hab'?6:type==='dome'?6:4;
     if(!free(x,z,size)) continue;
@@ -2673,13 +2860,15 @@ function buildTown(scene, b, site){
   [[0,.9,0,3.8,1.2,2.2,dark],[ -.6,2.1,0,1.8,1.2,2.0,accent],[1.0,1.8,0,1.8,.6,2.0,hull]].forEach(function(b0){ var m=new THREE.Mesh(new THREE.BoxGeometry(b0[3],b0[4],b0[5]),b0[6]); m.position.set(b0[0],b0[1],b0[2]); m.castShadow=m.receiveShadow=true; crawler.add(m); });
   [-1.3,0,1.3].forEach(function(wx){ [-1,1].forEach(function(sd){ var w=new THREE.Mesh(new THREE.CylinderGeometry(.55,.55,.4,12),dark); w.rotation.x=Math.PI/2; w.position.set(wx,.55,sd*1.15); crawler.add(w); }); });
   var crawlLamp=new THREE.Mesh(new THREE.SphereGeometry(.16,8,6),new THREE.MeshBasicMaterial({color:new THREE.Color(3.4,1.6,.3)})); crawlLamp.position.set(-.6,2.8,0); crawler.add(crawlLamp);
+  // district rings: a TOWN gets ring 2, a CITY ring 3 as well
+  var rings=lvl>=2?buildTownRings(g,hs,lvl,R,townMats(T,{hull:hull, winMat:winMat, dark:dark, accent:accent, lampMat:lampMat, TW:TW}),pools,doors,vents):{traffic:[], reds:[], skyH:0};
   // residents
   var npcs=[], suits=[lin('#8d8a80'),lin('#b5642a'),lin('#4f5a62'),lin('#a68a3a')];
   var bodyGeo=new THREE.CylinderGeometry(.22,.27,1.05,10), headGeo=new THREE.SphereGeometry(.21,12,10), visorGeo=new THREE.BoxGeometry(.26,.1,.06);
   var visorMat=new THREE.MeshBasicMaterial({color:new THREE.Color(.9,.6,.3)});
   if(!doors.length) doors.push(new THREE.Vector2(16,8));
   doors.push(new THREE.Vector2(kx+1.5,1.5), new THREE.Vector2(-6,11), new THREE.Vector2(8,-11));
-  for(var n=0;n<(op?3:7);n++){
+  for(var n=0;n<(op?3:7)+(lvl>=2?5:0)+(lvl>=3?6:0);n++){
     var ng=new THREE.Group(), sm=new THREE.MeshStandardMaterial({color:suits[n%suits.length], roughness:.7});
     var bm=new THREE.Mesh(bodyGeo,sm); bm.position.y=.85; bm.castShadow=true; ng.add(bm);
     var hm=new THREE.Mesh(headGeo,sm); hm.position.y=1.58; ng.add(hm);
@@ -2696,7 +2885,9 @@ function buildTown(scene, b, site){
     transparent:true, blending:THREE.AdditiveBlending, depthWrite:false, side:THREE.DoubleSide}));
   beacon.geometry.translate(0,.5,0); beacon.frustumCulled=false; beacon.position.set(site.x,hs,site.z); scene.add(beacon);
   mergeStatic(g);
-  return {name:site.name, label:site.label, outpost:op, j:site.j, x:site.x, z:site.z, group:g,
+  vents=vents.map(function(v){ return v.clone().add(new THREE.Vector3(site.x,0,site.z)); });
+  return {key:key, lvl:lvl, site:site, traffic:rings.traffic, reds:rings.reds, skyH:Math.max(16,rings.skyH), cityR:townCityR(lvl),
+    name:site.name, label:site.label, outpost:site.outpost, j:site.j, x:site.x, z:site.z, group:g,
     pad:new THREE.Vector3(site.x,hs+.7,site.z), kiosk:new THREE.Vector3(site.x+kx,hs,site.z), hs:hs,
     lampMat:lampMat, lampBase:lampBase, padLampMat:padLampMat, winMat:winMat, red:red, red2:red2, npcs:npcs, doors:doors, beacon:beacon,
     pools:pools, vents:vents, crawler:{obj:crawler, lamp:crawlLamp, x0:-14, z0:7, ph:R()*TAU}};
@@ -2716,6 +2907,8 @@ function updateTown(dt){
   var C=T.crawler; if(C){ C.ph+=dt*.09; var u=.5-.5*Math.cos(C.ph); C.obj.position.x=C.x0+u*9; C.obj.position.z=C.z0-u*6; C.lamp.material.color.setRGB(3.4,1.6,.3).multiplyScalar(((t*1.4)%1)<.5?1:.15); }
   T.padLampMat.color.setRGB(1.6,1,.3).multiplyScalar(((t*1.2)%1)<.5?1.6:.4);
   T.red.material.color.setRGB(4,.3,.2).multiplyScalar(((t*.7)%1)<.15?1:.08);
+  T.traffic.forEach(function(v){ v.ang+=v.sp*dt; v.obj.position.set(Math.sin(v.ang)*v.r,v.hs,Math.cos(v.ang)*v.r); v.obj.rotation.y=v.ang+(v.sp>0?Math.PI/2:-Math.PI/2); });
+  if(T.reds.length) T.reds[0].material.color.setRGB(4,.3,.2).multiplyScalar(((t*.6+.2)%1)<.15?1:.08);
   T.npcs.forEach(function(p){
     if(p.wait>0){ p.wait-=dt; return; }
     var dx=p.target.x-p.pos.x, dz=p.target.y-p.pos.y, dd=Math.hypot(dx,dz);
@@ -2747,13 +2940,13 @@ function updateGrass(force, focus){
   var cell=.55, per=Math.max(1,Math.round(2.6*S.biome.grassDensity));
   var cx0=Math.floor((p.x-radius)/cell), cx1=Math.floor((p.x+radius)/cell), cz0=Math.floor((p.z-radius)/cell), cz1=Math.floor((p.z+radius)/cell);
   var m=new THREE.Matrix4(), qt=new THREE.Quaternion(), sc=new THREE.Vector3(), ps=new THREE.Vector3(), eu=new THREE.Euler(), n=0, r2=radius*radius;
-  var nearTowns=S.ter.sites.filter(function(st){ return Math.hypot(st.x-p.x,st.z-p.z)<radius+50; }), nearTownsT={sites:nearTowns};
+  var nearTowns=S.ter.sites.filter(function(st){ return Math.hypot(st.x-p.x,st.z-p.z)<radius+(st.cr||46)+4; }), nearTownsT={sites:nearTowns};
   for(var ci=cx0;ci<=cx1 && n<cnt;ci++) for(var cj=cz0;cj<=cz1 && n<cnt;cj++){
     for(var k=0;k<per && n<cnt;k++){
       var x=(ci+hashCell(ci,cj,k))*cell, z=(cj+hashCell(cj,ci,k+7))*cell;
       var dx=x-p.x, dz=z-p.z, d2=dx*dx+dz*dz; if(d2>r2) continue;
       var patch=vnoise(x*.08+3,z*.08); if(patch<.32) continue;
-      if(nearTowns.length && nearSite(nearTownsT,x,z,46)) continue;
+      if(nearTowns.length && nearSiteR(nearTownsT,x,z,0)) continue;
       var y=S.heightAt(x,z); if(y<S.waterLevel+(S.waterLevel>-1e8?2.1+vnoise(x*.2,z*.2)*.8:.5)) continue;
       if(S.slopeAt(x,z)>.55) continue;
       var edge=1-sstep(r2*.55,r2,d2);
@@ -2894,7 +3087,7 @@ function buildCreature(sp){
   return {root:root, legs:legs, wings:wings, tents:tents, head:head};
 }
 function inWorld(x,z,m){ return Math.abs(x)<WORLD_E-(m||0) && Math.abs(z)<WORLD_E-(m||0); }
-function faunaSpotOk(s,x,z){ return inWorld(x,z,15) && !nearSite(s.ter,x,z,TOWN_R+4) && s.heightAt(x,z)>s.waterLevel+.4 && s.slopeAt(x,z)<.65; }
+function faunaSpotOk(s,x,z){ return inWorld(x,z,15) && !nearSiteR(s.ter,x,z,4) && s.heightAt(x,z)>s.waterLevel+.4 && s.slopeAt(x,z)<.65; }
 function placeCreature(s,c,cx,cz,spread,R){
   var air=c.sp.type==='flyer'||c.sp.type==='floater';
   for(var t=0;t<16;t++){ var x=cx+(R()-.5)*2*spread, z=cz+(R()-.5)*2*spread; if(inWorld(x,z,15) && (air||faunaSpotOk(s,x,z))){ c.pos.set(x,s.heightAt(x,z),z); c.home.set(x,z); return; } }
@@ -3036,20 +3229,20 @@ window.addEventListener('mouseup',function(){ setHold(false); });
 /* =========================================================================
    Game state + HUD
    ========================================================================= */
-var state={throttle:0, yawRate:0, pitchRate:0, mode:'title', yaw:Math.PI, pitch:0, vel:new THREE.Vector3(), energy:100, scan:1, credits:0, inv:{}, found:{}, sysSeed:0, up:{}, cargo:[], taken:{}, boardGen:{}, delivered:0, dock:null, mods:[], modsOwned:{}, lic:{}, fuel:null, hull:100, company:null, hullSel:null, rooks:{}, pulse:null, pulseK:0, ap:null, apAxes:null, route:null, fits:{}, fuelReserve:0, cleared:0, heat:{}, flares:3, food:100, rest:100, rations:2, fedT:0, restedT:0, needsOff:false, blinkT:0, sleeping:false, law:null, chase:null, arrivedT:0, pirateT:30,
+var state={towns:{}, throttle:0, yawRate:0, pitchRate:0, mode:'title', yaw:Math.PI, pitch:0, vel:new THREE.Vector3(), energy:100, scan:1, credits:0, inv:{}, found:{}, sysSeed:0, up:{}, cargo:[], taken:{}, boardGen:{}, delivered:0, dock:null, mods:[], modsOwned:{}, lic:{}, fuel:null, hull:100, company:null, hullSel:null, rooks:{}, pulse:null, pulseK:0, ap:null, apAxes:null, route:null, fits:{}, fuelReserve:0, cleared:0, heat:{}, flares:3, food:100, rest:100, rations:2, fedT:0, restedT:0, needsOff:false, blinkT:0, sleeping:false, law:null, chase:null, arrivedT:0, pirateT:30,
   pos:new THREE.Vector3(), vy:0, grounded:true, bob:0, fovKick:0, exposure:1, exposureTarget:1, t:0, warp:null};
 var OLD_KEYS={'CINDER REACH':'PYRITE','GLASSWATER':'CYANITE','VERDANT HOLLOW':'AMETHINE','PALE SILICATE':'AURUM'};
 try{
   var sv=JSON.parse(localStorage.getItem('nh_save')||'null');
   if(sv){
-    state.credits=sv.credits||0; state.found=sv.found||{}; state.sysSeed=sv.sys||0; state.up=sv.up||{}; state.cargo=sv.cargo||[]; state.taken=sv.taken||{}; state.boardGen=sv.boardGen||{}; state.delivered=sv.delivered||0;
+    state.credits=sv.credits||0; state.found=sv.found||{}; state.sysSeed=sv.sys||0; state.up=sv.up||{}; state.cargo=sv.cargo||[]; state.taken=sv.taken||{}; state.boardGen=sv.boardGen||{}; state.delivered=sv.delivered||0; state.towns=sv.towns||{};
     state.mods=sv.mods||[]; state.modsOwned=sv.modsOwned||{}; state.lic=sv.lic||{}; state.fuel=sv.fuel; state.hull=sv.hull==null?100:sv.hull; state.company=sv.company||null; state.hullSel=sv.hullSel==null?null:sv.hullSel; state.rooks=sv.rooks||{}; retireWedge(sv); state.fits=sv.fits||{}; state.fuelReserve=sv.fuelReserve||0; state.cleared=sv.cleared===undefined?(sv.sys||0):sv.cleared; state.heat=sv.heat||{}; state.flares=sv.flares==null?3:sv.flares;
     state.food=sv.food==null?100:sv.food; state.rest=sv.rest==null?100:sv.rest; state.rations=sv.rations==null?2:sv.rations; state.fedT=sv.fedT||0; state.restedT=sv.restedT||0; state.needsOff=!!sv.needsOff;
     Object.keys(sv.inv||{}).forEach(function(k){ var nk=OLD_KEYS[k]||k; if(ELEMENTS[nk]) state.inv[nk]=(state.inv[nk]||0)+sv.inv[k]; });
   }
 }catch(e){}
 drawThrottle();
-function save(){ try{ localStorage.setItem('nh_save',JSON.stringify({credits:state.credits,inv:state.inv,found:state.found,sys:state.sysSeed,up:state.up,cargo:state.cargo,taken:state.taken,boardGen:state.boardGen,delivered:state.delivered,
+function save(){ try{ localStorage.setItem('nh_save',JSON.stringify({credits:state.credits,inv:state.inv,found:state.found,sys:state.sysSeed,up:state.up,cargo:state.cargo,taken:state.taken,boardGen:state.boardGen,delivered:state.delivered,towns:state.towns,
   mods:state.mods,modsOwned:state.modsOwned,lic:state.lic,fuel:state.fuel,hull:state.hull,company:state.company,hullSel:state.hullSel,rooks:state.rooks,fits:state.fits,fuelReserve:state.fuelReserve,cleared:state.cleared,heat:state.heat,flares:state.flares,
   food:state.food,rest:state.rest,rations:state.rations,fedT:state.fedT,restedT:state.restedT,needsOff:state.needsOff})); }catch(e){} }
 
@@ -3462,7 +3655,7 @@ try{ if(state.company) fleetCatchUp(); }catch(e){ console.error(e); }
 /* freight locations in the current system: the station plus each town */
 function stationLoc(){ return {key:SYS.seed+':S', kind:'station', name:SYS.station.name, planet:-1, sys:SYS.seed, sysName:SYS.name}; }
 function siteLoc(sy, i, j){ var b=sy.biomes[i], st=planetTerrain(b).sites[j||0];
-  return {key:sy.seed+':T'+i+(j?'.'+j:''), kind:'town', name:st.name, planet:i, site:j||0, outpost:st.outpost, pname:b.name, sys:sy.seed, sysName:sy.name}; }
+  return {key:sy.seed+':T'+i+(j?'.'+j:''), kind:'town', name:st.name, label:st.label, planet:i, site:j||0, outpost:st.outpost, pname:b.name, sys:sy.seed, sysName:sy.name}; }
 function townLoc(i, j){ return siteLoc(SYS, i, j); }
 function sysSiteLocs(sy){ var L=[]; sy.biomes.forEach(function(b,i){ planetTerrain(b).sites.forEach(function(st,j){ L.push(siteLoc(sy,i,j)); }); }); return L; }
 function locations(){ return [stationLoc()].concat(sysSiteLocs(SYS)); }
@@ -3487,10 +3680,11 @@ var CARGO_NAMES={
   fragile:['Lab Glassware','Sensor Arrays','Telescope Optics','Seed Vault Samples','Art Prints','Med Scanners'],
   perishable:['Fresh Produce','Live Cultures','Vaccine Batch','Frozen Catch','Bakery Order','Blood Plasma'],
   hazardous:['Reactor Fuel Rods','Volatile Gas','Blasting Charges','Acid Drums','Coolant Tanks'],
-  oversize:['Reactor Core','Mining Excavator','Habitat Module','Turbine Blades','Dropship Frame','Bridge Span']
+  oversize:['Reactor Core','Mining Excavator','Habitat Module','Turbine Blades','Dropship Frame','Bridge Span'],
+  construction:['Prefab Habitats','Structural Girders','Power Cells','Concrete Printer','Solar Roofing','Water Recyclers','Street Lighting','Pressure Domes']
 };
-var KIND_MULT={standard:1, fragile:1.35, perishable:1.5, hazardous:1.85, oversize:1.7};
-var KIND_TAG={standard:'', fragile:'FRAGILE', perishable:'PERISHABLE', hazardous:'HAZARDOUS', oversize:'OVERSIZE'};
+var KIND_MULT={standard:1, fragile:1.35, perishable:1.5, hazardous:1.85, oversize:1.7, construction:1.15};
+var KIND_TAG={standard:'', fragile:'FRAGILE', perishable:'PERISHABLE', hazardous:'HAZARDOUS', oversize:'OVERSIZE', construction:'CONSTRUCTION'};
 
 var sysCache={};
 function sysInfo(seed){ if(!sysCache[seed]) sysCache[seed]=genSystem(seed); return sysCache[seed]; }
@@ -3502,15 +3696,19 @@ function boardOffers(loc){
   var g=state.boardGen[loc.key]||0, r=rng(ihash(ihash(SYS.seed+11,loc.planet+20+(loc.site||0)*100),g*31+7));
   var others=locations().filter(function(l){ return l.key!==loc.key; }), out=[], nbs=neighbourSeeds(SYS.seed,3);
   if(!others.length) return out;
-  for(var k=0;k<4;k++){
+  var nOff=4+(loc.kind==='town'?Math.max(0,townLevel(loc)-1):1);
+  for(var k=0;k<nOff;k++){
     var remote=r()<.3, dest, dist, ly=0;
     if(remote){ var ns=nbs[Math.floor(r()*nbs.length)]; dest=remoteLoc(ns,r); ly=lightYears(SYS.seed,ns); }
     else { dest=others[Math.floor(r()*others.length)]; dist=locDist(loc,dest); }
     var w=r(), kind=w<.36?'standard':w<.56?'fragile':w<.76?'perishable':w<.9?'hazardous':'oversize';
+    // towns that are still growing want building materials, more so the closer they are to their next stage
+    if(dest.kind==='town' && townLevel(dest)<3 && r()<.22+.3*townProgress(dest)) kind='construction';
     var names=CARGO_NAMES[kind], crates=r()<.35?2:1;
+    if(kind==='construction') crates=r()<.5?2:1;
     if(kind==='oversize') crates=r()<.5?3:4;
     var base=remote?(600+ly*5.5):(210+dist*.55);
-    var reward=Math.round(base*KIND_MULT[kind]*(crates===4?3.3:crates===3?2.6:crates===2?1.75:1)/10)*10;
+    var reward=Math.round(base*KIND_MULT[kind]*(crates===4?3.3:crates===3?2.6:crates===2?1.75:1)*(dest.kind==='town'?1+.08*townLevel(dest):1)/10)*10;
     var id=loc.key+':'+g+':'+k;
     if(state.taken[id]) continue;
     out.push({id:id, kind:kind, name:names[Math.floor(r()*names.length)], crates:crates, reward:reward, from:loc.name, dest:dest, ly:ly,
@@ -3534,15 +3732,47 @@ function acceptOffer(o, loc){
   return true;
 }
 function cargoPay(c){ var late=c.expires && Date.now()>c.expires; return {pay:Math.round(c.reward*c.cond*(late?.4:1)), late:late}; }
+/* =========================================================================
+   Town growth: every crate delivered to a town or outpost grows it. Construction loads count triple.
+   OUTPOST -> SETTLEMENT -> TOWN (ring 2 district) -> CITY (ring 3 district). Saved per town key.
+   ========================================================================= */
+var TOWN_LVLS=['OUTPOST','SETTLEMENT','TOWN','CITY'], TOWN_NEED=[30,70,160];
+function townBaseLvl(loc){ return loc.outpost?0:1; }
+function townRec(loc){ var t=state.towns[loc.key]; return t||{lvl:townBaseLvl(loc), g:0}; }
+function townLevel(loc){ return loc && loc.kind==='town' ? townRec(loc).lvl : 0; }
+function townProgress(loc){ var t=townRec(loc); return t.lvl>=3?1:clamp(t.g/TOWN_NEED[t.lvl],0,1); }
+function townTitle(loc){ var l=townLevel(loc); return l===0?(loc.label||'OUTPOST'):TOWN_LVLS[l]; }
+function growTown(loc, pts){
+  if(!loc || loc.kind!=='town' || !pts) return null;
+  var t=state.towns[loc.key]=townRec(loc), up=null;
+  if(t.lvl>=3) return null;
+  t.g+=pts;
+  while(t.lvl<3 && t.g>=TOWN_NEED[t.lvl]){ t.g-=TOWN_NEED[t.lvl]; t.lvl++; up=t.lvl; }
+  if(t.lvl>=3) t.g=0;
+  if(up!=null){
+    var nm=TOWN_LVLS[up];
+    setTimeout(function(){ toast(loc.name+' IS NOW A '+nm+(up>=2?' · NEW DISTRICT OPEN':''),'life'); sfx('confirm',.8); },900);
+    CB.queue=cbPick([loc.name+' just made '+nm.toLowerCase()+'. Your loads did that, driver.','Hear that? '+loc.name+' is a '+nm.toLowerCase()+' now. More pads, more work.','Construction crews all over '+loc.name+'. Place is booming.']);
+    rebuildTownAt(loc);
+  }
+  return up;
+}
+function rebuildTownAt(loc){
+  if(!SYS || loc.sys!==SYS.seed) return;
+  var surf=surfaces[loc.planet]; if(!surf || !surf.towns) return;
+  var i=-1; surf.towns.forEach(function(T,k){ if(T.key===loc.key) i=k; }); if(i<0) return;
+  var old=surf.towns[i]; surf.scene.remove(old.group); surf.scene.remove(old.beacon); disposeObject(old.group); disposeObject(old.beacon);
+  surf.towns[i]=buildTown(surf.scene, surf.biome, old.site, old.key);
+}
 function deliverHere(loc){
-  var total=0, n=0, late=0;
+  var total=0, n=0, late=0, pts=0;
   state.cargo=state.cargo.filter(function(c){
     if(c.dest.key!==loc.key) return true;
     if(c.kind!=='contraband' && !isCleared()) return true;
-    var p=cargoPay(c); total+=p.pay; n+=c.crates; if(p.late) late++; return false;
+    var p=cargoPay(c); total+=p.pay; n+=c.crates; if(p.late) late++; pts+=c.crates*(c.kind==='construction'?3:1); return false;
   });
   if(n){ state.credits+=total; state.delivered=(state.delivered||0)+n; }
-  return {total:total, n:n, late:late};
+  return {total:total, n:n, late:late, grew:growTown(loc,pts)};
 }
 var lastImpactToast=0;
 function cargoImpact(v){
@@ -3914,7 +4144,7 @@ function openTerminal(loc){
   closeMap(); termLoc=loc;
   $('stEye').textContent=(loc.kind==='station'?'DOCKED':'LANDED')+' · '+(loc.kind==='station'?SYS.name:loc.pname+' · '+SYS.name);
   $('stName').textContent=loc.name;
-  var tabs=loc.kind==='station'?['cargo','trade','services','upgrades','fleet']:['cargo','trade','services'];
+  var tabs=loc.kind==='station'?['cargo','trade','services','upgrades','fleet']:['cargo','trade','services','town'];
   $('stTabs').classList.toggle('many',tabs.length>4); coConfirm=null;
   $('stTabs').innerHTML=tabs.map(function(t){ return '<button type="button" role="tab" data-tab="'+t+'">'+t.toUpperCase()+'</button>'; }).join('');
   $('undockBtn').textContent=loc.kind==='station'?'UNDOCK':'LEAVE TERMINAL';
@@ -3967,6 +4197,16 @@ function renderTerminal(tab){
         '<small class="fx">'+(o.ly?'<span class="xs">WARP '+o.ly+' LY</span> ':'')+'Pays '+fmt(o.reward)+' units'+(o.limit?' · '+Math.round(o.limit/60)+' min limit':'')+(o.kind==='fragile'?' · pay drops if you crash':'')+'</small></span>'+
         '<span class="acts"><button class="pri" data-act="accept" data-id="'+o.id+'"'+(fits&&!need?'':' disabled')+'>'+(need?need:fits?'LOAD':'HOLD FULL')+'</button></span></div>';
     });
+  } else if(stTab==='town'){
+    var tr=townRec(loc), lv=tr.lvl, need=lv<3?TOWN_NEED[lv]:0, pct=lv<3?Math.round(tr.g/need*100):100;
+    h+='<div class="co-head"><span><b>'+loc.name+'</b><small>'+townTitle(loc)+(loc.outpost&&lv>0?' · FOUNDED AS A '+(loc.label||'OUTPOST'):'')+' · '+loc.pname+'</small></span></div>';
+    h+='<div class="st-row"><span class="nm">'+(lv<3?'GROWTH TO '+TOWN_LVLS[lv+1]:'FULLY GROWN')+'<small>'+(lv<3?tr.g+' / '+need+' growth':'This is a city. Bigger boards, better pay.')+'</small>'+
+      '<span class="gauge"><span class="bar"><i style="width:'+pct+'%;background:#c9a24a"></i></span><b>'+pct+'%</b></span></span></div>';
+    h+='<p class="st-note">Every crate you deliver here grows '+loc.name+'. <b>Construction</b> loads count triple, and growing towns post more of them on boards across the system.</p>';
+    var steps=[['SETTLEMENT','A full town core: more homes, more residents, a busier pad.'],['TOWN','A new district ring: housing and industry blocks, a ring road with traffic. More contracts, +16% pay.'],['CITY','An outer city ring of taller blocks. The biggest boards in the system, +24% pay.']];
+    steps.forEach(function(st,i){ var at=i+1, done=lv>=at;
+      h+='<div class="st-row upg'+(done?' hangar-on':'')+'"><span class="nm">'+st[0]+(done?'<span class="tag hi">BUILT</span>':'')+'<small>'+st[1]+'</small></span></div>'; });
+    h+='<p class="st-note">Coming next: business districts with their own pads, and investing in towns for a share of their income.</p>';
   } else if(stTab==='trade'){
     var held=Object.keys(ELEMENTS).filter(function(k){ return state.inv[k]>0; });
     h+='<p class="st-note">'+(held.length?'Sell raw elements you mined. Each stop sets its own prices.':'No elements on board. Crystals you collect on planets sell here.')+'</p>';
@@ -4523,6 +4763,7 @@ function cbEvent(kind, loc){
 function cbTick(dt){
   if(CB.hideT>0){ CB.hideT-=dt; if(CB.hideT<=0) $('cbMsg').classList.remove('show'); }
   if(!CB.on || state.mode==='title' || state.sleeping || state.law || termLoc || state.dock) return;
+  if(CB.queue){ var q=CB.queue; CB.queue=null; CB.t=Math.max(CB.t,25); setTimeout(function(){ cbSay(q); },1500); return; }
   CB.t-=dt*(state.ap?1.6:1);
   if(CB.t<=0){ CB.t=40+Math.random()*50; cbSay(cbLine()); }
 }
@@ -5529,6 +5770,7 @@ function updateAtmoAutopilot(dt){
   var ux=dh>.01?dx/dh:0, uz=dh>.01?dz/dh:0, hi=-1e9;
   for(var k=0;k<=8;k++){ var a=Math.min(dh,k*25); hi=Math.max(hi,S.heightAt(p.x+ux*a,p.z+uz*a)); }
   hi=Math.max(hi,S.waterLevel);
+  if(dh<T.cityR+60) hi=Math.max(hi,T.hs+T.skyH);   // clear the district towers on the way in
   var padY=T.pad.y+hullGear(sh), want;
   if(dh>260) want=hi+42;
   else want=lerp(padY+16,hi+42,clamp((dh-40)/220,0,1));
@@ -6220,7 +6462,7 @@ async function boot(){
   frame();
   setTimeout(streamShipModels,1500);
 }
-window.__nh={stationLoc:function(){ return stationLoc(); }, lineup:function(){ var sc=new THREE.Scene(); sc.background=new THREE.Color(.16,.165,.17); sc.environment=spaceScene.environment;
+window.__nh={town:{grow:function(loc,p){ return growTown(loc,p); }, rec:townRec, kit:function(){ return TOWN_KIT; }, prompt:kitPrompt}, stationLoc:function(){ return stationLoc(); }, lineup:function(){ var sc=new THREE.Scene(); sc.background=new THREE.Color(.16,.165,.17); sc.environment=spaceScene.environment;
     sc.add(new THREE.HemisphereLight(0xdfe6ee,0x30302c,.8)); var dl=new THREE.DirectionalLight(0xffffff,2.2); dl.position.set(-30,50,40); sc.add(dl);
     var x=0; [0,1,4,2,3].forEach(function(t){ var h=buildHull(t,true,{value:.4}); var bb=new THREE.Box3().setFromObject(h); h.position.set(x-bb.min.x,-h.userData.gear,0); x+=bb.max.x-bb.min.x+3; sc.add(h); });
     var cam=new THREE.PerspectiveCamera(30,innerWidth/innerHeight,.1,1000); cam.position.set(x/2,22,x*.95); cam.lookAt(x/2,0,0); SHOWCASE={scene:sc, cam:cam, ground:new THREE.Object3D()}; },
