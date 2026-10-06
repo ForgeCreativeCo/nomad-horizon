@@ -1,6 +1,6 @@
 # Town kit: 3D model prompts
 
-Towns grow in rings: a **core** around the landing pad (settlement), **ring 2** of 8 straight blocks round an octagon (town) and **ring 3** of 12 taller blocks (city). Gaps at the corners are filled in code. Every piece below is built in code today; generate a model from its prompt and the game swaps it in.
+Towns grow in rings: a **core** around the landing pad (settlement), **ring 2** of 8 straight blocks round an octagon (town) and **ring 3** of 12 taller blocks (city). Gaps at the corners are filled in code. Business buildings go on the plots in each ring once you choose them in the Town tab. Every piece below is built in code today; generate a model from its prompt and the game swaps it in.
 
 **To swap one in:** slim the GLB as usual (simplify, resize 1024, jpeg, meshopt), save it in `models/`, set that piece's `url` in `TOWN_KIT` in `index.html` (and `rotY` if the street side of the model doesn't face -Z), and add it to `CORE` in `sw.js`. The game scales it to the footprint below.
 
@@ -56,33 +56,33 @@ Towns grow in rings: a **core** around the landing pad (settlement), **ring 2** 
 
 > A straight rectangular city block segment for a frontier colony city, about twice as long as it is deep (47 m × 24 m footprint). One half has a 4–5 storey prefab tower; the other half is an EMPTY fenced paved lot (a business building goes there later) with a site office cabin and stacked crates at the back. Raised foundation slab, sidewalk along ONE long side (the street side). Both short ends cut flat and clean. Gritty frontier-colony sci-fi, hard-surface, game-ready. Worn sun-bleached white and grey prefab panels with burnt-orange trim stripes, dark gunmetal frames and railings, yellow-and-black hazard striping, dust, rust streaks and scuffs, warm lit window strips. Matches a weathered industrial space-trucking world. One single object, flat bottom resting on the ground, centered, no terrain, no ground plane, no vehicles, no people, no turnaround sheet or multiple views.
 
-## Business · mining depot (next step)
+## Business · mining depot (plot building)
 
-`biz_mining` · footprint 20 m × 16 m, about 12 m tall · used in the next step (business districts)
+`biz_mining` · footprint 20 m × 16 m, about 12 m tall
 
 > A frontier mining supply depot building about 20 m × 16 m: a rugged prefab warehouse with a big roller door, an ore hopper and conveyor, racks of drill heads and explosive crates behind a hazard fence, a lit sign reading MINING SUPPLY. Gritty frontier-colony sci-fi, hard-surface, game-ready. Worn sun-bleached white and grey prefab panels with burnt-orange trim stripes, dark gunmetal frames and railings, yellow-and-black hazard striping, dust, rust streaks and scuffs, warm lit window strips. Matches a weathered industrial space-trucking world. One single object, flat bottom resting on the ground, centered, no terrain, no ground plane, no vehicles, no people, no turnaround sheet or multiple views.
 
-## Business · farm co-op (next step)
+## Business · farm co-op (plot building)
 
-`biz_farm` · footprint 20 m × 16 m, about 9 m tall · used in the next step (business districts)
+`biz_farm` · footprint 20 m × 16 m, about 9 m tall
 
 > A frontier farm co-op building about 20 m × 16 m: a row of glowing hydroponic greenhouse domes, a seed store with a loading door, water tanks and pipes, a lit sign reading FARM CO-OP. Gritty frontier-colony sci-fi, hard-surface, game-ready. Worn sun-bleached white and grey prefab panels with burnt-orange trim stripes, dark gunmetal frames and railings, yellow-and-black hazard striping, dust, rust streaks and scuffs, warm lit window strips. Matches a weathered industrial space-trucking world. One single object, flat bottom resting on the ground, centered, no terrain, no ground plane, no vehicles, no people, no turnaround sheet or multiple views.
 
-## Business · clinic (next step)
+## Business · clinic (plot building)
 
-`biz_clinic` · footprint 18 m × 14 m, about 9 m tall · used in the next step (business districts)
+`biz_clinic` · footprint 20 m × 16 m, about 9 m tall
 
 > A frontier medical clinic about 18 m × 14 m: a clean white two-storey prefab with a green cross sign, a covered ambulance bay, a small rooftop landing pad for a medevac drone. Gritty frontier-colony sci-fi, hard-surface, game-ready. Worn sun-bleached white and grey prefab panels with burnt-orange trim stripes, dark gunmetal frames and railings, yellow-and-black hazard striping, dust, rust streaks and scuffs, warm lit window strips. Matches a weathered industrial space-trucking world. One single object, flat bottom resting on the ground, centered, no terrain, no ground plane, no vehicles, no people, no turnaround sheet or multiple views.
 
-## Business · shipyard (next step)
+## Business · shipyard (plot building)
 
-`biz_shipyard` · footprint 22 m × 18 m, about 14 m tall · used in the next step (business districts)
+`biz_shipyard` · footprint 20 m × 16 m, about 14 m tall
 
 > A small frontier shipyard about 22 m × 18 m: an open repair bay with a gantry crane over a cradle, stacked hull plates and engine parts, welding scorch marks, a lit sign reading REPAIRS & REFITS. Gritty frontier-colony sci-fi, hard-surface, game-ready. Worn sun-bleached white and grey prefab panels with burnt-orange trim stripes, dark gunmetal frames and railings, yellow-and-black hazard striping, dust, rust streaks and scuffs, warm lit window strips. Matches a weathered industrial space-trucking world. One single object, flat bottom resting on the ground, centered, no terrain, no ground plane, no vehicles, no people, no turnaround sheet or multiple views.
 
-## Business · market / cantina (next step)
+## Business · market / cantina (plot building)
 
-`biz_market` · footprint 18 m × 14 m, about 8 m tall · used in the next step (business districts)
+`biz_market` · footprint 20 m × 16 m, about 8 m tall
 
 > A frontier market and cantina about 18 m × 14 m: covered stalls under patched awnings, a squat bar building with neon signs, string lights, crates of goods, a few stools. Gritty frontier-colony sci-fi, hard-surface, game-ready. Worn sun-bleached white and grey prefab panels with burnt-orange trim stripes, dark gunmetal frames and railings, yellow-and-black hazard striping, dust, rust streaks and scuffs, warm lit window strips. Matches a weathered industrial space-trucking world. One single object, flat bottom resting on the ground, centered, no terrain, no ground plane, no vehicles, no people, no turnaround sheet or multiple views.
 
