@@ -2,7 +2,7 @@
 
 A mobile-first space trucker game that runs in the browser. Haul freight between space stations and frontier towns, fly seamlessly from orbit down to procedurally generated planets, and warp across an endless galaxy.
 
-Everything (planets, terrain, skies, wildlife, star systems and towns) is generated in code at runtime with [three.js](https://threejs.org/) r128. A few hand-made 3D models live in `models/` (the Skiff, Mule, Longhaul, Atlas and Rook Twin-Boom hulls, the station hub and its wheel, the customs hall, its scanner arch, the berth modules and the pier's loader arms); anything else, or any model that fails to load, is built procedurally.
+Planets, terrain, skies, wildlife, star systems and towns are generated in code at runtime with [three.js](https://threejs.org/) r128. The ships and the space station are hand-made 3D models (see [3D models](#3d-models)); if a model ever fails to load, the game falls back to a procedural version so it always runs.
 
 ## Play
 
@@ -42,33 +42,98 @@ Each freighter hull has its own turn rate and weight: the Skiff snaps into turns
 
 ## Features
 
-- **Seamless flight:** fly from space through the atmosphere to the ground and back with no loading screens.
+### The job
 - **Freight contracts:** take standard, fragile, perishable and hazardous loads between the station and towns in each system; your hold has limited crate slots.
-- **Freighter progression:** start in the Skiff light courier (4 crates) and trade up through the Mule (6), Longhaul tractor-trailer (9) and Atlas heavy lifter (12) at any station; each hull handles heavier than the last. Once you own more than one, the station's Upgrades tab has a hangar where you can switch back to any hull you've unlocked.
-- **The Rook Twin-Boom:** a patched-up smuggler's freighter, sold as a special order in the Upgrades tab (cheaper in lawless systems). 8 crates, 2 module slots, a built-in smuggler's compartment, the fastest handling in the game, but thin plating that takes 60% more damage. No oversize loads.
+- **Delivery routes:** tap a cargo line under your status panel (or any destination in System Nav or the planet map) and the autopilot chains every leg: warp if it's in another system, pulse across, drop into the atmosphere, cruise to the town and land on its pad, or fly in and dock at the station. Raiders and patrols pause the route and hand you control; it resumes once things are quiet. Touching the stick cancels it.
+- **Customs on the route:** in a customs system you haven't checked into, the route flies you through the customs hall first, rolls you onto the scale, and carries on to the drop once you're cleared. Carrying contraband? It asks first: skip the hall and go straight to the drop, or take your chances with the scanner. Wanted pilots are never routed into the hall.
+- **Pilot needs:** your pilot gets hungry and tired while you play (never while the game is closed). Eat a hot meal at a diner or cantina, carry ration packs (tap the fork on the HUD), and sleep at a motel, a station bunk or in your cab when landed. Sleeping jumps the clock 8 hours, so perishable deadlines keep running. Running on empty slows energy and scans; exhaustion dims the screen, dulls handling and causes microsleeps, and customs fines you for flying over your hours. Galley and sleeper cab modules help on long hauls, fleet pilots take rest breaks, and a relaxed mode in Services turns it all off.
+
+### Your rigs
+- **Freighter progression:** start in the Skiff light courier (4 crates) and trade up through the Mule short-hauler (6), Longhaul tractor-trailer (9) and Atlas heavy lifter (12) at any station. Each hull handles heavier than the last: the Skiff snaps into turns, the Atlas swings wide and coasts out of them. Once you own more than one, the Upgrades tab has a hangar where you can switch between them.
+- **The Rook Twin-Boom:** a patched-up smuggler's freighter, sold as a special order in the Upgrades tab (cheaper in lawless systems). 8 crates, 2 module slots, a built-in smuggler's compartment and the fastest handling in the game, but thin plating that takes 60% more damage. No oversize loads.
 - **Cargo modules and licences:** fit a reefer bay (perishables), shock racks (fragile cargo takes less damage), a shielded vault (hazardous, with a hazmat licence) or an aux fuel tank. Bigger hulls have more module slots. An oversize permit unlocks 3–4 crate loads on Longhaul and Atlas hulls.
 - **Fuel and wear:** warps burn fuel (longer jumps and bigger hulls burn more). Bumps, atmosphere entries and jumps wear the hull, and a hull under 50% flies slower. Refuel and repair at any terminal; fuel depots sell the cheapest fuel.
-- **Trucking company:** register your own company at any station, buy freighters, hire rookie, veteran or ace pilots and send ships on local runs or long hauls. They earn into the company account in real time, and at half rate for up to 8 hours while the game is closed. Collect earnings, repair worn ships and expand your head office from the station's Fleet tab. Your fleet ships berth at the station pier and show on the departures board.
-- **Customs and contraband:** every system with customs has a drive-through customs hall straight ahead of the warp-in point. Fly in, stop on the scale for the scan and leave out the back (or dock at the station) to check in; legal cargo can't be signed for until you do. Settlements post contraband runs (grey goods, restricted, black-market) that pay 1.8–4× but get scanned at customs: comply, try a bribe, or run. A smuggler's compartment helps hide it.
+
+### Flying and getting around
+- **Seamless flight:** fly from space through the atmosphere to the ground and back with no loading screens.
+- **Wide systems and massive worlds:** planets sit 15–30K km apart and are huge next to your rig (a planet is well over 100 Atlas lengths across), so a planet-to-planet hop takes about 1–2 minutes.
+- **Pulse drive:** tap **PULSE** (above the throttle, or P) in open space. It's mass-locked near planets, the station and hostiles, burns a little fuel, and drops you out automatically on arrival. Raiders can interdict you mid-pulse.
+- **Autopilot everywhere:** tap the radar (or N) for **System Nav** and pick a planet or the station. The autopilot turns, pulses, drops out about 1,000 km short and runs the rest at full throttle (no boost), then lines you up over your delivery town or docks you at the station. It steers wide of planets, the station's wheel and the customs hall. In an atmosphere, tap the radar for the planet map and pick a town or outpost: it cruises there, keeps clear of the terrain and lands on the pad. **Back to orbit** climbs you straight out to space. Any stick input takes back control.
+- **Procedural galaxy:** warp to seeded star systems with their own star, nebula and planet types (lush, ocean, desert, frozen, scorched, toxic, exotic).
+
+### The station and customs
+- **Orbital station:** a 160 m hub tower with a 260 m habitat wheel spinning round its neck, towering over the freight pier bolted to its face. You can't fly through the hub.
+- **Freight pier:** four berths built from loading-dock modules, each with robot clamp arms that swing back for arrivals and reach in to grip your hull once you're docked. Cargo lifts, an overhead container rail, crew on the concourse, flood lights, a live departures board, and other traffic docking and leaving berth 4. Your fleet's ships berth here too.
+- **Customs hall:** in every system with customs, a drive-through hall sits straight ahead of the warp-in point. Fly in, stop on the scale under the scanner arch for the scan, and leave out the back (or dock at the station) to check in; legal cargo can't be signed for until you do.
+
+### Law and danger
+- **Contraband:** settlements post contraband runs (grey goods, restricted, black-market) that pay 1.8–4× but get scanned at customs: comply, try a bribe, or run. A smuggler's compartment helps hide it.
 - **Patrols and heat:** patrol cutters hail ships that skipped customs or are wanted, and do random inspections. Run and you're wanted in that system: lose them by outrunning them, diving into an atmosphere or warping out. Heat cools over time or can be paid off at a station.
 - **Security levels and pirates:** each system is High, Medium, Low or Lawless security (shown in the warp menu). The lower the security, the fewer patrols, the more raiders and the better black-market pay. Raiders demand a ransom or a crate; run for the station defence grid, an atmosphere or a warp. A deflector shield and decoy flares help. You never lose your ship for good.
-- **Pilot needs:** your pilot gets hungry and tired while you play (never while the game is closed). Eat a hot meal at a diner or cantina, carry ration packs (tap the fork on the HUD), and sleep at a motel, a station bunk or in your cab when landed. Sleeping jumps the clock 8 hours, so perishable deadlines keep running. Running on empty slows energy and scans; exhaustion dims the screen, dulls handling and causes microsleeps, and customs fines you for flying over your hours. Galley and sleeper cab modules help on long hauls, fleet pilots take rest breaks, and a relaxed mode in Services turns it all off.
-- **Sound:** a cockpit drone, station ambience, warehouse room tone and forklifts at the loading docks, town-square bustle, night crickets and gravel footsteps on foot, landing gear, warp spool-ups, whooshes, landing burns, re-entry roar and hatch sounds from recorded clips, plus an engine, wind and jetpack that follow your throttle and speed, and interface, customs, patrol and raider cues made live with Web Audio. Toggle with the speaker button by the radar.
-- **Music:** seven ambient space soundscapes, shuffled with quiet gaps between them, mixed under the game and ducked when danger or sleep takes over. Toggle with the note button under the speaker. The soundtrack (about 11 MB) downloads in the background on first play and is kept for offline play across updates.
-- **Graphics:** layered ground materials (soil, sand, rock, snow) blended per pixel with triplanar rock on slopes, wet shorelines, moss-capped rocks and fake contact shadows; height fog with sun glow and haze that hides the world's edge; drifting cloud shadows; denser wind-swept grass that glows when backlit; depth-tinted water with shore foam; rebuilt sky and clouds; planets with continents, coastlines, mountain ridges, swirling cloud bands and city lights on their night side; a smoother star glow; panel-line normals and grime on ships, stations and towns; and a per-planet colour grade, speed blur and edge smoothing in post.
-- **Wide systems, pulse drive and autopilot:** worlds sit 15–30K km apart, so a planet-to-planet hop takes about 1–2 minutes. Tap **PULSE** (above the throttle, or P) to light the pulse drive in open space; it's mass-locked near planets, the station and hostiles, burns a little fuel, and drops you out automatically on arrival. Tap the radar (or N) for **System Nav**: pick a planet or the station and the autopilot turns, pulses, drops out and lines you up over the town you're delivering to (or docks you at the station). Any stick input takes back control. Raiders can interdict you mid-pulse. Inside a planet's atmosphere, tap the radar for the planet map and tap a town or outpost: the autopilot cruises there (no boost), keeps clear of the terrain and sets you down on the pad. The top row, **Back to orbit**, climbs you straight out to space.
-- **Delivery routes:** tap a cargo line under your status panel (or any destination in System Nav or the planet map) and the autopilot chains every leg: warp if it's in another system, pulse across, drop into the atmosphere, cruise to the town and land on its pad, or fly in and dock at a station. Raiders and patrols pause the route and hand you control; it resumes once things are quiet. In a customs system you have not checked into, the route flies you through the customs hall first; if you are carrying contraband it asks whether to skip the hall and go straight to the drop. Touching the stick cancels it.
-- **CB radio:** other drivers chatter on channel 19: patrol and raider warnings for the system you're in, which station is paying top units, town gossip, and the odd word when you set out or arrive. Toggle it with the CB button.
-- **Space stations:** dock by autopilot in a hangar bay; trade, upgrade your ship and pick up contracts.
+
+### Your company
+- **Trucking company:** register your own company at any station, buy freighters, hire rookie, veteran or ace pilots and send ships on local runs or long hauls. They earn into the company account in real time, and at half rate for up to 8 hours while the game is closed. Collect earnings, repair worn ships and expand your head office from the station's Fleet tab. Fleet ships berth at the station pier and show on the departures board.
+
+### Worlds
 - **Open planet surfaces:** each planet is about 3 × 3 km, streamed in tiles as you fly (full detail nearby, simpler tiles further out). Where you dive in from orbit decides where you arrive.
 - **Settlements:** 1–2 habitable planets per system, each with 2–4 towns (landing pad, cargo terminal, residents); every other planet has 1–2 outposts (mining camps, research outposts, fuel depots). Short-hop contracts run between towns on the same planet.
 - **Planet map:** tap the radar (or press M) for a relief map with every town and outpost, your drops, your ship and a waypoint you can set.
-- **Procedural galaxy:** warp to seeded star systems with their own star, nebula and planet types (lush, ocean, desert, frozen, scorched, toxic, exotic).
 - **Living worlds:** day/night cycle, wildlife that grazes and flees, crystal deposits to mine and sell.
-- **Unreal-style rendering:** HDR pipeline with bloom, ACES tonemapping, lens flares, god rays, image-based lighting, shadows, wind-blown grass and eye adaptation.
+
+### Atmosphere
+- **CB radio:** other drivers chatter on channel 19: patrol and raider warnings for the system you're in, which station is paying top units, town gossip, and the odd word when you set out or arrive. Toggle it with the CB button.
+- **Sound:** a cockpit drone, station ambience, warehouse room tone and forklifts at the loading docks, town-square bustle, night crickets and gravel footsteps on foot, landing gear, warp spool-ups, whooshes, landing burns, re-entry roar and hatch sounds from recorded clips, plus an engine, wind and jetpack that follow your throttle and speed, and interface, customs, patrol and raider cues made live with Web Audio. Toggle with the speaker button by the radar.
+- **Music:** seven ambient space soundscapes, shuffled with quiet gaps between them, mixed under the game and ducked when danger or sleep takes over. Toggle with the note button under the speaker. The soundtrack (about 11 MB) downloads in the background on first play and is kept for offline play across updates.
+
+### Graphics
+- **Rendering:** HDR pipeline with bloom, ACES tonemapping, lens flares, god rays, image-based lighting, shadows and eye adaptation, plus a per-planet colour grade, speed blur and edge smoothing in post.
+- **Surfaces:** layered ground materials (soil, sand, rock, snow) blended per pixel with triplanar rock on slopes, wet shorelines, moss-capped rocks and fake contact shadows; height fog with sun glow; drifting cloud shadows; dense wind-swept grass that glows when backlit; depth-tinted water with shore foam.
+- **From orbit:** planets with continents, coastlines, mountain ridges, swirling cloud bands, rings and city lights on their night side.
 - **Scales to the device:** Low, High and Epic graphics settings plus automatic dynamic resolution.
 
-Progress (units, cargo, upgrades, current system) is saved in the browser's local storage.
+Progress (units, cargo, upgrades, fleet, current system) is saved in the browser's local storage.
+
+## 3D models
+
+Hand-made models live in `models/` as GLB files:
+
+| File | What it is |
+| --- | --- |
+| `skiff.glb`, `mule.glb`, `longhaul.glb`, `atlas.glb`, `rook_twinboom.glb` | The five player and fleet hulls |
+| `station_hub.glb`, `station_ring.glb` | The station's hub tower and spinning habitat wheel |
+| `berth.glb`, `loader_arm.glb` | Pier berth module and the robot clamp arm |
+| `customs_hall.glb`, `scanner_arch.glb` | The customs hall shell and the scanner arch over the scale |
+
+All of them share one look: worn white industrial plating, burnt-orange trim, dark gunmetal frames and hazard striping.
+
+**Adding or replacing a model:**
+1. Export a single object as GLB (one copy only, no turnaround sheet, no ground plane).
+2. Slim it to about 1 MB with [gltf-transform](https://gltf-transform.dev/): `simplify --ratio 0.02 --error 0.002`, `resize --width 1024 --height 1024`, then `jpeg --quality 82`.
+3. Ships are configured in `SHIP_MODELS` in `index.html`: file, scale, turn (`rotY`), the height below which triangles count as landing legs (`legY`), engine nozzle positions for the flames, nav-light tips, and optional tilting pods. A file that holds two copies can be trimmed with `clipY` and re-centred with `center`.
+4. Station pieces are configured in `ENV_MODELS` and placed by the station, pier and customs-hall builders.
+5. Add the file to `CORE` in `sw.js` and bump `VERSION`.
+
+The game ships its own engine flames, glows, nav lights and lights, so models don't need them baked in. Crates are part of the hull models, so hulls always look loaded.
+
+## Roadmap
+
+Planned, roughly in order:
+
+1. **Town growth.** Towns grow from outposts into towns and then cities as you deliver to them. Construction materials, prefab habitats and power cells count most. Each stage adds visible new districts with their own landing pads and businesses that need specific goods: a mining depot (drill heads, explosives), a farm co-op (water, seed stock), a clinic (medical supplies), a shipyard (alloys, engine parts), a market or bar (luxury goods). Bigger towns mean more jobs and better pay.
+2. **Investing in towns.** Put credits straight into a town to speed its growth and take a share, earning a small income for your company from the cities you helped build.
+3. **Freighters.** A capital ship that's both your company's headquarters and its biggest hauler:
+   - Flown with the same controls as your rigs, but heavy: slow turns, lots of momentum, long braking. Pulse and warp, but it can't enter an atmosphere or dock at a station.
+   - A hangar built from the same berth modules and clamp arms as the pier: launch your rig from it, run cargo down to the towns, and autopilot back in to dock.
+   - Park it in a system and it becomes your base: hired crews and their rigs work contracts from it there.
+   - The big growth jumps (town to city) need bulk construction loads only a freighter can bring into orbit; your rigs ferry it down.
+4. **Bulk hauling.** Large station-to-station contracts sized for a freighter's hold.
+5. **Upkeep, threats and upgrades for freighters.** Daily running costs (fuel, crew wages), raiders that target a parked freighter, and upgrades such as more hangar bays, cargo pods, crew quarters and a fuel refinery.
+6. **More decisions on the road.** Moments like the contraband prompt, so autopilot runs stay interesting: distress calls, pirate offers, fuel-versus-time shortcuts.
+
+Housekeeping along the way:
+- Load only the models needed at start (your ship and the station) and fetch the rest in the background, to keep the first download small on mobile data.
+- A phone performance pass around the station, the pier and the larger planets.
+- Split `index.html` into modules and restore an automated test run, so new features can't quietly break old ones.
 
 ## Sound credits
 
