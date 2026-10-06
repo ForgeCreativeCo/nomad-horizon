@@ -126,23 +126,32 @@ The game ships its own engine flames, glows, nav lights and lights, so models do
 
 ## Roadmap
 
-Planned, roughly in order:
+### Done recently
+- **Town growth:** outposts grow into settlements, towns and cities with district rings as you deliver to them. The rings are built in code from a town kit whose pieces each carry a 3D-model prompt ([docs/town-kit-prompts.md](docs/town-kit-prompts.md)), so models can be swapped in later.
+- **Business districts:** you choose a business for each plot (2 in a town, 5 in a city); each ships its own goods and pulls in the goods it needs. All deliveries still land at the town's one pad, by design.
 
-1. ~~**Town growth.**~~ Done: outposts grow into settlements, towns and cities with district rings, built in code from a town kit whose pieces each carry a 3D-model prompt ([docs/town-kit-prompts.md](docs/town-kit-prompts.md)) so models can be swapped in later.
-   ~~**Business districts.**~~ Done: you choose a business for each plot; each ships its own goods and pulls in the goods it needs. All deliveries still land at the town's one pad.
-2. **Investing in towns.** Put credits straight into a town to speed its growth and take a share, earning a small income for your company from the cities you helped build.
-3. **Freighters.** A capital ship that's both your company's headquarters and its biggest hauler:
+### Next up (in this order)
+1. **Investing in towns.**
+   - An **Invest** button on the Town tab turns credits into growth, so you can push a town toward its next stage without hauling every crate.
+   - Investing buys a share of the town. Shares pay a small income that grows with the town's stage and its businesses, paid into your company account (or to you if you haven't founded a company), including while the game is closed, like fleet earnings.
+   - The Town tab shows your stake and what it earns; a system overview lists every town you hold a share in.
+2. **Fleet runs grow towns.** Your hired crews' deliveries add a little growth to the towns on their routes, tying the company and the towns together.
+3. **Town kit models.** Generate the town pieces from [docs/town-kit-prompts.md](docs/town-kit-prompts.md) and swap them in: start with the town core and one ring-2 block to check the look in-game, then the rest of the blocks and the five business buildings.
+
+### After that
+4. **Freighters.** A capital ship that's both your company's headquarters and its biggest hauler:
    - Flown with the same controls as your rigs, but heavy: slow turns, lots of momentum, long braking. Pulse and warp, but it can't enter an atmosphere or dock at a station.
    - A hangar built from the same berth modules and clamp arms as the pier: launch your rig from it, run cargo down to the towns, and autopilot back in to dock.
    - Park it in a system and it becomes your base: hired crews and their rigs work contracts from it there.
    - The big growth jumps (town to city) need bulk construction loads only a freighter can bring into orbit; your rigs ferry it down.
-4. **Bulk hauling.** Large station-to-station contracts sized for a freighter's hold.
-5. **Upkeep, threats and upgrades for freighters.** Daily running costs (fuel, crew wages), raiders that target a parked freighter, and upgrades such as more hangar bays, cargo pods, crew quarters and a fuel refinery.
-6. **More decisions on the road.** Moments like the contraband prompt, so autopilot runs stay interesting: distress calls, pirate offers, fuel-versus-time shortcuts.
+5. **Bulk hauling.** Large station-to-station contracts sized for a freighter's hold.
+6. **Upkeep, threats and upgrades for freighters.** Daily running costs (fuel, crew wages), raiders that target a parked freighter, and upgrades such as more hangar bays, cargo pods, crew quarters and a fuel refinery.
+7. **More decisions on the road.** Moments like the contraband prompt, so autopilot runs stay interesting: distress calls, pirate offers, fuel-versus-time shortcuts.
 
-Housekeeping along the way:
+### Housekeeping along the way
 - ~~Load only the models needed at start and fetch the rest in the background.~~ Done: models are also meshopt-compressed (11.6 MB down to 4.7 MB).
-- Phone performance: static town and pier props are now merged to cut draw calls by about 40%. Still to check on a real phone: frame rate at towns at night and around the pier.
+- Phone performance: static town and pier props are merged to cut draw calls by about 40%. Still to check on a real phone: frame rate in cities (rings, traffic and lights), at night, and around the pier.
+- Tune town growth pace once it's been played (currently 30 / 70 / 160 growth per stage; construction ×3, business goods ×2).
 - Split `index.html` into modules and restore an automated test run, so new features can't quietly break old ones.
 
 ## Sound credits
