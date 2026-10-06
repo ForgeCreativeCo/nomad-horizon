@@ -77,6 +77,7 @@ Each freighter hull has its own turn rate and weight: the Skiff snaps into turns
 
 ### Your company
 - **Trucking company:** register your own company at any station, buy freighters, hire rookie, veteran or ace pilots and send ships on local runs or long hauls. They earn into the company account in real time, and at half rate for up to 8 hours while the game is closed. Collect earnings, repair worn ships and expand your head office from the station's Fleet tab. Fleet ships berth at the station pier and show on the departures board.
+- **Fleet runs grow towns:** every finished run drops at a town in the system you're in (long hauls sometimes cross to a neighbouring system), and about half of them add growth there (a quarter while you're away): 1 point, doubled for Longhaul and Atlas hulls and doubled again on long hauls. Each ship shows its last drop, the Town tab shows how much growth your company has brought, and a town your fleet levels up goes in the company log.
 
 ### Worlds
 - **Open planet surfaces:** each planet is about 3 × 3 km, streamed in tiles as you fly (full detail nearby, simpler tiles further out). Where you dive in from orbit decides where you arrive.
@@ -131,20 +132,20 @@ The game ships its own engine flames, glows, nav lights and lights, so models do
 - **Town growth:** outposts grow into settlements, towns and cities with district rings as you deliver to them. The rings are built in code from a town kit whose pieces each carry a 3D-model prompt ([docs/town-kit-prompts.md](docs/town-kit-prompts.md)), so models can be swapped in later.
 - **Business districts:** you choose a business for each plot (2 in a town, 5 in a city); each ships its own goods and pulls in the goods it needs. All deliveries still land at the town's one pad, by design.
 - **Investing in towns:** buy shares from the Town tab; every 150 units adds 1 growth, and your stake pays an hourly income that rises with the town's stage and businesses. Your holdings are listed on the Town tab and the station's Fleet tab.
+- **Fleet runs grow towns:** your hired crews' runs drop at towns in the system you're in and add a little growth, so a company and town shares pay off together.
 
 ### Next up (in this order)
-1. **Fleet runs grow towns.** Your hired crews' deliveries add a little growth to the towns on their routes, tying the company and the towns together.
-2. **Town kit models.** Generate the town pieces from [docs/town-kit-prompts.md](docs/town-kit-prompts.md) and swap them in: start with the town core and one ring-2 block to check the look in-game, then the rest of the blocks and the five business buildings.
+1. **Town kit models.** Generate the town pieces from [docs/town-kit-prompts.md](docs/town-kit-prompts.md) and swap them in: start with the town core and one ring-2 block to check the look in-game, then the rest of the blocks and the five business buildings.
 
 ### After that
-3. **Freighters.** A capital ship that's both your company's headquarters and its biggest hauler:
+2. **Freighters.** A capital ship that's both your company's headquarters and its biggest hauler:
    - Flown with the same controls as your rigs, but heavy: slow turns, lots of momentum, long braking. Pulse and warp, but it can't enter an atmosphere or dock at a station.
    - A hangar built from the same berth modules and clamp arms as the pier: launch your rig from it, run cargo down to the towns, and autopilot back in to dock.
    - Park it in a system and it becomes your base: hired crews and their rigs work contracts from it there.
    - The big growth jumps (town to city) need bulk construction loads only a freighter can bring into orbit; your rigs ferry it down.
-4. **Bulk hauling.** Large station-to-station contracts sized for a freighter's hold.
-5. **Upkeep, threats and upgrades for freighters.** Daily running costs (fuel, crew wages), raiders that target a parked freighter, and upgrades such as more hangar bays, cargo pods, crew quarters and a fuel refinery.
-6. **More decisions on the road.** Moments like the contraband prompt, so autopilot runs stay interesting: distress calls, pirate offers, fuel-versus-time shortcuts.
+3. **Bulk hauling.** Large station-to-station contracts sized for a freighter's hold.
+4. **Upkeep, threats and upgrades for freighters.** Daily running costs (fuel, crew wages), raiders that target a parked freighter, and upgrades such as more hangar bays, cargo pods, crew quarters and a fuel refinery.
+5. **More decisions on the road.** Moments like the contraband prompt, so autopilot runs stay interesting: distress calls, pirate offers, fuel-versus-time shortcuts.
 
 ### Housekeeping along the way
 - ~~Load only the models needed at start and fetch the rest in the background.~~ Done: models are also meshopt-compressed (11.6 MB down to 4.7 MB).

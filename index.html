@@ -3687,6 +3687,7 @@ function simFleet(mins, eff, quiet){
         if(roll<R.risk/P.skill){ s.cond=Math.max(0,s.cond-15); pay*=.5; var m=s.name+' · BREAKDOWN · HULL '+Math.round(s.cond)+'%'; fleetLog(m); if(!quiet) toast('FLEET · '+m); }
         else if(roll>1-.05*P.skill){ pay*=1.5; fleetLog(s.name+' · BONUS RUN · +'+fmt(pay)); }
         pay=Math.round(pay); s.earned+=pay; C.bank+=pay; total+=pay;
+        fleetDrop(s,eff,quiet);
         s.shift=(s.shift||0)+1; if(s.shift>=6){ s.shift=0; s.restLeft=6; fleetLog(s.name+' · '+s.pilot.name+' ON A REST BREAK'); }
         if(s.cond<=0){ fleetLog(s.name+' · GROUNDED · NEEDS REPAIR'); if(!quiet) toast('FLEET · '+s.name+' GROUNDED · NEEDS REPAIR'); }
       }
@@ -3711,7 +3712,6 @@ setInterval(function(){
 function coInitials(name){ var w=name.split(/\s+/).filter(Boolean); return ((w[0]||'X')[0]+((w[1]||w[0]||'X')[w[1]?0:1]||'X')).toUpperCase(); }
 function pilotName(){ var r=Math.random; return PILOT_FIRST[Math.floor(r()*PILOT_FIRST.length)]+' '+genWord(rng(Math.floor(r()*1e9)+1),2).toUpperCase(); }
 function fleetTierAt(k, def){ var C=state.company; return C && C.ships[k]?C.ships[k].tier:def; }
-try{ if(state.company) fleetCatchUp(); }catch(e){ console.error(e); }
 
 /* freight locations in the current system: the station plus each town */
 function stationLoc(){ return {key:SYS.seed+':S', kind:'station', name:SYS.station.name, planet:-1, sys:SYS.seed, sysName:SYS.name}; }
@@ -3812,14 +3812,15 @@ function townRec(loc){ var t=state.towns[loc.key]; if(t && !t.biz) t.biz=[]; ret
 function townLevel(loc){ return loc && loc.kind==='town' ? townRec(loc).lvl : 0; }
 function townProgress(loc){ var t=townRec(loc); return t.lvl>=3?1:clamp(t.g/TOWN_NEED[t.lvl],0,1); }
 function townTitle(loc){ var l=townLevel(loc); return l===0?(loc.label||'OUTPOST'):TOWN_LVLS[l]; }
-function growTown(loc, pts){
+function growTown(loc, pts, quiet){
   if(!loc || loc.kind!=='town' || !pts) return null;
   var t=state.towns[loc.key]=townRec(loc), up=null;
   if(t.lvl>=3) return null;
   t.g+=pts;
   while(t.lvl<3 && t.g>=TOWN_NEED[t.lvl]){ t.g-=TOWN_NEED[t.lvl]; t.lvl++; up=t.lvl; }
   if(t.lvl>=3) t.g=0;
-  if(up!=null){
+  if(up!=null && quiet) rebuildTownAt(loc);
+  else if(up!=null){
     var nm=TOWN_LVLS[up];
     setTimeout(function(){ toast(loc.name+' IS NOW A '+nm+(up>=2?' · NEW DISTRICT OPEN':''),'life'); sfx('confirm',.8); },900);
     CB.queue=cbPick([loc.name+' just made '+nm.toLowerCase()+'. Your loads did that, driver.','Hear that? '+loc.name+' is a '+nm.toLowerCase()+' now. More pads, more work.','Construction crews all over '+loc.name+'. Place is booming.']);
@@ -3880,6 +3881,20 @@ function holdingsHTML(curKey){
       '<small class="fx">~'+fmt(shareRate(t))+' units/hr</small></span></div>'; });
   return h;
 }
+/* Fleet runs grow towns: each finished run drops at a town in the system you're in (long hauls sometimes
+   cross to a neighbouring system), and about half of them add growth there; while you're away, a quarter. */
+function fleetDrop(s, eff, quiet){
+  var home=SYS||sysInfo(state.sysSeed), sy=home, r=Math.random;
+  if(s.route==='long' && r()<.4){ var nb=neighbourSeeds(home.seed,3); sy=sysInfo(nb[Math.floor(r()*nb.length)]); }
+  var L=sysSiteLocs(sy); if(!L.length) return;
+  var loc=L[Math.floor(r()*L.length)]; s.lastDrop=loc.name+(sy===home?'':' ('+sy.name+')');
+  if(r()>=.5*eff) return;
+  var t=state.towns[loc.key]=townRec(loc), pts=(s.tier>=2?2:1)*(s.route==='long'?2:1);
+  t.fleet=(t.fleet||0)+pts; t.name=loc.name; t.pname=loc.pname; t.sysName=loc.sysName;
+  var up=growTown(loc,pts,true);
+  if(up!=null){ var m=loc.name+' IS NOW A '+TOWN_LVLS[up]+' · YOUR FLEET HELPED'; fleetLog(m); if(!quiet) toast('FLEET · '+m,'life'); }
+}
+try{ if(state.company) fleetCatchUp(); }catch(e){ console.error(e); }
 try{ sharesCatchUp(); }catch(e){ console.error(e); }
 setInterval(function(){
   if(!holdings().length) return;
@@ -4325,7 +4340,8 @@ function renderTerminal(tab){
     h+='<div class="co-head"><span><b>'+loc.name+'</b><small>'+townTitle(loc)+(loc.outpost&&lv>0?' · FOUNDED AS A '+(loc.label||'OUTPOST'):'')+' · '+loc.pname+'</small></span></div>';
     h+='<div class="st-row"><span class="nm">'+(lv<3?'GROWTH TO '+TOWN_LVLS[lv+1]:'FULLY GROWN')+'<small>'+(lv<3?tr.g+' / '+need+' growth':'This is a city. Bigger boards, better pay.')+'</small>'+
       '<span class="gauge"><span class="bar"><i style="width:'+pct+'%;background:#c9a24a"></i></span><b>'+pct+'%</b></span></span></div>';
-    h+='<p class="st-note">Every crate you deliver here grows '+loc.name+'. <b>Construction</b> loads count triple, and growing towns post more of them on boards across the system.</p>';
+    h+='<p class="st-note">Every crate you deliver here grows '+loc.name+'. <b>Construction</b> loads count triple, and growing towns post more of them on boards across the system.'+(state.company?' Your company’s runs grow it too.':'')+'</p>';
+    if(tr.fleet) h+='<p class="st-note">'+(state.company?state.company.name:'Your fleet')+' has brought <b>'+fmt(tr.fleet)+' growth</b> to '+loc.name+'.</p>';
     var steps=[['SETTLEMENT','A full town core: more homes, more residents, a busier pad.'],['TOWN','A new district ring: housing and industry blocks, a ring road with traffic. More contracts, +16% pay.'],['CITY','An outer city ring of taller blocks. The biggest boards in the system, +24% pay.']];
     steps.forEach(function(st,i){ var at=i+1, done=lv>=at;
       h+='<div class="st-row upg'+(done?' hangar-on':'')+'"><span class="nm">'+st[0]+(done?'<span class="tag hi">BUILT</span>':'')+'<small>'+st[1]+'</small></span></div>'; });
@@ -4376,7 +4392,7 @@ function renderTerminal(tab){
         acts+='<button data-act="fsell" data-id="'+sh.id+'">'+(coConfirm===sh.id?'CONFIRM · +'+fmt(FLEET_PRICE[sh.tier]/2):'SELL')+'</button>';
         h+='<div class="st-row upg"><span class="nm">'+sh.name+' · '+HULL_NAMES[sh.tier]+'<span class="tag '+(st3==='GROUNDED'||st3==='NO PILOT'?'lock':'hi')+'">'+st3+'</span>'+
           '<small>'+(sh.pilot?'Pilot '+sh.pilot.name+' ('+PILOT_GRADES[sh.pilot.grade].name+', takes '+Math.round(PILOT_GRADES[sh.pilot.grade].cut*100)+'%)':'No pilot hired')+' · '+R.name+' · earned '+fmt(sh.earned)+'</small>'+
-          '<small class="fx">~'+fmt(fleetNet(sh)*60)+' units/hr · hull '+Math.round(sh.cond)+'%</small>'+
+          '<small class="fx">~'+fmt(fleetNet(sh)*60)+' units/hr · hull '+Math.round(sh.cond)+'%'+(sh.lastDrop?' · last drop '+sh.lastDrop:'')+'</small>'+
           '<span class="gauge"><span class="bar"><i style="width:'+Math.round(sh.cond)+'%;background:'+(sh.cond<35?'#ff5a3c':sh.cond<65?'#ffb24d':'#e7e1d2')+'"></i></span>'+
           '<span class="bar"><i style="width:'+Math.round(sh.runT/R.len*100)+'%;background:#a9c27c"></i></span></span></span>'+
           '<span class="acts wrap">'+acts+'</span></div>';
@@ -4389,7 +4405,7 @@ function renderTerminal(tab){
       h+='<div class="st-sub">HEAD OFFICE</div>';
       h+='<div class="st-row upg"><span class="nm">OFFICE LEVEL '+(C.office+1)+'<small>Room for '+cap3+' ships'+(C.office<OFFICE_COST.length?' · next level fits '+OFFICE_CAP[C.office+1]:'')+'</small></span><span class="acts">'+
         (C.office<OFFICE_COST.length?'<button class="pri" data-act="cooffice"'+(state.credits>=OFFICE_COST[C.office]?'':' disabled')+'>'+fmt(OFFICE_COST[C.office])+' UNITS</button>':'<span class="maxed">MAXED</span>')+'</span></div>';
-      h+='<p class="st-note">Local runs are steady and gentle on hulls. Long hauls pay about 55% more but wear ships twice as fast and break down more. Better pilots earn more and break down less, but take a bigger cut.</p>';
+      h+='<p class="st-note">Local runs are steady and gentle on hulls. Long hauls pay about 55% more but wear ships twice as fast and break down more. Better pilots earn more and break down less, but take a bigger cut. Every run drops at a town in the system you’re in (long hauls sometimes cross to a neighbouring system) and helps it grow; Longhaul and Atlas hulls on long hauls help most.</p>';
       h+=holdingsHTML(null);
       if(C.log.length) h+='<div class="st-sub">COMPANY LOG</div><div class="co-log">'+C.log.join('<br>')+'</div>';
     }
