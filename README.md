@@ -86,7 +86,9 @@ Each freighter hull has its own turn rate and weight: the Skiff snaps into turns
 - **Music:** seven ambient space soundscapes, shuffled with quiet gaps between them, mixed under the game and ducked when danger or sleep takes over. Toggle with the note button under the speaker. The soundtrack (about 11 MB) downloads in the background on first play and is kept for offline play across updates.
 
 ### Graphics
-- **Rendering:** HDR pipeline with bloom, ACES tonemapping, lens flares, god rays, image-based lighting, shadows and eye adaptation, plus a per-planet colour grade, speed blur and edge smoothing in post.
+- **Look:** grounded, gritty realism. One hard star light in space with near-black shadow sides and only planet-shine as fill; harsh glare, haze and dust on the ground; a muted world where saturated colour comes from working lights, warning strobes, engines and screens.
+- **Rendering:** HDR pipeline with a filmic (AgX-style) curve that lets highlights clip like a real camera, one restrained colour grade, bloom, god rays in atmosphere only, film grain, lens dirt and vignette (no lens-flare ghosts), image-based lighting, shadows and partial eye adaptation.
+- **Weather and wear:** each planet type has its own weather (dust storms, wind-driven rain, snow, ash fall with dry lightning, toxic haze) that builds and breaks; your hull shows chipped paint, rust and soot as its condition drops and comes back clean after a repair; re-entry heat, landing dust and camera shake give the rig weight.
 - **Surfaces:** layered ground materials (soil, sand, rock, snow) blended per pixel with triplanar rock on slopes, wet shorelines, moss-capped rocks and fake contact shadows; height fog with sun glow; drifting cloud shadows; dense wind-swept grass that glows when backlit; depth-tinted water with shore foam.
 - **From orbit:** planets with continents, coastlines, mountain ridges, swirling cloud bands, rings and city lights on their night side.
 - **Scales to the device:** Low, High and Epic graphics settings plus automatic dynamic resolution.
@@ -108,10 +110,12 @@ All of them share one look: worn white industrial plating, burnt-orange trim, da
 
 **Adding or replacing a model:**
 1. Export a single object as GLB (one copy only, no turnaround sheet, no ground plane).
-2. Slim it to about 1 MB with [gltf-transform](https://gltf-transform.dev/): `simplify --ratio 0.02 --error 0.002`, `resize --width 1024 --height 1024`, then `jpeg --quality 82`.
+2. Slim it with [gltf-transform](https://gltf-transform.dev/): `simplify --ratio 0.02 --error 0.002`, `resize --width 1024 --height 1024`, `jpeg --quality 82`, then `meshopt` (compresses and quantizes the geometry; a model ends up around 0.3–0.5 MB). The game decodes it with three.js's meshopt decoder.
 3. Ships are configured in `SHIP_MODELS` in `index.html`: file, scale, turn (`rotY`), the height below which triangles count as landing legs (`legY`), engine nozzle positions for the flames, nav-light tips, and optional tilting pods. A file that holds two copies can be trimmed with `clipY` and re-centred with `center`.
 4. Station pieces are configured in `ENV_MODELS` and placed by the station, pier and customs-hall builders.
 5. Add the file to `CORE` in `sw.js` and bump `VERSION`.
+
+**Loading:** at boot the game waits only for the station pieces and your current rig. The other hulls stream in one at a time afterwards; any rig that was built from the procedural stand-in while its model was still loading is swapped for the model in place. On the Low graphics setting model textures are halved to save phone memory.
 
 The game ships its own engine flames, glows, nav lights and lights, so models don't need them baked in. Crates are part of the hull models, so hulls always look loaded.
 
@@ -131,8 +135,8 @@ Planned, roughly in order:
 6. **More decisions on the road.** Moments like the contraband prompt, so autopilot runs stay interesting: distress calls, pirate offers, fuel-versus-time shortcuts.
 
 Housekeeping along the way:
-- Load only the models needed at start (your ship and the station) and fetch the rest in the background, to keep the first download small on mobile data.
-- A phone performance pass around the station, the pier and the larger planets.
+- ~~Load only the models needed at start and fetch the rest in the background.~~ Done: models are also meshopt-compressed (11.6 MB down to 4.7 MB).
+- Phone performance: static town and pier props are now merged to cut draw calls by about 40%. Still to check on a real phone: frame rate at towns at night and around the pier.
 - Split `index.html` into modules and restore an automated test run, so new features can't quietly break old ones.
 
 ## Sound credits

@@ -557,6 +557,7 @@ body.mapopen #joywrap,body.mapopen #actions,body.mapopen #throttle{visibility:hi
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/RenderPass.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/libs/meshopt_decoder.js"></script>
 <script>
 (function(){
 'use strict';
@@ -1535,14 +1536,82 @@ var SHIP_MODELS={
      pods:[[.193,.011,-.329,-.065,.052],[.193,.011,.329,-.065,.052],[-.273,.028,-.31,-.045,.052],[-.273,.028,.32,-.045,.052]]}
 };
 var SHIP_GLB={};
+/* Model loading. The GLB files are meshopt-compressed (about 60% smaller), so they are decoded here and turned
+   back into plain float geometry before the hull and station builders touch them.
+   Boot waits only for what the first screen needs: the station set pieces and your current rig. The other hulls
+   stream in afterwards, and any rig already built from the procedural fallback is swapped for its model in place. */
+var GLB_LOADER=null, SHIP_FAILED={};
+function glbLoader(){
+  if(GLB_LOADER || !THREE.GLTFLoader) return GLB_LOADER;
+  GLB_LOADER=new THREE.GLTFLoader();
+  if(typeof MeshoptDecoder!=='undefined') GLB_LOADER.setMeshoptDecoder(MeshoptDecoder);
+  return GLB_LOADER;
+}
+// quantized attributes (int16 positions, int8 normals) back to float, so applyMatrix4 and the splitters work unchanged
+function floatGeometry(geo){
+  Object.keys(geo.attributes).forEach(function(name){ var a=geo.attributes[name];
+    if(a.array instanceof Float32Array && !a.isInterleavedBufferAttribute) return;
+    // r128's getX returns the raw integers, so undo the normalisation here
+    var n=a.count, sz=a.itemSize, out=new Float32Array(n*sz), arr=a.isInterleavedBufferAttribute?a.data.array:a.array, k=1, signed=false;
+    if(a.normalized){ if(arr instanceof Int8Array){ k=127; signed=true; } else if(arr instanceof Uint8Array){ k=255; } else if(arr instanceof Int16Array){ k=32767; signed=true; } else if(arr instanceof Uint16Array){ k=65535; } }
+    var get=[a.getX,a.getY,a.getZ,a.getW];
+    for(var i=0;i<n;i++) for(var c=0;c<sz;c++){ var v=get[c].call(a,i)/k; out[i*sz+c]=signed?Math.max(v,-1):v; }
+    geo.setAttribute(name,new THREE.BufferAttribute(out,sz)); });
+  return geo;
+}
+// low tier: halve model textures (a quarter of the graphics memory)
+function lowTex(map){
+  if(!map || qKey!=='low' || !map.image || !map.image.width || map.image.width<=512) return map;
+  var c=document.createElement('canvas'); c.width=map.image.width>>1; c.height=map.image.height>>1; c.getContext('2d').drawImage(map.image,0,0,c.width,c.height);
+  map.image=c; map.needsUpdate=true; return map;
+}
+function loadGLB(url){ return new Promise(function(res){ var L=glbLoader(); if(!L) return res(null); L.load(url,function(gl){ res(gl); },undefined,function(){ res(null); }); }); }
+function loadShipModel(k){
+  if(SHIP_GLB[k] || !SHIP_MODELS[k]) return Promise.resolve();
+  return loadGLB(SHIP_MODELS[k].url).then(function(gl){
+    if(!gl){ SHIP_FAILED[k]=1; dropPending(+k); return; }
+    try{ SHIP_GLB[k]=prepShipModel(gl,SHIP_MODELS[k]); upgradeHulls(+k); }catch(e){ console.warn('ship model',k,e); SHIP_FAILED[k]=1; dropPending(+k); } });
+}
+function loadEnvModel(k){
+  return loadGLB(ENV_MODELS[k].url).then(function(gl){ if(!gl) return; try{ ENV_GLB[k]=prepEnvModel(gl,ENV_MODELS[k]); }catch(e){ console.warn('env model',k,e); } });
+}
 function loadShipModels(){
-  if(!THREE.GLTFLoader) return Promise.resolve();
-  var L=new THREE.GLTFLoader();
-  var all=Object.keys(SHIP_MODELS).map(function(k){ var cfg=SHIP_MODELS[k];
-    return new Promise(function(res){ L.load(cfg.url,function(gl){ try{ SHIP_GLB[k]=prepShipModel(gl,cfg); }catch(e){ console.warn('ship model',k,e); } res(); },undefined,function(){ res(); }); }); });
-  var env=Object.keys(ENV_MODELS).map(function(k){ var cfg=ENV_MODELS[k];
-    return new Promise(function(res){ L.load(cfg.url,function(gl){ try{ ENV_GLB[k]=prepEnvModel(gl,cfg); }catch(e){ console.warn('env model',k,e); } res(); },undefined,function(){ res(); }); }); });
-  return Promise.race([Promise.all(all.concat(env)), new Promise(function(r){ setTimeout(r,20000); })]);
+  if(!glbLoader()) return Promise.resolve();
+  var mine=String(hullTier());
+  var first=Object.keys(ENV_MODELS).map(loadEnvModel).concat(SHIP_MODELS[mine]?[loadShipModel(mine)]:[]);
+  var ready=(typeof MeshoptDecoder!=='undefined' && MeshoptDecoder.ready)?MeshoptDecoder.ready:Promise.resolve();
+  return ready.then(function(){ return Promise.race([Promise.all(first), new Promise(function(r){ setTimeout(r,20000); })]); });
+}
+// after boot: the rest of the hulls, one at a time so they don't compete with the first screen
+function streamShipModels(){
+  var rest=Object.keys(SHIP_MODELS).filter(function(k){ return !SHIP_GLB[k]; });
+  rest.reduce(function(p,k){ return p.then(function(){ return loadShipModel(k); }); }, Promise.resolve());
+}
+/* fallback rigs waiting for their model: swapped in place, so every reference to the rig stays valid */
+var PENDING_HULLS=[];
+function hullAlive(g){ var r=g; while(r.parent) r=r.parent; return !!r.isScene; }
+function dropPending(tier){ PENDING_HULLS=PENDING_HULLS.filter(function(g){ return g.userData.tier!==tier; }); }
+function upgradeHulls(tier){
+  PENDING_HULLS=PENDING_HULLS.filter(function(g){
+    if(g.userData.tier!==tier) return true;
+    if(hullAlive(g)) swapHullParts(g);
+    return false; });
+}
+function swapHullParts(g){
+  var ou=g.userData, nh=buildHullCore(ou.tier, ou.landedBuilt, ou.wearU);
+  var legsVis=ou.legs.length?ou.legs[0].visible:ou.landedBuilt, fly=ou.flames.length?ou.flames[0].visible:!ou.landedBuilt;
+  var hot=!!(ou.throat && ou.throat.color.r>1);
+  if(ou.plasma){ g.remove(ou.plasma); disposeObject(ou.plasma); }
+  g.children.filter(function(c){ return c.userData.hullPart; }).forEach(function(c){ g.remove(c); disposeObject(c); });
+  nh.children.slice().forEach(function(c){ c.userData.hullPart=true; g.add(c); });
+  var keep={}; Object.keys(ou).forEach(function(k){ if(!(k in nh.userData) && k!=='plasma') keep[k]=ou[k]; });
+  g.userData=Object.assign(keep, nh.userData, {wearU:ou.wearU, landedBuilt:ou.landedBuilt});
+  g.userData.legs.forEach(function(l){ l.visible=legsVis; });
+  g.userData.flames.concat(g.userData.glows).forEach(function(f){ f.visible=fly; });
+  g.userData.tilts.forEach(function(p){ p.rotation.x=fly?-Math.PI/2:0; });
+  setThroat(g,hot);
+  if(legsVis) g.position.y+=(g.userData.gear-ou.gear)*g.scale.y;
+  if(g===ship || (S && g===S.ship)) updateHullCargo();
 }
 /* ---- station set pieces (customs hall, scanner arch, berth module, loader arm) ----
    Each is kept in its own model units; placement code scales it. Missing files fall back to the procedural build. */
@@ -1560,8 +1629,8 @@ var ENV_GLB={};
 function prepEnvModel(gl,cfg){
   gl.scene.updateMatrixWorld(true);
   var mesh=null; gl.scene.traverse(function(o){ if(o.isMesh && !mesh) mesh=o; });
-  var geo=mesh.geometry.clone(); geo.applyMatrix4(mesh.matrixWorld);
-  var map=mesh.material.map||null; if(map){ map.anisotropy=maxAniso; tud(map).shared=true; }
+  var geo=floatGeometry(mesh.geometry.clone()); geo.applyMatrix4(mesh.matrixWorld);
+  var map=lowTex(mesh.material.map||null); if(map){ map.anisotropy=maxAniso; tud(map).shared=true; }
   var mat=new THREE.MeshStandardMaterial({map:map, roughness:.62, metalness:.28, envMapIntensity:.9});
   var D={geo:geo, mat:mat};
   if(cfg.split!=null){
@@ -1584,7 +1653,7 @@ function envPiece(k,sx,sy,sz,rotY){
 function prepShipModel(gl,cfg){
   gl.scene.updateMatrixWorld(true);
   var mesh=null; gl.scene.traverse(function(o){ if(o.isMesh && !mesh) mesh=o; });
-  var geo=mesh.geometry.clone(); geo.applyMatrix4(mesh.matrixWorld);
+  var geo=floatGeometry(mesh.geometry.clone()); geo.applyMatrix4(mesh.matrixWorld);
   // some exports are turnaround sheets with two copies: keep one (clipY) and centre it (center)
   if(cfg.clipY){ var p0=geo.attributes.position, ix=geo.index.array, keep=[];
     for(var q=0;q<ix.length;q+=3){ var cy=(p0.getY(ix[q])+p0.getY(ix[q+1])+p0.getY(ix[q+2]))/3; if(cy>cfg.clipY[0] && cy<cfg.clipY[1]) keep.push(ix[q],ix[q+1],ix[q+2]); }
@@ -1600,7 +1669,7 @@ function prepShipModel(gl,cfg){
   var X=new THREE.Matrix4().makeRotationY(cfg.rotY||0).multiply(new THREE.Matrix4().makeScale(cfg.scale,cfg.scale,cfg.scale));
   geo.applyMatrix4(X);
   function part(list){ var g=new THREE.BufferGeometry(); g.setAttribute('position',geo.attributes.position); g.setAttribute('normal',geo.attributes.normal); if(geo.attributes.uv) g.setAttribute('uv',geo.attributes.uv); g.setIndex(list); g.computeBoundingSphere(); g.computeBoundingBox(); return g; }
-  var map=mesh.material.map||null; if(map){ map.anisotropy=maxAniso; tud(map).shared=true; }
+  var map=lowTex(mesh.material.map||null); if(map){ map.anisotropy=maxAniso; tud(map).shared=true; }
   var P=function(v){ return new THREE.Vector3(v[0],v[1],v[2]).applyMatrix4(X); };
   var D={body:part(body), legs:part(legs), map:map, cfg:cfg, gear:-bb0.min.y*cfg.scale,
     pods:(cfg.pods||[]).map(function(pd,k){ var c=P(pd), gq=part(pods[k]).clone(); gq.translate(-c.x,-c.y,-c.z); gq.computeBoundingSphere(); tud(gq).shared=true; return {geo:gq, c:c, drop:(pd[1]-pd[3])*cfg.scale, r:pd[4]*cfg.scale*.6}; }),
@@ -1649,6 +1718,14 @@ function buildHullGLB(tier, landed, wearU){
   return g;
 }
 function buildHull(tier, landed, wearU){
+  if(!wearU) wearU={value:.3+Math.random()*.45};   // other rigs are always a bit beaten up
+  var g=buildHullCore(tier, landed, wearU);
+  g.children.forEach(function(c){ c.userData.hullPart=true; });
+  g.userData.wearU=wearU; g.userData.landedBuilt=!!landed;
+  if(!g.userData.modelled && SHIP_MODELS[tier] && !SHIP_FAILED[tier]) PENDING_HULLS.push(g);
+  return g;
+}
+function buildHullCore(tier, landed, wearU){
   if(SHIP_GLB[tier]) return buildHullGLB(tier, landed, wearU);
   if(!wearU) wearU={value:.3+Math.random()*.45};   // other rigs are always a bit beaten up
   var MT=hullMats(wearU), g=new THREE.Group(), flames=[], glows=[], legs=[], tilts=[], cargo=[];
@@ -2315,7 +2392,8 @@ async function buildSurface(idx){
   var dA=detailAlbedo.clone(); dA.userData={}; dA.needsUpdate=true; dA.repeat.set(1,1);
   var dN=detailNormal.clone(); dN.userData={}; dN.needsUpdate=true; dN.repeat.set(1,1);
   var terrainMat=terrainMaterial(b, !!b.water);
-  var rgeo=new THREE.IcosahedronGeometry(1,3), rp=rgeo.attributes.position, vv=new THREE.Vector3();
+  var EP=qKey==='epic';   // rocks and flora are instanced by the thousand: keep the per-instance mesh light below Epic
+  var rgeo=new THREE.IcosahedronGeometry(1,EP?3:2), rp=rgeo.attributes.position, vv=new THREE.Vector3();
   for(k=0;k<rp.count;k++){ vv.fromBufferAttribute(rp,k); var nn=.7+fbm(vv.x*1.3+idx,vv.y*1.3+vv.z*1.1,4)*.6; vv.multiplyScalar(nn); rp.setXYZ(k,vv.x,vv.y*.7,vv.z); }
   rgeo.computeVertexNormals();
   var rA=detailAlbedo.clone(); rA.userData={}; rA.needsUpdate=true; rA.repeat.set(3,3);
@@ -2324,12 +2402,12 @@ async function buildSurface(idx){
   var trunkGeo=new THREE.CylinderGeometry(.18,.42,1,10,4); trunkGeo.translate(0,.5,0);
   var tpos=trunkGeo.attributes.position; for(k=0;k<tpos.count;k++){ var ty=tpos.getY(k); tpos.setX(k,tpos.getX(k)+Math.sin(ty*2.4)*.18*ty); }
   trunkGeo.computeVertexNormals();
-  var capGeo=new THREE.SphereGeometry(1,24,12,0,TAU,0,Math.PI*.5); capGeo.scale(1,.42,1);
+  var capGeo=new THREE.SphereGeometry(1,EP?24:14,EP?12:7,0,TAU,0,Math.PI*.5); capGeo.scale(1,.42,1);
   var crysCol=lin(b.crystal), crysGeo=new THREE.OctahedronGeometry(.5,0); crysGeo.scale(.6,2.2,.6);
   var assets={terrainMat:terrainMat, rockGeo:rgeo, rockMat:rockMat,
     trunkGeo:trunkGeo, trunkMat:new THREE.MeshStandardMaterial({color:lin(b.trunk), roughness:.8, normalMap:rN}),
     capGeo:capGeo, capMat:translucent(new THREE.MeshStandardMaterial({color:lin(b.cap), roughness:.55, emissive:lin(b.cap), emissiveIntensity:.18, side:THREE.DoubleSide}),1.1),
-    bulbGeo:new THREE.SphereGeometry(.16,12,8), bulbMat:new THREE.MeshBasicMaterial({color:lin(b.bulb).multiplyScalar(5)}),
+    bulbGeo:new THREE.SphereGeometry(.16,6,4), bulbMat:new THREE.MeshBasicMaterial({color:lin(b.bulb).multiplyScalar(5)}),
     crysGeo:crysGeo, crysMat:new THREE.MeshStandardMaterial({color:crysCol.clone().lerp(new THREE.Color(.05,.05,.05),.55), emissive:crysCol, emissiveIntensity:.9, roughness:.18, metalness:.3, envMapIntensity:1.6}),
     poolGeo:new THREE.PlaneGeometry(9,9), poolMat:new THREE.MeshBasicMaterial({map:glowTex, color:crysCol.clone().multiplyScalar(1.4), transparent:true, blending:THREE.AdditiveBlending, depthWrite:false}),
     markerMat:new THREE.SpriteMaterial({map:glowTex, color:crysCol.clone().multiplyScalar(3), blending:THREE.AdditiveBlending, depthWrite:false, depthTest:false, transparent:true}),
@@ -2452,12 +2530,62 @@ var POOL_FS='uniform vec3 color; uniform float k; varying vec2 vUv; void main(){
 var CONE_FS='uniform vec3 color; uniform float k; varying vec2 vUv; void main(){ float y=vUv.y; float a=pow(y,2.2)*0.02; gl_FragColor=vec4(color*max(a,0.0)*k,1.0); }';
 var UV_VS='varying vec2 vUv; void main(){ vUv=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }';
 function lightPool(par,x,y,z,rad,col,list,cone){
-  var U={color:{value:col}, k:{value:0}};
-  var m=new THREE.Mesh(new THREE.PlaneGeometry(rad*2,rad*2), new THREE.ShaderMaterial({uniforms:U, vertexShader:UV_VS, fragmentShader:POOL_FS, transparent:true, blending:THREE.AdditiveBlending, depthWrite:false, polygonOffset:true, polygonOffsetFactor:-4}));
+  // one material per light colour per town, so the merge pass below can draw all pools of a colour at once
+  list.mats=list.mats||{}; var key=col.getHexString(), M=list.mats[key];
+  if(!M){ var U={color:{value:col}, k:{value:0}}; list.push(U);
+    M=list.mats[key]={U:U, pool:new THREE.ShaderMaterial({uniforms:U, vertexShader:UV_VS, fragmentShader:POOL_FS, transparent:true, blending:THREE.AdditiveBlending, depthWrite:false, polygonOffset:true, polygonOffsetFactor:-4}),
+      cone:new THREE.ShaderMaterial({uniforms:U, vertexShader:UV_VS, fragmentShader:CONE_FS, transparent:true, blending:THREE.AdditiveBlending, depthWrite:false, side:THREE.DoubleSide})}; }
+  var m=new THREE.Mesh(new THREE.PlaneGeometry(rad*2,rad*2), M.pool);
   m.rotation.x=-Math.PI/2; m.position.set(x,y+.06,z); m.renderOrder=2; par.add(m);
-  if(cone && Q.wx>0){ var cn=new THREE.Mesh(new THREE.CylinderGeometry(.3,rad*.75,cone,16,1,true), new THREE.ShaderMaterial({uniforms:U, vertexShader:UV_VS, fragmentShader:CONE_FS, transparent:true, blending:THREE.AdditiveBlending, depthWrite:false, side:THREE.DoubleSide}));
-    cn.position.set(x,y+cone/2,z); par.add(cn); }
-  list.push(U); return U;
+  if(cone && Q.wx>0){ var cn=new THREE.Mesh(new THREE.CylinderGeometry(.3,rad*.75,cone,16,1,true), M.cone); cn.position.set(x,y+cone/2,z); par.add(cn); }
+  return M.U;
+}
+/* Draw-call merge: static meshes inside a built group that share a material become one mesh.
+   Skipped: anything flagged userData.dyn (it moves), rigs (they can be swapped for models), shared model geometry,
+   instanced meshes, and see-through materials other than additive light. Mobile GPUs choke on draw calls long
+   before triangles, and towns and the pier were hundreds of tiny boxes. */
+var MG_M=new THREE.Matrix4(), MG_N=new THREE.Matrix3();
+function mergeStatic(root){
+  root.updateMatrixWorld(true);
+  var inv=new THREE.Matrix4().copy(root.matrixWorld).invert(), groups={}, order=[];
+  (function walk(o){
+    if(o!==root && (o.userData.dyn || o.userData.tier!==undefined)) return;
+    if(o.isMesh && !o.isInstancedMesh && !o.isSkinnedMesh && o.visible && !Array.isArray(o.material) && o.geometry && o.geometry.attributes.position && o.geometry.attributes.normal
+       && !(o.geometry.userData && o.geometry.userData.shared) && o.frustumCulled && !o.morphTargetInfluences
+       && (!o.material.transparent || o.material.blending===THREE.AdditiveBlending)){
+      var a=o.geometry.attributes, sig=o.material.uuid+'|'+(o.castShadow?1:0)+(o.receiveShadow?1:0)+'|'+o.renderOrder+'|'+(a.uv?1:0)+(a.color?1:0);
+      if(!groups[sig]){ groups[sig]=[]; order.push(sig); } groups[sig].push(o);
+    }
+    o.children.slice().forEach(walk);
+  })(root);
+  var merged=0, removed=0;
+  order.forEach(function(sig){
+    var list=groups[sig]; if(list.length<2) return;
+    var nv=0, ni=0; list.forEach(function(m){ var g=m.geometry; nv+=g.attributes.position.count; ni+=g.index?g.index.count:g.attributes.position.count; });
+    var hasUV=!!list[0].geometry.attributes.uv, hasC=!!list[0].geometry.attributes.color;
+    var P=new Float32Array(nv*3), N=new Float32Array(nv*3), UVa=hasUV?new Float32Array(nv*2):null, C=hasC?new Float32Array(nv*3):null, I=nv>65535?new Uint32Array(ni):new Uint16Array(ni);
+    var vo=0, io=0, v=new THREE.Vector3();
+    list.forEach(function(m){
+      var g=m.geometry, pa=g.attributes.position, na=g.attributes.normal, ua=g.attributes.uv, ca=g.attributes.color;
+      MG_M.multiplyMatrices(inv,m.matrixWorld); MG_N.getNormalMatrix(MG_M);
+      for(var i=0;i<pa.count;i++){
+        v.fromBufferAttribute(pa,i).applyMatrix4(MG_M); P[(vo+i)*3]=v.x; P[(vo+i)*3+1]=v.y; P[(vo+i)*3+2]=v.z;
+        v.fromBufferAttribute(na,i).applyMatrix3(MG_N).normalize(); N[(vo+i)*3]=v.x; N[(vo+i)*3+1]=v.y; N[(vo+i)*3+2]=v.z;
+        if(UVa){ UVa[(vo+i)*2]=ua.getX(i); UVa[(vo+i)*2+1]=ua.getY(i); }
+        if(C){ C[(vo+i)*3]=ca.getX(i); C[(vo+i)*3+1]=ca.getY(i); C[(vo+i)*3+2]=ca.getZ(i); }
+      }
+      if(g.index){ var ix=g.index.array; for(var k=0;k<ix.length;k++) I[io+k]=ix[k]+vo; io+=ix.length; }
+      else { for(var k2=0;k2<pa.count;k2++) I[io+k2]=vo+k2; io+=pa.count; }
+      vo+=pa.count;
+    });
+    var geo=new THREE.BufferGeometry(); geo.setAttribute('position',new THREE.BufferAttribute(P,3)); geo.setAttribute('normal',new THREE.BufferAttribute(N,3));
+    if(UVa) geo.setAttribute('uv',new THREE.BufferAttribute(UVa,2)); if(C) geo.setAttribute('color',new THREE.BufferAttribute(C,3));
+    geo.setIndex(new THREE.BufferAttribute(I,1)); geo.computeBoundingSphere(); geo.computeBoundingBox();
+    var mm=new THREE.Mesh(geo,list[0].material); mm.castShadow=list[0].castShadow; mm.receiveShadow=list[0].receiveShadow; mm.renderOrder=list[0].renderOrder;
+    root.add(mm); merged++;
+    list.forEach(function(m){ if(m.parent) m.parent.remove(m); m.geometry.dispose(); removed++; });
+  });
+  return {merged:merged, removed:removed};
 }
 var TOWN_SUF=[' LANDING',' CROSSING',"'S REST",' DEPOT',' HAVEN',' POINT',' JUNCTION'];
 function townName(seed){ var r=rng(ihash(seed,8080)); return genWord(r,2).toUpperCase()+TOWN_SUF[Math.floor(r()*TOWN_SUF.length)]; }
@@ -2541,7 +2669,7 @@ function buildTown(scene, b, site){
     lightPool(g,fx*.45,hs+.72,fz*.45,8,new THREE.Color(.17,.155,.13),pools,Q.godrays>=24?10.5:0); });
   // a second mast with an obstruction light, and a parked ground crawler
   mesh(new THREE.CylinderGeometry(.22,.4,16,6),dark,22,hs+8,-14); var red2=mesh(new THREE.SphereGeometry(.35,8,6),new THREE.MeshBasicMaterial({color:new THREE.Color(4,.3,.2)}),22,hs+16.3,-14,false);
-  var crawler=new THREE.Group(); crawler.position.set(-14,hs,7); crawler.rotation.y=.7; g.add(crawler);
+  var crawler=new THREE.Group(); crawler.userData.dyn=true; crawler.position.set(-14,hs,7); crawler.rotation.y=.7; g.add(crawler);
   [[0,.9,0,3.8,1.2,2.2,dark],[ -.6,2.1,0,1.8,1.2,2.0,accent],[1.0,1.8,0,1.8,.6,2.0,hull]].forEach(function(b0){ var m=new THREE.Mesh(new THREE.BoxGeometry(b0[3],b0[4],b0[5]),b0[6]); m.position.set(b0[0],b0[1],b0[2]); m.castShadow=m.receiveShadow=true; crawler.add(m); });
   [-1.3,0,1.3].forEach(function(wx){ [-1,1].forEach(function(sd){ var w=new THREE.Mesh(new THREE.CylinderGeometry(.55,.55,.4,12),dark); w.rotation.x=Math.PI/2; w.position.set(wx,.55,sd*1.15); crawler.add(w); }); });
   var crawlLamp=new THREE.Mesh(new THREE.SphereGeometry(.16,8,6),new THREE.MeshBasicMaterial({color:new THREE.Color(3.4,1.6,.3)})); crawlLamp.position.set(-.6,2.8,0); crawler.add(crawlLamp);
@@ -2557,7 +2685,7 @@ function buildTown(scene, b, site){
     var hm=new THREE.Mesh(headGeo,sm); hm.position.y=1.58; ng.add(hm);
     var vm=new THREE.Mesh(visorGeo,visorMat); vm.position.set(0,1.6,.18); ng.add(vm);
     var st=doors[Math.floor(R()*doors.length)];
-    ng.position.set(st.x,hs,st.y); g.add(ng);
+    ng.position.set(st.x,hs,st.y); ng.userData.dyn=true; g.add(ng);
     npcs.push({obj:ng, pos:st.clone(), target:doors[Math.floor(R()*doors.length)].clone(), wait:R()*4, speed:1.1+R()*.6, ph:R()*TAU});
   }
   // amber locator column, seen from the air
@@ -2567,6 +2695,7 @@ function buildTown(scene, b, site){
     fragmentShader:'uniform vec3 color; uniform float time, fade; varying vec2 vUv; void main(){ float y=vUv.y; float a=pow(1.0-y,1.6)*(0.75+0.25*sin(time*2.0-y*40.0)); gl_FragColor=vec4(color*a*fade,1.0); }',
     transparent:true, blending:THREE.AdditiveBlending, depthWrite:false, side:THREE.DoubleSide}));
   beacon.geometry.translate(0,.5,0); beacon.frustumCulled=false; beacon.position.set(site.x,hs,site.z); scene.add(beacon);
+  mergeStatic(g);
   return {name:site.name, label:site.label, outpost:op, j:site.j, x:site.x, z:site.z, group:g,
     pad:new THREE.Vector3(site.x,hs+.7,site.z), kiosk:new THREE.Vector3(site.x+kx,hs,site.z), hs:hs,
     lampMat:lampMat, lampBase:lampBase, padLampMat:padLampMat, winMat:winMat, red:red, red2:red2, npcs:npcs, doors:doors, beacon:beacon,
@@ -3484,7 +3613,7 @@ function buildStation(st, parent){
   var ringWin=weather(new THREE.MeshStandardMaterial({color:lin('#8a8b86'), map:texRep(T.plate,26,1), emissive:new THREE.Color(1,.82,.6), emissiveMap:T.win, emissiveIntensity:1.6, metalness:.5, roughness:.55}),.9,{u:SW,paint:.8});
   var solar=new THREE.MeshStandardMaterial({color:lin('#4a4f58'), map:texRep(T.solar,6,2), metalness:.5, roughness:.35, envMapIntensity:1.2});
   function box(w,h,d,x,y,z,mat){ var m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat); m.position.set(x,y,z); g.add(m); return m; }
-  var BIG=!!(ENV_GLB.hub && ENV_GLB.ring), ringG=new THREE.Group(), blink=[];
+  var BIG=!!(ENV_GLB.hub && ENV_GLB.ring), ringG=new THREE.Group(), blink=[]; ringG.userData.dyn=true;
   function beacon(x,y,z,col,phase,par){ var s=new THREE.Mesh(new THREE.SphereGeometry(BIG?1.6:.6,10,8),new THREE.MeshBasicMaterial({color:col})); s.position.set(x,y,z); (par||g).add(s); blink.push({m:s, base:col.clone(), ph:phase}); }
   if(BIG){
     var hb=envPiece('hub',STN.hubS,STN.hubS,STN.hubS,0); hb.position.set(0,0,STN.hubZ); g.add(hb);
@@ -3533,7 +3662,7 @@ function buildStation(st, parent){
   var crew=[], crewCols=['#b8752a','#8a8d8c','#5b6a74','#a3a29a','#6b5f4a'];
   for(var w=0;w<10;w++){ var cg=new THREE.Group(), cm=new THREE.MeshStandardMaterial({color:lin(crewCols[w%5]), roughness:.7});
     var bd=new THREE.Mesh(new THREE.CylinderGeometry(.32,.38,1.5,8),cm); bd.position.y=.75; cg.add(bd); var hd=new THREE.Mesh(new THREE.SphereGeometry(.3,10,8),cm); hd.position.y=1.8; cg.add(hd);
-    cg.position.set(-46+w*10,-30.8,8+(w%3)*2); g.add(cg); crew.push({g:cg, x0:cg.position.x, ph:w*1.7}); }
+    cg.position.set(-46+w*10,-30.8,8+(w%3)*2); cg.userData.dyn=true; g.add(cg); crew.push({g:cg, x0:cg.position.x, ph:w*1.7}); }
   var cLight=new THREE.PointLight(0xffd2a0,1.4,90,1.5); cLight.position.set(0,-22,18); g.add(cLight);
   // sign + live departures board on the concourse roof
   function signTex(text,sub){ var c=document.createElement('canvas'); c.width=1024; c.height=192; var x=c.getContext('2d');
@@ -3552,7 +3681,7 @@ function buildStation(st, parent){
   [-1,1].forEach(function(sd){ var ed=new THREE.Mesh(new THREE.PlaneGeometry(104,.6),edgeM); ed.rotation.x=-Math.PI/2; ed.position.set(0,PY+.24,17+sd*2.2); g.add(ed); });
   box(104,.8,.8,0,-15,20.5,yellowM); for(var rx=-48;rx<=48;rx+=16){ box(.6,18,.6,rx,-24.5,20.5,dark); }
   var rail=[], CRC=['#8e4a32','#3d5670','#a88a3e','#4d6450','#77786f'];
-  for(var r=0;r<5;r++){ var rg=new THREE.Group(); g.add(rg);
+  for(var r=0;r<5;r++){ var rg=new THREE.Group(); rg.userData.dyn=true; g.add(rg);
     var tro=new THREE.Mesh(new THREE.BoxGeometry(1.8,1.2,1.6),hull); tro.position.set(0,-16,20.5); rg.add(tro);
     var crt=new THREE.Mesh(new THREE.BoxGeometry(4.6,2.2,2.2),new THREE.MeshStandardMaterial({color:lin(CRC[r]), map:hullTextures().rib, metalness:.45, roughness:.55})); crt.position.set(0,-18,20.5); rg.add(crt);
     rail.push({g:rg, ph:r/5}); }
@@ -3573,17 +3702,17 @@ function buildStation(st, parent){
     }
     // docking clamps: the robot arms, one each side, reaching in to grip the hull (procedural clamps if the model is missing)
     if(ENV_GLB.arm) [-1,1].forEach(function(s){ var AS=7.5, px=bx+s*9, z=27;
-      var am=envPiece('arm',AS,AS,AS,-s*Math.PI/2); am.position.set(px-s*.2*AS,PY+.85+.457*AS,z); g.add(am);
+      var am=envPiece('arm',AS,AS,AS,-s*Math.PI/2); am.userData.dyn=true; am.position.set(px-s*.2*AS,PY+.85+.457*AS,z); g.add(am);
       box(5.4,1.2,5.4,px,PY+.25,z,dark); box(2,9,2,px,PY-4.6,z,dark);
       clamps.push({g:am, arm:am.userData.slew, s:s, b:i, o:0}); });
-    else (BM?[25,31,37]:[20,28,36]).forEach(function(z){ [-1,1].forEach(function(s){ var cgp=new THREE.Group(); cgp.position.set(bx+s*5.4,PY+.4,z); g.add(cgp);
+    else (BM?[25,31,37]:[20,28,36]).forEach(function(z){ [-1,1].forEach(function(s){ var cgp=new THREE.Group(); cgp.userData.dyn=true; cgp.position.set(bx+s*5.4,PY+.4,z); g.add(cgp);
       var p1=new THREE.Mesh(new THREE.BoxGeometry(.8,4.6,1.4),yellowM); p1.position.y=2.1; cgp.add(p1);
       var p2=new THREE.Mesh(new THREE.BoxGeometry(2,.8,1.4),yellowM); p2.position.set(-s*.8,4.2,0); cgp.add(p2);
       clamps.push({g:cgp, s:s, b:i}); }); });
     [-1,1].forEach(function(s){ var bl=new THREE.Mesh(new THREE.SphereGeometry(.45,10,8),new THREE.MeshBasicMaterial({color:new THREE.Color(.3,3.4,.9)})); bl.position.set(bx+s*5.2,PY+.9,41.5); g.add(bl); berthBeacons.push({m:bl, b:i, k:berthBeacons.length}); });
     var nm=new THREE.Mesh(new THREE.PlaneGeometry(7,2.4),new THREE.MeshBasicMaterial({map:signTex('BERTH '+(i+1),i===PLAYER_BERTH?'ASSIGNED TO YOU':'FREIGHT'), color:new THREE.Color(1.3,1.3,1.3)}));
     nm.rotation.x=-Math.PI/2; nm.position.set(bx,PY+.3,17); g.add(nm);
-    box(2.4,18,2.4,bx-7.5,PY+9,BM?16.4:17,dark); var lf=new THREE.Group(); g.add(lf);
+    box(2.4,18,2.4,bx-7.5,PY+9,BM?16.4:17,dark); var lf=new THREE.Group(); lf.userData.dyn=true; g.add(lf);
     var lp=new THREE.Mesh(new THREE.BoxGeometry(2.2,.3,2.2),yellowM); lf.add(lp); var lcr=new THREE.Mesh(new THREE.BoxGeometry(1.8,1.6,1.8),new THREE.MeshStandardMaterial({color:lin(CRC[(i+2)%5]), map:hullTextures().rib, metalness:.45, roughness:.55})); lcr.position.y=.95; lf.add(lcr);
     lifts.push({g:lf, x:bx-7.5, z:BM?16.4:17, ph:i*.27});
     var tb=new THREE.Mesh(new THREE.CylinderGeometry(1.2,1.2,8,18,1,true),tubeM); tb.rotation.x=Math.PI/2; tb.position.set(bx+7.2,-27.5,19); g.add(tb);
@@ -3603,6 +3732,7 @@ function buildStation(st, parent){
   [0,2].forEach(function(bi,k){ if(Q.flora<1 && k>0) return; var h=buildHull(fleetTierAt(k,(tr0+k)%4),false); h.scale.setScalar(HULL_SPACE); h.userData.flames.concat(h.userData.glows).forEach(function(f){ f.visible=false; });
     h.position.set(BX[bi],PY+hullGear(h)*.75+.4,28); h.rotation.y=Math.PI; g.add(h); parked.push({h:h, b:bi}); });
   var inbound=buildHull(fleetTierAt(2,(tr0+2)%4),false); inbound.scale.setScalar(HULL_SPACE); inbound.rotation.y=Math.PI; g.add(inbound);
+  mergeStatic(g);
   var traffic=[]; var orb=buildHull((tr0+3)%4,false); orb.scale.setScalar(.5); parent.add(orb); traffic.push({obj:orb, r:BIG?200:110, ph:1.2, sp:BIG?.06:.1, tilt:BIG?.12:.25});
   g.updateMatrixWorld(true);
   var mouthW=g.localToWorld(new THREE.Vector3(BX[PLAYER_BERTH],PY,42)), insideW=g.localToWorld(new THREE.Vector3(BX[PLAYER_BERTH],PY,28)), dirW=new THREE.Vector3(Math.sin(st.yaw),0,Math.cos(st.yaw));
@@ -6088,6 +6218,7 @@ async function boot(){
   $('titleCard').innerHTML='RIG <b>HX-417</b><span>HULL <b>'+Math.round(state.hull)+'%</b></span><span>UNITS <b>'+fmt(state.credits)+'</b></span><span>SYSTEM <b>'+(SYS?SYS.name:'ORIGIN')+'</b></span>';
   setTimeout(function(){ ld.style.opacity=0; },400);
   frame();
+  setTimeout(streamShipModels,1500);
 }
 window.__nh={stationLoc:function(){ return stationLoc(); }, lineup:function(){ var sc=new THREE.Scene(); sc.background=new THREE.Color(.16,.165,.17); sc.environment=spaceScene.environment;
     sc.add(new THREE.HemisphereLight(0xdfe6ee,0x30302c,.8)); var dl=new THREE.DirectionalLight(0xffffff,2.2); dl.position.set(-30,50,40); sc.add(dl);
