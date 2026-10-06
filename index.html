@@ -621,7 +621,7 @@ else if(!gl2 && renderer.extensions.has('OES_texture_half_float') && renderer.ex
 var HDR = hdrType===THREE.HalfFloatType;
 var maxAniso = renderer.capabilities.getMaxAnisotropy();
 
-var SYS_SPREAD=95, SUN_FAR=60, PLANET_R=5, SPACE_UNIT=SYS_SPREAD/2.6;   // systems are wide: worlds sit 15-30K km out
+var SYS_SPREAD=95, SUN_FAR=60, PLANET_R=45, SPACE_UNIT=SYS_SPREAD/2.6;   // systems are wide: worlds sit 15-30K km out
 var camera = new THREE.PerspectiveCamera(62, 1, 0.1, 13000);
 var resScale = 1;
 function basePR(){ return Math.min(window.devicePixelRatio||1, Q.pr); }
@@ -2012,9 +2012,9 @@ function buildSystem(sys){
     var am=new THREE.MeshStandardMaterial({color:0x6a5e54, roughness:.95, metalness:.05, map:detailAlbedo, normalMap:detailNormal});
     var pr=planets[sys.belt].radius, AC=420, inst=new THREE.InstancedMesh(ag,am,AC), dmy=new THREE.Object3D(), ar=rng(9+sys.seed);
     for(var a=0;a<AC;a++){
-      var ang=ar()*TAU, rad=pr*1.6+ar()*pr;
-      dmy.position.set(Math.cos(ang)*rad,(ar()-.5)*12,Math.sin(ang)*rad);
-      dmy.rotation.set(ar()*TAU,ar()*TAU,ar()*TAU); var s=(.25+Math.pow(ar(),3)*2.4)*2.5; dmy.scale.set(s,s*(.6+ar()*.5),s);
+      var ang=ar()*TAU, rad=pr*1.6+ar()*pr, BF=PLANET_R/5;
+      dmy.position.set(Math.cos(ang)*rad,(ar()-.5)*12*BF,Math.sin(ang)*rad);
+      dmy.rotation.set(ar()*TAU,ar()*TAU,ar()*TAU); var s=(.25+Math.pow(ar(),3)*2.4)*2.5*Math.sqrt(BF)*1.4; dmy.scale.set(s,s*(.6+ar()*.5),s);
       dmy.updateMatrix(); inst.setMatrixAt(a,dmy.matrix);
     }
     asteroidGroup=new THREE.Group(); asteroidGroup.add(inst); asteroidGroup.rotation.x=.28; planets[sys.belt].vis.add(asteroidGroup);
@@ -4061,7 +4061,7 @@ function updatePulse(dt){
     if(state.throttle<=.05){ dropPulse('PULSE DRIVE DISENGAGED'); return; }
     if(state.ap && state.ap.dist!=null && state.ap.dist<AP_DROP_AT+brake){ dropPulse('DROPPING OUT · '+shortKm(state.ap.dist)+' TO '+(state.route&&state.route.loc.sys===SYS.seed?state.route.loc.name:state.ap.name)+' · FULL THROTTLE'); return; }
     for(var i=0;i<planets.length;i++){ var p=planets[i], to=V2.copy(p.pos).sub(ship.position), dc=to.length(), bd=dc-p.radius;
-      if(bd<p.radius*1.8+brake && dir.dot(to.multiplyScalar(1/dc))>.3){
+      if(bd<Math.min(p.radius*1.8,800)+brake && dir.dot(to.multiplyScalar(1/dc))>.3){
         var mine=state.ap && state.ap.kind==='planet' && state.ap.idx===p.index;
         dropPulse((mine||!state.ap?'ARRIVING · ':'PULSE DROPPED · PASSING ')+p.biome.name); return; } }
     if(station){ var ts=V2.copy(station.center).sub(ship.position), sdd=ts.length();
@@ -4404,7 +4404,7 @@ function updateSpace(dt){
   if(state.dock){ updateDock(dt); return; }
   if(state.warp){ updateWarp(dt); return; }
   updatePulse(dt); updateAutopilot(dt);
-  var nearD=1e9; planets.forEach(function(p){ nearD=Math.min(nearD,ship.position.distanceTo(p.pos)-p.radius*1.6); });
+  var nearD=1e9; planets.forEach(function(p){ nearD=Math.min(nearD,ship.position.distanceTo(p.pos)-p.radius-Math.min(p.radius*.6,70)); });
   if(station) nearD=Math.min(nearD,ship.position.distanceTo(station.center)-60);
   state.openK=lerp(state.openK||0,sstep(40,320,nearD),1-Math.pow(.3,dt));
   var f=flyShip(dt, ship, 1, 24*speedMul(), 70*speedMul(), state.openK);
@@ -5683,7 +5683,7 @@ function drawRadar(center, yaw, range, items, caption){
       rctx.beginPath(); rctx.moveTo(0,-9); rctx.lineTo(7,7); rctx.lineTo(0,3); rctx.lineTo(-7,7); rctx.closePath(); rctx.fill();
       rctx.restore();
     } else if(it.kind==='planet'){
-      rctx.beginPath(); rctx.arc(X,Y,Math.max(3,it.size*sc*1.2),0,TAU); rctx.globalAlpha=edge?.6:1; rctx.fill(); rctx.globalAlpha=1;
+      rctx.beginPath(); rctx.arc(X,Y,Math.max(3,Math.min(16,it.size*sc*1.2)),0,TAU); rctx.globalAlpha=edge?.6:1; rctx.fill(); rctx.globalAlpha=1;
     } else if(it.kind==='town'){
       rctx.save(); rctx.translate(X,Y);  rctx.beginPath(); rctx.moveTo(0,-8); rctx.lineTo(7,-1); rctx.lineTo(5,-1); rctx.lineTo(5,6); rctx.lineTo(-5,6); rctx.lineTo(-5,-1); rctx.lineTo(-7,-1); rctx.closePath(); rctx.fill(); rctx.restore();
     } else if(it.kind==='station'){
