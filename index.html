@@ -3298,14 +3298,14 @@ try{
   if(sv){
     state.credits=sv.credits||0; state.found=sv.found||{}; state.sysSeed=sv.sys||0; state.up=sv.up||{}; state.cargo=sv.cargo||[]; state.taken=sv.taken||{}; state.boardGen=sv.boardGen||{}; state.delivered=sv.delivered||0; state.towns=sv.towns||{};
     state.mods=sv.mods||[]; state.modsOwned=sv.modsOwned||{}; state.lic=sv.lic||{}; state.fuel=sv.fuel; state.hull=sv.hull==null?100:sv.hull; state.company=sv.company||null; state.hullSel=sv.hullSel==null?null:sv.hullSel; state.rooks=sv.rooks||{}; retireWedge(sv); state.fits=sv.fits||{}; state.fuelReserve=sv.fuelReserve||0; state.cleared=sv.cleared===undefined?(sv.sys||0):sv.cleared; state.heat=sv.heat||{}; state.flares=sv.flares==null?3:sv.flares;
-    state.food=sv.food==null?100:sv.food; state.rest=sv.rest==null?100:sv.rest; state.rations=sv.rations==null?2:sv.rations; state.fedT=sv.fedT||0; state.restedT=sv.restedT||0; state.needsOff=!!sv.needsOff;
+    state.food=sv.food==null?100:sv.food; state.rest=sv.rest==null?100:sv.rest; state.rations=sv.rations==null?2:sv.rations; state.fedT=sv.fedT||0; state.restedT=sv.restedT||0; state.needsOff=!!sv.needsOff; state.shareLast=sv.shareLast==null?null:sv.shareLast; state.shareAcc=sv.shareAcc||0;
     Object.keys(sv.inv||{}).forEach(function(k){ var nk=OLD_KEYS[k]||k; if(ELEMENTS[nk]) state.inv[nk]=(state.inv[nk]||0)+sv.inv[k]; });
   }
 }catch(e){}
 drawThrottle();
 function save(){ try{ localStorage.setItem('nh_save',JSON.stringify({credits:state.credits,inv:state.inv,found:state.found,sys:state.sysSeed,up:state.up,cargo:state.cargo,taken:state.taken,boardGen:state.boardGen,delivered:state.delivered,towns:state.towns,
   mods:state.mods,modsOwned:state.modsOwned,lic:state.lic,fuel:state.fuel,hull:state.hull,company:state.company,hullSel:state.hullSel,rooks:state.rooks,fits:state.fits,fuelReserve:state.fuelReserve,cleared:state.cleared,heat:state.heat,flares:state.flares,
-  food:state.food,rest:state.rest,rations:state.rations,fedT:state.fedT,restedT:state.restedT,needsOff:state.needsOff})); }catch(e){} }
+  food:state.food,rest:state.rest,rations:state.rations,fedT:state.fedT,restedT:state.restedT,needsOff:state.needsOff,shareLast:state.shareLast,shareAcc:state.shareAcc})); }catch(e){} }
 
 function toast(msg, cls){ if(typeof SND!=='undefined' && state.mode!=='title' && !(typeof AU!=='undefined' && AU.hush)){ if(cls==='life') SND.good(); else SND.blip(); } var el=document.createElement('div'); el.className='toast'+(cls?' '+cls:''); el.textContent=msg; $('toastWrap').appendChild(el); setTimeout(function(){ el.remove(); },2400); }
 function renderInv(){
@@ -3834,6 +3834,59 @@ function rebuildTownAt(loc){
   var old=surf.towns[i]; surf.scene.remove(old.group); surf.scene.remove(old.beacon); disposeObject(old.group); disposeObject(old.beacon);
   surf.towns[i]=buildTown(surf.scene, surf.biome, old.site, old.key);
 }
+/* Investing: units turn into growth (one point per INVEST_PER_G) and a stake that pays an hourly share of the
+   town's income. Yield rises with the town's stage and its businesses. Paid into the company account if you
+   run one, otherwise straight to you; while the game is closed it pays at half rate for up to 8 hours. */
+var INVEST_PER_G=150, INVEST_AMTS=[1000,5000,20000], INVEST_YIELD=[.02,.04,.06,.08];
+var sharesAway=null;
+function townRecByKey(k){ var t=state.towns[k]; if(t && !t.biz) t.biz=[]; return t; }
+function shareRate(t){ return t && t.inv ? t.inv*INVEST_YIELD[t.lvl]*(1+.15*(t.biz||[]).filter(Boolean).length) : 0; }   // units per hour
+function holdings(){ return Object.keys(state.towns).filter(function(k){ return state.towns[k].inv>0; }).map(function(k){ return {key:k, t:townRecByKey(k)}; }); }
+function sharesPerHour(){ return holdings().reduce(function(a,h){ return a+shareRate(h.t); },0); }
+function investIn(loc, amt){
+  if(!loc || loc.kind!=='town' || amt<=0 || state.credits<amt) return null;
+  var t=state.towns[loc.key]=townRec(loc);
+  state.credits-=amt; t.inv=(t.inv||0)+amt; t.earned=t.earned||0;
+  t.name=loc.name; t.pname=loc.pname; t.sysName=loc.sysName;
+  if(state.shareLast==null) state.shareLast=Date.now();
+  var pts=t.lvl<3?Math.floor(amt/INVEST_PER_G):0;
+  return {pts:pts, grew:pts?growTown(loc,pts):null};
+}
+function simShares(mins, eff){
+  var total=0;
+  holdings().forEach(function(h){ var p=shareRate(h.t)*mins/60*eff; h.t.earned=(h.t.earned||0)+p; total+=p; });
+  if(total<=0) return 0;
+  state.shareAcc=(state.shareAcc||0)+total;
+  var whole=Math.floor(state.shareAcc); state.shareAcc-=whole;
+  if(whole>0){ if(state.company) state.company.bank+=whole; else state.credits+=whole; }
+  return total;
+}
+function sharesCatchUp(){
+  var now=Date.now(), mins=(now-(state.shareLast||now))/60000; state.shareLast=now;
+  if(mins<=0 || !holdings().length) return;
+  if(mins>3){ var got=Math.round(simShares(Math.min(mins,480),.5)); if(got>0) sharesAway=got; }
+  else simShares(mins,1);
+}
+function sharesAwayToast(){
+  if(!sharesAway || state.mode==='title') return;
+  toast('WHILE YOU WERE AWAY · YOUR TOWN SHARES PAID '+fmt(sharesAway)+(state.company?' · COLLECT AT ANY STATION':' UNITS'),'life'); sharesAway=null;
+}
+function holdingsHTML(curKey){
+  var H=holdings(); if(!H.length) return '';
+  var h='<div class="st-sub">YOUR TOWN HOLDINGS · ~'+fmt(sharesPerHour())+' UNITS / HR</div>';
+  H.sort(function(a,b){ return shareRate(b.t)-shareRate(a.t); }).forEach(function(x){ var t=x.t;
+    h+='<div class="st-row upg'+(x.key===curKey?' hangar-on':'')+'"><span class="nm">'+(t.name||x.key)+'<span class="tag hi">'+TOWN_LVLS[t.lvl]+'</span>'+
+      '<small>'+(t.pname?t.pname+' · ':'')+(t.sysName?t.sysName+' system · ':'')+'stake '+fmt(t.inv)+' units · paid '+fmt(Math.round(t.earned||0))+'</small>'+
+      '<small class="fx">~'+fmt(shareRate(t))+' units/hr</small></span></div>'; });
+  return h;
+}
+try{ sharesCatchUp(); }catch(e){ console.error(e); }
+setInterval(function(){
+  if(!holdings().length) return;
+  sharesCatchUp(); sharesAwayToast();
+  if(termLoc && (stTab==='town' || stTab==='fleet')) renderTerminal();
+  renderInv(); save();
+},5000);
 function deliverHere(loc){
   var total=0, n=0, late=0, pts=0;
   state.cargo=state.cargo.filter(function(c){
@@ -4285,7 +4338,16 @@ function renderTerminal(tab){
       h+='<div class="st-row upg"><span class="nm">PLOT '+(pi+1)+' · FOR LEASE<small>Choose a business to build here · '+fmt(BIZ_COST)+' units</small>'+
         '<span class="bizopts">'+opts.map(function(k){ return '<button data-act="bizbuild" data-plot="'+pi+'" data-biz="'+k+'"'+(state.credits>=BIZ_COST?'':' disabled')+' title="'+BIZ[k].note+'">'+BIZ[k].name+'</button>'; }).join('')+'</span></span></div>';
     }
-    h+='<p class="st-note">Coming next: investing in towns for a share of their income.</p>';
+    var inv=tr.inv||0, bizN=(tr.biz||[]).filter(Boolean).length, yl=INVEST_YIELD[lv]*(1+.15*bizN);
+    h+='<div class="st-sub">INVEST IN '+loc.name+'</div>';
+    h+='<div class="st-row upg'+(inv?' hangar-on':'')+'"><span class="nm">YOUR STAKE'+(inv?'<span class="tag hi">SHAREHOLDER</span>':'')+
+      '<small>'+(inv?fmt(inv)+' units invested · paid '+fmt(Math.round(tr.earned||0))+' so far':'You hold no shares here yet.')+'</small>'+
+      '<small class="fx">'+(inv?'~'+fmt(shareRate(tr))+' units/hr · ':'')+'pays '+(yl*100).toFixed(1)+'% of your stake per hour at this stage'+(bizN?' (with '+bizN+' business'+(bizN>1?'es':'')+')':'')+'</small></span></div>';
+    h+='<div class="st-row upg"><span class="nm">BUY SHARES<small>'+(lv<3?'Every '+INVEST_PER_G+' units also adds 1 growth toward '+TOWN_LVLS[lv+1]+'.':'A city is fully grown: shares here pay the best rate.')+
+      ' Income goes '+(state.company?'into '+state.company.name+'’s account':'straight to you')+', and keeps coming at half rate for up to 8 hours while you’re away.</small>'+
+      '<span class="bizopts">'+INVEST_AMTS.map(function(a){ return '<button data-act="invest" data-amt="'+a+'"'+(state.credits>=a?'':' disabled')+'>'+fmt(a)+(lv<3?' · +'+Math.floor(a/INVEST_PER_G)+' GROWTH':'')+'</button>'; }).join('')+'</span></span></div>';
+    h+='<p class="st-note">Shares pay more as '+loc.name+' grows and opens businesses: '+INVEST_YIELD.map(function(y,i){ return TOWN_LVLS[i].toLowerCase()+' '+(y*100)+'%'; }).join(', ')+' an hour, +15% for each business.</p>';
+    h+=holdingsHTML(loc.key);
   } else if(stTab==='trade'){
     var held=Object.keys(ELEMENTS).filter(function(k){ return state.inv[k]>0; });
     h+='<p class="st-note">'+(held.length?'Sell raw elements you mined. Each stop sets its own prices.':'No elements on board. Crystals you collect on planets sell here.')+'</p>';
@@ -4301,6 +4363,7 @@ function renderTerminal(tab){
       h+='<p class="st-note">Start your own trucking company. Buy freighters, hire pilots and they run contracts for you, paying into the company account even while you are offline (at half rate, up to 8 hours).</p>';
       h+='<div class="st-row upg" style="display:block"><span class="nm">COMPANY NAME</span><input id="coName" class="co-input" maxlength="22" value="HORIZON FREIGHT" autocomplete="off">'+
         '<button class="bigact" data-act="cofound"'+(state.credits>=FOUND_COST?'':' disabled')+'>REGISTER COMPANY · '+fmt(FOUND_COST)+' UNITS</button></div>';
+      h+=holdingsHTML(null);
     } else {
       var cap3=OFFICE_CAP[C.office], perHr=C.ships.reduce(function(a,sh){ return a+fleetNet(sh)*60; },0);
       h+='<div class="co-head"><div><div class="nm">'+C.name+'</div><small>'+C.ships.length+'/'+cap3+' SHIPS · ~'+fmt(perHr)+' UNITS / HR</small></div>'+
@@ -4327,6 +4390,7 @@ function renderTerminal(tab){
       h+='<div class="st-row upg"><span class="nm">OFFICE LEVEL '+(C.office+1)+'<small>Room for '+cap3+' ships'+(C.office<OFFICE_COST.length?' · next level fits '+OFFICE_CAP[C.office+1]:'')+'</small></span><span class="acts">'+
         (C.office<OFFICE_COST.length?'<button class="pri" data-act="cooffice"'+(state.credits>=OFFICE_COST[C.office]?'':' disabled')+'>'+fmt(OFFICE_COST[C.office])+' UNITS</button>':'<span class="maxed">MAXED</span>')+'</span></div>';
       h+='<p class="st-note">Local runs are steady and gentle on hulls. Long hauls pay about 55% more but wear ships twice as fast and break down more. Better pilots earn more and break down less, but take a bigger cut.</p>';
+      h+=holdingsHTML(null);
       if(C.log.length) h+='<div class="st-sub">COMPANY LOG</div><div class="co-log">'+C.log.join('<br>')+'</div>';
     }
   } else if(stTab==='services'){
@@ -4460,6 +4524,9 @@ $('stationPanel').addEventListener('click',function(e){
     if(!BIZ[bz] || pl>=BIZ_PLOTS[tr2.lvl] || tr2.biz[pl] || tr2.biz.indexOf(bz)>=0 || state.credits<BIZ_COST) return;
     state.credits-=BIZ_COST; tr2.biz[pl]=bz; rebuildTownAt(loc); sfx('confirm',.8);
     toast(BIZ[bz].name+' OPENS IN '+loc.name,'life'); CB.queue=cbPick(['New '+BIZ[bz].name.toLowerCase()+' just opened in '+loc.name+'. Freight’s gonna be flowing.','Somebody built a '+BIZ[bz].name.toLowerCase()+' out at '+loc.name+'. About time.']); }
+  else if(act==='invest'){ var ia=+t.dataset.amt, ir=investIn(loc,ia); if(!ir) return;
+    SND.cash(); toast('INVESTED '+fmt(ia)+' IN '+loc.name+(ir.pts?' · +'+ir.pts+' GROWTH':''),'life');
+    if(ir.grew==null) CB.queue=cbPick(['Word is somebody’s putting real money into '+loc.name+'. Cranes going up.','Fresh money in '+loc.name+'. Expect more work out that way.']); }
   else if(act==='deliver'){ var r=deliverHere(loc); if(r.n){ SND.cash(); sfx('forklift',.5,1.06); AU.forkT=Math.max(AU.forkT,10); } if(r.n) toast('DELIVERED '+r.n+' CRATE'+(r.n>1?'S':'')+' · +'+fmt(r.total)+' UNITS'+(r.late?' · '+r.late+' LATE':''),'life'); }
   renderInv(); save(); renderTerminal();
 });
@@ -6516,6 +6583,7 @@ $('gfxBtn').addEventListener('click',function(){
 $('enterBtn').addEventListener('click',function(){
   audioStart();
   if(fleetAway){ var fa=fleetAway; fleetAway=null; setTimeout(function(){ toast('WHILE YOU WERE AWAY · YOUR FLEET EARNED '+fmt(fa)+' · COLLECT AT ANY STATION','life'); },2500); }
+  if(sharesAway) setTimeout(sharesAwayToast,5000);
   var t=$('title'); t.style.opacity=0; setTimeout(function(){ t.hidden=true; },900); $('letterbox').classList.add('off');
   camera.fov=62; camera.updateProjectionMatrix();
   $('hud').classList.add('on'); $('joywrap').classList.add('on'); $('actions').classList.add('on'); thWrap.classList.add('on'); setThrottle(.3);
@@ -6545,7 +6613,7 @@ async function boot(){
   frame();
   setTimeout(streamShipModels,1500);
 }
-window.__nh={town:{grow:function(loc,p){ return growTown(loc,p); }, rec:townRec, kit:function(){ return TOWN_KIT; }, prompt:kitPrompt}, stationLoc:function(){ return stationLoc(); }, lineup:function(){ var sc=new THREE.Scene(); sc.background=new THREE.Color(.16,.165,.17); sc.environment=spaceScene.environment;
+window.__nh={town:{grow:function(loc,p){ return growTown(loc,p); }, rec:townRec, kit:function(){ return TOWN_KIT; }, prompt:kitPrompt, invest:investIn, shares:function(mins,eff){ return simShares(mins,eff==null?1:eff); }, terminal:openTerminal}, stationLoc:function(){ return stationLoc(); }, lineup:function(){ var sc=new THREE.Scene(); sc.background=new THREE.Color(.16,.165,.17); sc.environment=spaceScene.environment;
     sc.add(new THREE.HemisphereLight(0xdfe6ee,0x30302c,.8)); var dl=new THREE.DirectionalLight(0xffffff,2.2); dl.position.set(-30,50,40); sc.add(dl);
     var x=0; [0,1,4,2,3].forEach(function(t){ var h=buildHull(t,true,{value:.4}); var bb=new THREE.Box3().setFromObject(h); h.position.set(x-bb.min.x,-h.userData.gear,0); x+=bb.max.x-bb.min.x+3; sc.add(h); });
     var cam=new THREE.PerspectiveCamera(30,innerWidth/innerHeight,.1,1000); cam.position.set(x/2,22,x*.95); cam.lookAt(x/2,0,0); SHOWCASE={scene:sc, cam:cam, ground:new THREE.Object3D()}; },

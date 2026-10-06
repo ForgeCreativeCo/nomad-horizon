@@ -50,6 +50,7 @@ Each freighter hull has its own turn rate and weight: the Skiff snaps into turns
 
 - **Growing towns:** every crate you deliver to a town or outpost grows it, and **construction** loads (prefab habitats, girders, power cells and more) count triple. Outposts grow into settlements, settlements into towns, towns into cities. A town gets a new district ring of housing and industry blocks with a ring road and traffic; a city adds an outer ring of taller blocks. Bigger towns post more contracts and pay more for deliveries (+8% per stage), and growing towns post more construction loads. The **Town** tab at any town terminal shows its stage and progress. Towns grow in place while you're there.
 - **Business districts:** each ring has plots you fill yourself from the Town tab (3,000 units each): a mining depot, farm co-op, clinic, shipyard or market & cantina, one of each per town, 2 plots in a town and 5 in a city. Each business ships its own goods out of town and pulls in the goods it needs from boards across the system: those loads are marked for the business, pay +35% and count double toward the town's growth.
+- **Investing in towns:** the Town tab sells shares in 1,000, 5,000 and 20,000 unit lots. Every 150 units invested adds 1 growth, so you can buy a town up to its next stage without hauling every crate. Your stake pays an hourly income of 2% (outpost), 4% (settlement), 6% (town) or 8% (city), +15% for each business. It goes into your company account if you've founded one, otherwise straight to you, and keeps paying at half rate for up to 8 hours while the game is closed. Your stake and its earnings show on the Town tab, and every town you hold shares in is listed there and on the station's Fleet tab.
 
 ### Your rigs
 - **Freighter progression:** start in the Skiff light courier (4 crates) and trade up through the Mule short-hauler (6), Longhaul tractor-trailer (9) and Atlas heavy lifter (12) at any station. Each hull handles heavier than the last: the Skiff snaps into turns, the Atlas swings wide and coasts out of them. Once you own more than one, the Upgrades tab has a hangar where you can switch between them.
@@ -129,24 +130,21 @@ The game ships its own engine flames, glows, nav lights and lights, so models do
 ### Done recently
 - **Town growth:** outposts grow into settlements, towns and cities with district rings as you deliver to them. The rings are built in code from a town kit whose pieces each carry a 3D-model prompt ([docs/town-kit-prompts.md](docs/town-kit-prompts.md)), so models can be swapped in later.
 - **Business districts:** you choose a business for each plot (2 in a town, 5 in a city); each ships its own goods and pulls in the goods it needs. All deliveries still land at the town's one pad, by design.
+- **Investing in towns:** buy shares from the Town tab; every 150 units adds 1 growth, and your stake pays an hourly income that rises with the town's stage and businesses. Your holdings are listed on the Town tab and the station's Fleet tab.
 
 ### Next up (in this order)
-1. **Investing in towns.**
-   - An **Invest** button on the Town tab turns credits into growth, so you can push a town toward its next stage without hauling every crate.
-   - Investing buys a share of the town. Shares pay a small income that grows with the town's stage and its businesses, paid into your company account (or to you if you haven't founded a company), including while the game is closed, like fleet earnings.
-   - The Town tab shows your stake and what it earns; a system overview lists every town you hold a share in.
-2. **Fleet runs grow towns.** Your hired crews' deliveries add a little growth to the towns on their routes, tying the company and the towns together.
-3. **Town kit models.** Generate the town pieces from [docs/town-kit-prompts.md](docs/town-kit-prompts.md) and swap them in: start with the town core and one ring-2 block to check the look in-game, then the rest of the blocks and the five business buildings.
+1. **Fleet runs grow towns.** Your hired crews' deliveries add a little growth to the towns on their routes, tying the company and the towns together.
+2. **Town kit models.** Generate the town pieces from [docs/town-kit-prompts.md](docs/town-kit-prompts.md) and swap them in: start with the town core and one ring-2 block to check the look in-game, then the rest of the blocks and the five business buildings.
 
 ### After that
-4. **Freighters.** A capital ship that's both your company's headquarters and its biggest hauler:
+3. **Freighters.** A capital ship that's both your company's headquarters and its biggest hauler:
    - Flown with the same controls as your rigs, but heavy: slow turns, lots of momentum, long braking. Pulse and warp, but it can't enter an atmosphere or dock at a station.
    - A hangar built from the same berth modules and clamp arms as the pier: launch your rig from it, run cargo down to the towns, and autopilot back in to dock.
    - Park it in a system and it becomes your base: hired crews and their rigs work contracts from it there.
    - The big growth jumps (town to city) need bulk construction loads only a freighter can bring into orbit; your rigs ferry it down.
-5. **Bulk hauling.** Large station-to-station contracts sized for a freighter's hold.
-6. **Upkeep, threats and upgrades for freighters.** Daily running costs (fuel, crew wages), raiders that target a parked freighter, and upgrades such as more hangar bays, cargo pods, crew quarters and a fuel refinery.
-7. **More decisions on the road.** Moments like the contraband prompt, so autopilot runs stay interesting: distress calls, pirate offers, fuel-versus-time shortcuts.
+4. **Bulk hauling.** Large station-to-station contracts sized for a freighter's hold.
+5. **Upkeep, threats and upgrades for freighters.** Daily running costs (fuel, crew wages), raiders that target a parked freighter, and upgrades such as more hangar bays, cargo pods, crew quarters and a fuel refinery.
+6. **More decisions on the road.** Moments like the contraband prompt, so autopilot runs stay interesting: distress calls, pirate offers, fuel-versus-time shortcuts.
 
 ### Housekeeping along the way
 - ~~Load only the models needed at start and fetch the rest in the background.~~ Done: models are also meshopt-compressed (11.6 MB down to 4.7 MB).
