@@ -55,7 +55,7 @@ canvas#scene{position:absolute;inset:0;width:100%;height:100%;display:block;}
 .bar{width:4.6rem;height:.32rem;border-radius:99px;background:rgba(255,255,255,.08);overflow:hidden;}
 .bar>i{display:block;height:100%;width:100%;background:var(--cyan);box-shadow:0 0 8px var(--cyan);}
 #enBar>i{background:var(--amber);box-shadow:0 0 8px var(--amber);}
-#invrow{position:absolute;left:.75rem;top:calc(7.9rem + env(safe-area-inset-top,0px));display:flex;flex-direction:column;gap:.3rem;}
+#invrow{position:absolute;left:.75rem;top:calc(7.9rem + env(safe-area-inset-top,0px));display:flex;flex-wrap:wrap;gap:.3rem;max-width:15rem;}
 .chip{display:flex;align-items:center;gap:.4rem;padding:.2rem .55rem .2rem .4rem;border-radius:99px;
   background:var(--glass);border:1px solid var(--line);font-family:var(--font-mono);font-size:.66rem;}
 .chip .dot{width:.5rem;height:.5rem;border-radius:2px;transform:rotate(45deg);}
@@ -199,18 +199,6 @@ button:focus-visible{outline:2px solid var(--cyan);outline-offset:3px;}
 #iosHint b{color:var(--ink);font-weight:400;}
 #title .hint{font-family:var(--font-mono);font-size:.64rem;letter-spacing:.06em;color:var(--ink-dim);opacity:.8;}
 .toast.life{border-left-color:#a9c27c;}
-.jobline{font-family:var(--font-mono);font-size:.6rem;letter-spacing:.06em;color:var(--amber);text-shadow:0 1px 4px rgba(0,0,0,.9);max-width:15rem;}
-.jobline.late{color:#ff7a5a;}
-.jobline{pointer-events:auto;cursor:pointer;padding:.12rem 0;}
-.jobline .go{display:inline-block;margin-left:.4rem;padding:0 .35rem;border:1px solid rgba(255,178,77,.55);border-radius:99px;font-size:.52rem;letter-spacing:.12em;}
-.jobline.on .go{background:var(--amber);color:#170c02;border-color:var(--amber);}
-.invbody{display:flex;flex-direction:column;gap:.3rem;} .invbody[hidden]{display:none;}
-.jobhead{font-family:var(--font-mono);font-size:.55rem;letter-spacing:.14em;color:var(--ink-dim);text-shadow:0 1px 4px rgba(0,0,0,.9);
-  pointer-events:auto;cursor:pointer;padding:.12rem 0;max-width:15rem;}
-.jobhead.folded{color:var(--amber);}
-.jobline.warp{color:var(--warp);} .jobline.warp .go{border-color:rgba(143,184,255,.55);} .jobline.warp.on .go{background:var(--warp);color:#06101f;border-color:var(--warp);}
-.jobline.late{color:#ff7a5a;}
-.jobline.proj{color:#e8c66a;margin-bottom:.15rem;} .jobline.proj .go{border-color:rgba(232,198,106,.6);} .jobline.proj.on .go{background:#e8c66a;color:#170c02;border-color:#e8c66a;}
 #cbBtn{position:absolute;right:11.2rem;top:calc(3.4rem + env(safe-area-inset-top,0px));pointer-events:auto;width:2.2rem;height:2.2rem;padding:0;border-radius:50%;
   display:flex;align-items:center;justify-content:center;color:var(--cyan);cursor:pointer;font-family:var(--font-display);font-weight:700;font-size:.6rem;letter-spacing:.04em;}
 #cbBtn.off{color:var(--ink-dim);text-decoration:line-through;}
@@ -489,6 +477,73 @@ body.mapopen #joywrap,body.mapopen #actions,body.mapopen #throttle{visibility:hi
 #letterbox::before{top:0;} #letterbox::after{bottom:0;}
 #letterbox.off::before,#letterbox.off::after{height:0;}
 @media (prefers-reduced-motion:reduce){#title.cold .inner{animation:none;}}
+
+/* ---------- nav droid: HUD chip + one panel for route, jobs and loads ---------- */
+#droidChip{position:absolute;left:calc(9.3rem + env(safe-area-inset-left,0px));bottom:calc(1.2rem + env(safe-area-inset-bottom,0px));z-index:12;pointer-events:auto;cursor:pointer;
+  display:flex;align-items:center;gap:.5rem;min-height:2.75rem;max-width:min(17rem,calc(100vw - 20.5rem));padding:.35rem .75rem .35rem .55rem;
+  background:var(--glass);border:1px solid var(--line);border-radius:2px;color:var(--ink);font-family:var(--font-mono);font-size:.62rem;letter-spacing:.08em;white-space:nowrap;overflow:hidden;}
+#droidChip.on{border-color:rgba(232,160,60,.7);}
+#droidChip #dcName{font-family:var(--font-display);font-weight:700;font-size:.8rem;letter-spacing:.08em;color:var(--amber);min-width:0;overflow:hidden;text-overflow:ellipsis;}
+#droidChip #dcInfo{color:var(--ink-dim);font-variant-numeric:tabular-nums;}
+#droidChip #dcInfo:empty{display:none;}
+#droidChip.idle #dcName{color:var(--ink);letter-spacing:.18em;font-size:.7rem;}
+.dr-eye{flex:0 0 auto;width:1.1rem;height:1.1rem;border:1px solid var(--amber);border-radius:2px;position:relative;}
+.dr-eye::after{content:"";position:absolute;left:50%;top:50%;width:.36rem;height:.36rem;margin:-.18rem 0 0 -.18rem;border-radius:50%;background:var(--amber);}
+#navPanel{max-height:min(88%,calc(100% - 1rem));gap:.5rem;background:rgba(13,13,12,.97);}
+body.droidopen #joywrap,body.droidopen #actions,body.droidopen #throttle{visibility:hidden;}
+#navPanel .panel-x{width:2.75rem;height:2.75rem;top:.4rem;right:.45rem;}
+#navPanel .wp-head{padding-right:3.2rem;line-height:1.5;}
+#drSay{display:flex;align-items:flex-start;gap:.55rem;padding-right:2.6rem;font-family:var(--font-mono);font-size:.7rem;line-height:1.4;color:var(--ink);}
+#drSay .dr-eye{margin-top:.05rem;}
+.dr-tabs{display:flex;gap:.35rem;flex:0 0 auto;}
+.dr-tabs button{flex:1;min-height:2.75rem;font-family:var(--font-mono);font-size:.64rem;letter-spacing:.16em;color:var(--ink-dim);background:none;
+  border:1px solid var(--line);border-radius:2px;cursor:pointer;}
+.dr-tabs button.on{color:#141009;background:var(--amber);border-color:var(--amber);}
+.dr-tabs button b{font-weight:400;opacity:.8;}
+.dr-pane{display:flex;flex-direction:column;gap:.5rem;overflow-y:auto;min-height:0;flex:1 1 auto;-webkit-overflow-scrolling:touch;touch-action:pan-y;}
+.dr-pane[hidden]{display:none!important;}
+#drRoute .wp-title{font-size:1rem;margin:0;}
+#nvList{overflow:visible;flex:0 0 auto;}
+.wp-row .dr-go{grid-row:1 / span 3;grid-column:4;align-self:center;}
+#nvList .wp-row,#mpList .wp-row{grid-template-columns:auto 1fr auto auto;}
+#nvList .wp-drop,#nvList .wp-meta,#mpList .wp-drop,#mpList .wp-meta{grid-column:2 / 4;}
+.dr-go{display:inline-flex;align-items:center;justify-content:center;min-width:3.2rem;min-height:2.75rem;padding:0 .7rem;font-family:var(--font-display);font-weight:700;
+  font-size:.78rem;letter-spacing:.14em;color:#141009;background:var(--amber);border:1px solid var(--amber);border-radius:2px;cursor:pointer;}
+.dr-go.ghost{color:var(--amber);background:none;}
+.dr-sum{display:flex;justify-content:space-between;gap:.5rem;font-family:var(--font-mono);font-size:.62rem;letter-spacing:.14em;color:var(--ink-dim);}
+.dr-sum b{color:var(--ink);font-weight:400;}
+.dr-card{border:1px solid var(--line);border-radius:2px;background:rgba(236,231,219,.025);padding:.6rem .7rem;display:grid;grid-template-columns:1fr auto;gap:.2rem .6rem;align-items:center;}
+.dr-card.trk{border-color:rgba(232,160,60,.8);box-shadow:inset 3px 0 0 var(--amber);}
+.dr-card.warp{box-shadow:inset 3px 0 0 var(--warp);} .dr-card.trk.warp{box-shadow:inset 3px 0 0 var(--amber);}
+.dr-card.done{opacity:.6;}
+.dr-name{font-family:var(--font-display);font-weight:700;font-size:.95rem;letter-spacing:.08em;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.dr-card.trk .dr-name{color:var(--amber);}
+.dr-st{justify-self:end;font-family:var(--font-mono);font-size:.55rem;letter-spacing:.14em;padding:.12rem .4rem;border:1px solid var(--line);color:var(--ink-dim);white-space:nowrap;}
+.dr-st.s-route{color:var(--amber);border-color:rgba(232,160,60,.6);} .dr-st.s-range{color:#141009;background:#a9c27c;border-color:#a9c27c;} .dr-st.s-done{color:#a9c27c;border-color:rgba(169,194,124,.6);}
+.dr-st.s-late{color:#141009;background:var(--alarm,#e0442a);border-color:var(--alarm,#e0442a);}
+.dr-meta{grid-column:1 / -1;font-family:var(--font-mono);font-size:.6rem;letter-spacing:.06em;color:var(--ink-dim);font-variant-numeric:tabular-nums;line-height:1.45;}
+.dr-meta b{color:var(--ink);font-weight:400;}
+.dr-acts{grid-column:1 / -1;display:flex;gap:.4rem;margin-top:.2rem;}
+.dr-acts button{flex:1;}
+.dr-trk{min-height:2.75rem;font-family:var(--font-mono);font-size:.62rem;letter-spacing:.14em;color:var(--ink);background:rgba(236,231,219,.05);border:1px solid var(--line);border-radius:2px;cursor:pointer;}
+.dr-trk.on{color:var(--amber);border-color:rgba(232,160,60,.75);background:rgba(232,160,60,.12);}
+.dr-empty{font-size:.8rem;color:var(--ink-dim);line-height:1.45;padding:.2rem .1rem;}
+.dr-empty b{color:var(--ink);font-weight:500;}
+.dr-pips{display:flex;gap:.25rem;grid-column:1 / -1;}
+.dr-pips span{flex:1;font-family:var(--font-mono);font-size:.5rem;letter-spacing:.1em;color:var(--ink-dim);text-align:center;padding-top:.3rem;border-top:3px solid rgba(236,231,219,.12);}
+.dr-pips span.on{border-top-color:#e8c66a;color:var(--ink);} .dr-pips span.cur{border-top-color:#e8c66a;color:#e8c66a;}
+.dr-bar{grid-column:1 / -1;display:flex;align-items:center;gap:.5rem;font-family:var(--font-mono);font-size:.6rem;color:var(--ink-dim);font-variant-numeric:tabular-nums;}
+.dr-bar span{flex:1;height:.42rem;background:rgba(236,231,219,.1);overflow:hidden;} .dr-bar i{display:block;height:100%;background:#e8c66a;}
+.dr-card.proj{border-color:rgba(232,198,106,.7);} .dr-card.proj .dr-name{color:#e8c66a;}
+.toast.droid{border-left-color:var(--amber);color:var(--ink);white-space:normal;max-width:min(86vw,26rem);text-align:left;}
+#cbMsg{bottom:calc(4rem + env(safe-area-inset-bottom,0px));}
+.navtag.mini .lbl,.navtag.edge .lbl{display:none;} .navtag.mini .dia{width:.45rem;height:.45rem;border-width:1.5px;animation:none;}
+@media (max-height:430px){
+  #navPanel{padding:.65rem .8rem;gap:.4rem;}
+  #navPanel .nv-btns #nvClose{display:none;}
+  #drRoute .wp-title{display:none;}
+  #drSay{font-size:.64rem;}
+}
 </style>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
 </head>
@@ -509,6 +564,7 @@ body.mapopen #joywrap,body.mapopen #actions,body.mapopen #throttle{visibility:hi
       <span class="k" id="clockK">SYSTEM</span><span class="v" id="clockV">ORIGIN</span>
     </div>
     <div id="invrow"></div>
+    <button id="droidChip" type="button" hidden aria-label="Nav droid: route, jobs and loads"><span class="dr-eye" aria-hidden="true"></span><span id="dcName">NAV DROID</span><span id="dcInfo"></span></button>
     <div id="compassWrap" class="panel"><canvas id="compass" width="520" height="40"></canvas></div>
     <button id="pitchBtn" class="panel" type="button" aria-pressed="true">PITCH <b id="pitchName">INV</b></button>
     <button id="gfxBtn" class="panel" type="button">GFX <b id="gfxName">HIGH</b></button>
@@ -541,12 +597,15 @@ body.mapopen #joywrap,body.mapopen #actions,body.mapopen #throttle{visibility:hi
     </div>
     <div id="guide" class="panel" hidden><div id="gdEye"></div><div id="gdText"></div><div id="gdBtns"><button id="gdOk" type="button">GOT IT</button><button id="gdSkip" type="button">SKIP GUIDE</button></div></div>
     <div id="lawPanel" class="panel" hidden><div id="lwHead"><span id="lwEye"></span><span id="lwTimer"></span></div><div id="lwTitle"></div><div id="lwBody"></div><div id="lwBtns"></div></div>
-    <div id="navPanel" class="panel" hidden>
-      <button class="panel-x" id="nvX" type="button" aria-label="Close nav">&#x2715;</button>
-      <div class="wp-head">SYSTEM NAV &middot; <span id="nvSys"></span></div>
-      <div class="wp-title">Set autopilot</div>
-      <div id="nvList"></div>
-      <div class="nv-btns"><button id="nvOff" type="button" hidden>AUTOPILOT OFF</button><button id="nvClose" type="button">CANCEL</button></div>
+    <div id="navPanel" class="panel" hidden role="dialog" aria-label="Nav droid">
+      <button class="panel-x" id="nvX" type="button" aria-label="Close nav droid">&#x2715;</button>
+      <div class="wp-head">NAV DROID &middot; <span id="nvSys"></span></div>
+      <div id="drSay"><span class="dr-eye" aria-hidden="true"></span><span id="drLine"></span></div>
+      <div class="dr-tabs" role="tablist"><button type="button" role="tab" data-dr="route">ROUTE</button><button type="button" role="tab" data-dr="jobs">JOBS <b id="drJobsN"></b></button><button type="button" role="tab" data-dr="loads">LOADS</button></div>
+      <div id="drRoute" class="dr-pane" role="tabpanel"><div class="wp-title">Set autopilot</div><div id="drRouteNote" class="dr-empty" hidden></div><div id="nvList"></div></div>
+      <div id="drJobs" class="dr-pane" role="tabpanel" hidden></div>
+      <div id="drLoads" class="dr-pane" role="tabpanel" hidden></div>
+      <div class="nv-btns"><button id="nvOff" type="button" hidden>AUTOPILOT OFF</button><button id="nvClose" type="button">CLOSE</button></div>
     </div>
     <div id="townsPanel" class="panel" hidden>
       <button class="panel-x" id="twX" type="button" aria-label="Close my towns">&#x2715;</button>
@@ -3513,14 +3572,14 @@ try{
   if(sv){
     state.credits=sv.credits||0; state.found=sv.found||{}; state.sysSeed=sv.sys||0; state.up=sv.up||{}; state.cargo=sv.cargo||[]; state.taken=sv.taken||{}; state.boardGen=sv.boardGen||{}; state.boardT=sv.boardT||{}; state.delivered=sv.delivered||0; state.towns=sv.towns||{};
     state.mods=sv.mods||[]; state.modsOwned=sv.modsOwned||{}; state.lic=sv.lic||{}; state.fuel=sv.fuel; state.hull=sv.hull==null?100:sv.hull; state.company=sv.company||null; state.hullSel=sv.hullSel==null?null:sv.hullSel; state.rooks=sv.rooks||{}; retireWedge(sv); state.fits=sv.fits||{}; state.fuelReserve=sv.fuelReserve||0; state.cleared=sv.cleared===undefined?(sv.sys||0):sv.cleared; state.heat=sv.heat||{}; state.flares=sv.flares==null?3:sv.flares;
-    state.food=sv.food==null?100:sv.food; state.rest=sv.rest==null?100:sv.rest; state.rations=sv.rations==null?2:sv.rations; state.fedT=sv.fedT||0; state.restedT=sv.restedT||0; state.needsOff=!!sv.needsOff; state.shareLast=sv.shareLast==null?null:sv.shareLast; state.shareAcc=sv.shareAcc||0; state.project=sv.project||null; state.home=sv.home||null; state.resume=sv.resume||null; state.passenger=sv.passenger||null; state.tut=sv.tut||null; state.hints=sv.hints||{};
+    state.food=sv.food==null?100:sv.food; state.rest=sv.rest==null?100:sv.rest; state.rations=sv.rations==null?2:sv.rations; state.fedT=sv.fedT||0; state.restedT=sv.restedT||0; state.needsOff=!!sv.needsOff; state.shareLast=sv.shareLast==null?null:sv.shareLast; state.shareAcc=sv.shareAcc||0; state.project=sv.project||null; state.home=sv.home||null; state.resume=sv.resume||null; state.passenger=sv.passenger||null; state.tut=sv.tut||null; state.hints=sv.hints||{}; state.track=sv.track||null;
     Object.keys(sv.inv||{}).forEach(function(k){ var nk=OLD_KEYS[k]||k; if(ELEMENTS[nk]) state.inv[nk]=(state.inv[nk]||0)+sv.inv[k]; });
   }
 }catch(e){}
 drawThrottle();
 function save(){ if(saveLock) return; try{ snapResume(); }catch(e){} var data; try{ data=JSON.stringify({v:SAVE_V,resume:state.resume,passenger:state.passenger,tut:state.tut,hints:state.hints,credits:state.credits,inv:state.inv,found:state.found,sys:state.sysSeed,up:state.up,cargo:state.cargo,taken:state.taken,boardGen:state.boardGen,boardT:state.boardT,delivered:state.delivered,towns:state.towns,
   mods:state.mods,modsOwned:state.modsOwned,lic:state.lic,fuel:state.fuel,hull:state.hull,company:state.company,hullSel:state.hullSel,rooks:state.rooks,fits:state.fits,fuelReserve:state.fuelReserve,cleared:state.cleared,heat:state.heat,flares:state.flares,
-  food:state.food,rest:state.rest,rations:state.rations,fedT:state.fedT,restedT:state.restedT,needsOff:state.needsOff,shareLast:state.shareLast,shareAcc:state.shareAcc,project:state.project,home:state.home}); localStorage.setItem('nh_save',data); rollBackup(data); }catch(e){} }
+  food:state.food,rest:state.rest,rations:state.rations,fedT:state.fedT,restedT:state.restedT,needsOff:state.needsOff,shareLast:state.shareLast,shareAcc:state.shareAcc,project:state.project,home:state.home,track:state.track||null}); localStorage.setItem('nh_save',data); rollBackup(data); }catch(e){} }
 /* ---------- keeping saves safe: a rolling backup every 10 minutes (two kept), a fallback to it if the main save is
    missing or unreadable, and a save the moment the game is hidden or closed ---------- */
 var SAVE_V=3, saveLock=false, saveRestored, BAK_EVERY=10*60000;   // saveRestored is set by the loader above, so no initializer here
@@ -3554,43 +3613,14 @@ try{ if(navigator.storage && navigator.storage.persisted) navigator.storage.pers
 
 
 function toast(msg, cls){ if(typeof SND!=='undefined' && state.mode!=='title' && !(typeof AU!=='undefined' && AU.hush)){ if(cls==='life') SND.good(); else SND.blip(); } var el=document.createElement('div'); el.className='toast'+(cls?' '+cls:''); el.textContent=msg; $('toastWrap').appendChild(el); setTimeout(function(){ el.remove(); },2400); }
-var invFold=false;
-try{ invFold=localStorage.getItem('nh_cargoFold')==='1'; }catch(e){}
+/* the HUD row under the status panel keeps the scanned-element chips; cargo, drops and the project live in the nav droid */
 function renderInv(){
-  var wrap=$('invrow'); wrap.innerHTML=''; var row=document.createElement('div'); row.className='invbody';
+  var wrap=$('invrow'); wrap.innerHTML='';
   Object.keys(ELEMENTS).forEach(function(k){ var n=state.inv[k]; if(!n) return;
     var c=document.createElement('div'); c.className='chip';
     c.innerHTML='<span class="dot" style="background:'+ELEMENTS[k]+';box-shadow:0 0 6px '+ELEMENTS[k]+'"></span>'+k+' &times;'+n;
-    row.appendChild(c); });
-  var groups={};
-  state.cargo.forEach(function(c){ var k=c.dest.key; if(!groups[k]) groups[k]={d:c.dest, n:0, tl:'', frag:false}; var g=groups[k]; g.n+=c.crates;
-    var tl=timeLeft(c); if(tl && (!g.tl || tl<g.tl)) g.tl=tl; if(c.kind==='fragile') g.frag=true; });
-  if(state.project){ var P=state.project, here=projectLoc(), pr=townRec(P), pc=document.createElement('div'), pon=!!(state.route && state.route.project), pb=here?projectBoards().length:0;
-    pc.className='jobline proj'+(pon?' on':'');
-    pc.textContent='\u2605 PROJECT \u00b7 '+P.name+' \u00b7 '+(pr.lvl>=3?'CITY':TOWN_LVLS[pr.lvl]+' '+Math.round(townProgress(P)*100)+'%')+
-      (here?(pb?' \u00b7 LOADS AT '+pb+' STOP'+(pb>1?'S':''):' \u00b7 NO LOADS POSTED'):' \u00b7 WARP '+P.sysName);
-    var pg=document.createElement('span'); pg.className='go'; pg.textContent=pon?'ROUTE ON':here?'FIND LOAD':'GO'; pc.appendChild(pg);
-    pc.addEventListener('click',function(e){ e.stopPropagation(); projectTap(); });
-    row.appendChild(pc); }
-  // jobs in this system first, then warp jobs grouped by system, so the list reads as a route
-  var gk=Object.keys(groups), far=function(d){ return SYS && d.sys!==SYS.seed; };
-  gk.sort(function(a,b){ var A=groups[a].d, B=groups[b].d; return (far(A)-far(B)) || (far(A)?String(A.sysName).localeCompare(B.sysName):0); });
-  gk.forEach(function(k){ var g=groups[k], c=document.createElement('div'), on=state.route && !state.route.project && state.route.loc.key===g.d.key, fr=far(g.d);
-    c.className='jobline'+(fr?' warp':'')+(g.tl==='LATE'?' late':'')+(on?' on':'')+(tutAt(3)&&!state.dock&&!state.route?' tut-glow':'');
-    c.textContent='\u25b8 '+g.n+' \u2192 '+(isProject(g.d)?'\u2605 ':'')+g.d.name+(fr?' \u00b7 WARP '+g.d.sysName:'')+(g.tl?' \u00b7 '+g.tl:'');
-    var go=document.createElement('span'); go.className='go'; go.textContent=on?'ROUTE ON':'AUTO'; c.appendChild(go);
-    c.addEventListener('click',function(e){ e.stopPropagation(); if(state.route && state.route.loc.key===g.d.key){ apOff(''); cancelRoute('ROUTE CANCELLED'); } else startRoute(g.d); });
-    row.appendChild(c); });
-  // a header line folds the whole list away so it doesn't cover the view
-  var nDrop=gk.length, nWarp=gk.filter(function(k){ return far(groups[k].d); }).length;
-  if(nDrop || state.project || row.children.length){
-    var hd=document.createElement('div'); hd.className='jobhead'+(invFold?' folded':'');
-    hd.textContent=(invFold?'▸ ':'▾ ')+'CARGO · '+holdUsed()+' CRATE'+(holdUsed()===1?'':'S')+' · '+nDrop+' DROP'+(nDrop===1?'':'S')+(nWarp?' ('+nWarp+' WARP)':'')+
-      (invFold && state.route?' · ROUTE ON':'')+(invFold?' · SHOW':' · HIDE');
-    hd.addEventListener('click',function(e){ e.stopPropagation(); invFold=!invFold; try{ localStorage.setItem('nh_cargoFold',invFold?'1':'0'); }catch(err){} renderInv(); });
-    wrap.appendChild(hd);
-  }
-  row.hidden=invFold; wrap.appendChild(row);
+    wrap.appendChild(c); });
+  if(typeof droidSync==='function'){ droidSync(); droidChip(true); }
   $('holdVal').textContent=holdUsed()+'/'+holdCap();
   if(state.fuel==null) state.fuel=fuelCap();
   var ff=state.fuel/fuelCap(), fu=$('fuFill'); fu.style.width=Math.round(clamp(ff,0,1)*100)+'%'; fu.classList.toggle('low',ff<.25);
@@ -3618,19 +3648,21 @@ function wrapA(a){ while(a>Math.PI) a-=TAU; while(a<-Math.PI) a+=TAU; return a; 
 function drawCompass(markers){
   var W=cmp.width, Hh=cmp.height, span=Math.PI*0.9; cctx.clearRect(0,0,W,Hh);
   cctx.font='600 15px "IBM Plex Mono", monospace'; cctx.textAlign='center'; cctx.textBaseline='middle';
-  var heading=-state.yaw+Math.PI;
+  // forward is (sin yaw, cos yaw) and the ship's right is (-cos yaw, sin yaw), as on the radar: a bearing b sits at yaw-b
+  var heading=state.yaw;
   for(var deg=0;deg<360;deg+=15){
-    var rel=wrapA(deg*Math.PI/180-heading); if(Math.abs(rel)>span/2) continue;
+    var rel=wrapA(heading-deg*Math.PI/180); if(Math.abs(rel)>span/2) continue;
     var x=W/2+rel/span*W, fade=1-Math.abs(rel)/(span/2);
     cctx.globalAlpha=.25+.75*fade;
-    if(deg%90===0){ cctx.fillStyle='#eef6ff'; cctx.fillText(['N','E','S','W'][deg/90],x,Hh/2); }
-    else if(deg%45===0){ cctx.fillStyle='#93a8c4'; cctx.fillText(String(deg),x,Hh/2); }
+    var lab=(360-deg)%360;   // read clockwise: turning right counts up
+    if(deg%90===0){ cctx.fillStyle='#eef6ff'; cctx.fillText(['N','E','S','W'][lab/90],x,Hh/2); }
+    else if(deg%45===0){ cctx.fillStyle='#93a8c4'; cctx.fillText(String(lab),x,Hh/2); }
     else { cctx.fillStyle='#93a8c4'; cctx.fillRect(x-.5,Hh/2-5,1,10); }
   }
   markers.forEach(function(m){
-    var rel=wrapA(m.bearing-heading); if(Math.abs(rel)>span/2) return;
-    var x=W/2+rel/span*W; cctx.globalAlpha=1; cctx.fillStyle=m.color;
-    cctx.save(); cctx.translate(x,6); cctx.rotate(Math.PI/4); cctx.fillRect(-4,-4,8,8); cctx.restore();
+    var rel=wrapA(heading-m.bearing); if(Math.abs(rel)>span/2) return;
+    var x=W/2+rel/span*W, h=m.small?2.5:m.big?5.5:4; cctx.globalAlpha=1; cctx.fillStyle=m.color;
+    cctx.save(); cctx.translate(x,6); cctx.rotate(Math.PI/4); cctx.fillRect(-h,-h,h*2,h*2); if(m.big){ cctx.strokeStyle='#000'; cctx.lineWidth=1.5; cctx.strokeRect(-h,-h,h*2,h*2); } cctx.restore();
     if(m.label){ cctx.font='12px "IBM Plex Mono", monospace'; cctx.fillText(m.label,x,Hh-8); cctx.font='600 15px "IBM Plex Mono", monospace'; }
   });
   cctx.globalAlpha=1; cctx.fillStyle='#e7e1d2'; cctx.fillRect(W/2-1,0,2,6);
@@ -4625,7 +4657,7 @@ function deliverHere(loc){
     if(c.kind!=='contraband' && !isCleared()) return true;
     var p=cargoPay(c); total+=p.pay; n+=c.crates; if(p.late) late++; pts+=c.crates*(c.kind==='construction'?3:c.biz?2:1)+(c.story!=null?2:0); if(c.story!=null) stories.push({si:c.story, pay:p.pay, late:p.late}); return false;
   });
-  if(n){ state.credits+=total; state.delivered=(state.delivered||0)+n; if(isProject(loc)) state.project.crates=(state.project.crates||0)+n; }
+  if(n){ state.credits+=total; state.delivered=(state.delivered||0)+n; if(isProject(loc)) state.project.crates=(state.project.crates||0)+n; droidDelivered(loc,n); }
   return {total:total, n:n, late:late, grew:growTown(loc,pts), stories:stories};
 }
 var lastImpactToast=0;
@@ -5504,27 +5536,251 @@ function updateApChip(force){
   el.hidden=false;
   $('apName').textContent=A.kind==='customs'?'CUSTOMS HALL':(state.route&&state.route.loc.sys===SYS.seed?state.route.loc.name:A.name); $('apInfo').textContent=ph+' · '+shortKm(d)+' · ETA '+clockStr(apEta(d));
 }
-/* the system nav list (tap the radar in space) */
-function openNav(){
-  if(state.mode!=='space'||state.dock||state.warp) return;
-  warpPanel.hidden=true;
-  var list=$('nvList'); list.innerHTML='';
+/* =========================================================================
+   Nav droid: one panel for the route list (ROUTE), your crates grouped by drop (JOBS) and the project (LOADS),
+   one tracked job that the compass, radar, nav tags and HUD chip all follow, and a droid with opinions.
+   Every GO calls startRoute(), the same call the old cargo-line AUTO buttons and the nav list made.
+   ========================================================================= */
+/* What the droid says at the top of the panel. First entry whose `when` matches wins; a line is picked at random.
+   Fields: {dest} {crates} {fuel} {hull} {drops} {n} {planet} {project} {sys} */
+var DROID_LINES=[
+  {when:function(c){ return c.fuel<10; }, say:['Fuel’s at {fuel}%. I’m not pushing.','{fuel}% fuel. I’ve started drafting my last words.','We are coasting on {fuel}% and optimism. Mostly optimism.']},
+  {when:function(c){ return c.fuel<25; }, say:['Fuel’s at {fuel}%. Top up before you get ambitious.','{fuel}% fuel. Stations sell the stuff, I hear.']},
+  {when:function(c){ return c.hull<35; }, say:['Hull’s at {hull}%. I can hear wind. In space.','{hull}% hull. Maybe fewer rocks this trip.']},
+  {when:function(c){ return c.trk && c.trk.late; }, say:['{dest} is past due. They’ll still pay. Less.','We’re late for {dest}. I blame the pilot.']},
+  {when:function(c){ return c.trk && c.st==='range'; }, say:['{dest} is right there. Even I could land this.','In range of {dest}. Try not to miss the pad.']},
+  {when:function(c){ return c.trk && c.st==='route'; }, say:['En route to {dest}. I’ll wake you if something explodes.','Heading for {dest}. Sit back. Touch nothing.']},
+  {when:function(c){ return c.chain; }, say:['{n} stops near {planet}. Run them back to back and save the fuel.','{n} drops on {planet}. Even you can chain those.']},
+  {when:function(c){ return c.drops && c.used>=c.cap; }, say:['Hold’s full. {drops} drop{s}. No pressure.','Every slot’s taken. Let’s go get paid.']},
+  {when:function(c){ return c.drops && c.allFar; }, say:['Everything aboard is for another system. Bold.','All {drops} drop{s} need a warp. Hope you like {sys}.']},
+  {when:function(c){ return c.trk; }, say:['{dest}, {crates} crate{cs}. Say GO and I’ll fly.','Next stop {dest}. I’ve done the maths. You’re welcome.']},
+  {when:function(c){ return c.project; }, say:['Hold’s empty. {project} won’t build itself.','Nothing aboard. {project} could use a load or two.']},
+  {when:function(){ return true; }, say:['Hold’s empty. I’m told that’s not how money works.','Nothing aboard. Find a board, find a load.','No cargo, no pay. I don’t make the rules.']}
+];
+/* Droid-voiced warnings through the usual toast. */
+var DROID_WARN={
+  fuel25:['Fuel under 25%. I’m just saying it out loud.','A quarter tank. This is me being concerned.'],
+  fuel10:['Fuel under 10%. I’m not pushing.','Ten percent fuel. Find a pump or find religion.'],
+  range:['{dest} is in range. Try not to overshoot.','{dest} coming up. Deliver at the terminal.'],
+  done:['Delivered to {dest}. Next up: {next}.','{dest} signed for it. On to {next}.'],
+  last:['Delivered to {dest}. Hold’s clear. Go find more work.','{dest} signed. That was the last of it.']
+};
+var DR={tab:'route', sig:'', keys:null, done:{}, gone:{}, st:{}, warn:{f25:false, f10:false}, line:'', lineK:''};
+function drFill(t, c){ return t.replace(/\{(\w+)\}/g,function(m,k){ return c[k]!=null?c[k]:''; }); }
+function drPick(a){ return a[Math.floor(Math.random()*a.length)]; }
+function drToast(line, c){ toast('NAV DROID · '+drFill(line,c||{}),'droid'); }
+/* crates grouped by drop-off: one entry per destination, this system first, then warp stops */
+function jobGroups(){
+  var m={}, out=[];
+  state.cargo.forEach(function(c){ var k=c.dest.key; if(!m[k]){ m[k]={key:k, d:c.dest, n:0, tl:'', frag:false, far:!!(SYS && c.dest.sys!==SYS.seed)}; out.push(m[k]); }
+    var g=m[k]; g.n+=c.crates; var tl=timeLeft(c); if(tl && (!g.tl || tl==='LATE' || tl<g.tl)) g.tl=tl; if(c.kind==='fragile') g.frag=true; });
+  out.forEach(function(g){ var j=jobDist(g.d); g.dist=j.d; g.eta=j.eta; g.dTxt=j.txt; g.late=g.tl==='LATE'; });
+  return out.sort(function(a,b){ return (a.far-b.far) || (a.far?String(a.d.sysName).localeCompare(b.d.sysName):a.dist-b.dist); });
+}
+/* how far a drop is from wherever you are now, and roughly how long the autopilot takes to get there */
+function jobDist(loc){
+  if(!SYS || !loc) return {d:1e12, eta:null, txt:''};
+  if(loc.sys!==SYS.seed) return {d:1e12, eta:null, txt:'WARP · '+loc.sysName+' · '+lightYears(SYS.seed,loc.sys)+' LY'};
+  if((state.mode==='atmo'||state.mode==='surface') && S && loc.kind==='town' && loc.planet===S.idx){
+    var T=townByKey(loc.key), f=mapFocus();
+    if(T){ var d=Math.hypot(T.x-f.x,T.z-f.z); return {d:d/1000, eta:d/Math.max(1,atmoCruise())+4, txt:fmtDist(d), ground:d}; }
+  }
+  if(!ship || !planets.length) return {d:1e12, eta:null, txt:''};
+  var t=loc.kind==='station'?{kind:'station'}:{kind:'planet', idx:loc.planet, site:loc.site||0}, sd=apDist(t);
+  return {d:sd, eta:apEta(sd)+(state.mode==='space'?0:40), txt:shortKm(sd)};
+}
+/* picked up, en route, in range or delivered */
+function jobStatus(g){
+  if(state.route && state.route.loc && state.route.loc.key===g.key && !state.route.project) {
+    if(!jobInRange(g)) return 'route'; }
+  if(jobInRange(g)) return 'range';
+  return 'up';
+}
+function jobInRange(g){
+  if(g.far) return false;
+  if(g.d.kind==='station') return !!(state.dock && termLoc && termLoc.key===g.key) || (state.mode==='space' && station && ship.position.distanceTo(station.center)<DOCK_RANGE*3);
+  var j=jobDist(g.d); return j.ground!=null && j.ground<800;
+}
+var DR_STATUS={up:'PICKED UP', route:'EN ROUTE', range:'IN RANGE', done:'DELIVERED'};
+function trackedGroup(G){ G=G||jobGroups(); for(var i=0;i<G.length;i++) if(G[i].key===state.track) return G[i]; return null; }
+function trackedLoc(){ if(!state.track) return null; for(var i=0;i<state.cargo.length;i++) if(state.cargo[i].dest.key===state.track) return state.cargo[i].dest; return null; }
+function setTrack(key){ state.track=key||null; DR.sig=''; droidSync(); droidChip(true); }
+/* called from deliverHere(): remembers what was just signed for so tracking can say so and move on */
+function droidDelivered(loc, n){ DR.done[loc.key]={name:loc.name, n:n, t:Date.now()}; }
+/* keep exactly one tracked job: follow it until it's gone, then the nearest one left; pick up the first new job if none */
+function droidReconcile(G){
+  var keys={}; G.forEach(function(g){ keys[g.key]=1; });
+  if(state.track && !keys[state.track]){
+    var was=state.track, dn=DR.done[was]; state.track=G.length?G[0].key:null;
+    if(dn && Date.now()-dn.t<15000) drToast(drPick(state.track?DROID_WARN.done:DROID_WARN.last), {dest:dn.name, next:state.track?G[0].d.name:''});
+  }
+  if(!state.track && G.length){
+    var fresh=DR.keys?G.filter(function(g){ return !DR.keys[g.key]; }):G;
+    if(fresh.length) state.track=fresh[0].key;
+  }
+  DR.keys=keys;
+}
+/* one comment for the top of the panel, re-rolled only when the situation changes */
+function droidLine(G){
+  var trk=trackedGroup(G), fc=fuelCap(), used=holdUsed(), byPl={}, chain=null;
+  G.forEach(function(g){ if(!g.far && g.d.kind==='town') (byPl[g.d.planet]=byPl[g.d.planet]||[]).push(g); });
+  Object.keys(byPl).forEach(function(k){ if(!chain && byPl[k].length>1) chain={n:byPl[k].length, planet:byPl[k][0].d.pname}; });
+  var c={fuel:Math.round(clamp(state.fuel/fc,0,1)*100), hull:Math.round(state.hull), used:used, cap:holdCap(), drops:G.length, s:G.length===1?'':'s',
+    trk:trk, st:trk?jobStatus(trk):'', dest:trk?trk.d.name:'', crates:trk?trk.n:0, cs:trk&&trk.n===1?'':'s',
+    chain:chain, n:chain?chain.n:0, planet:chain?chain.planet:'', allFar:G.length>0 && G.every(function(g){ return g.far; }), sys:G.length?G[0].d.sysName:'',
+    project:state.project?state.project.name:''};
+  for(var i=0;i<DROID_LINES.length;i++){ var L=DROID_LINES[i]; if(!L.when(c)) continue;
+    var k=i+'|'+c.dest+'|'+c.st+'|'+c.drops; if(DR.lineK!==k){ DR.lineK=k; DR.line=drFill(drPick(L.say),c); } return DR.line; }
+  return '';
+}
+/* ---------- the HUD chip: tracked job, distance, ETA; NAV DROID when nothing is tracked ---------- */
+var drChipT=0;
+function droidChip(force){
+  var el=$('droidChip');
+  var show=state.mode!=='title' && !!SYS && !state.dock && !termLoc && !state.warp && !state.sleeping && !state.inHome && !mapOpen && $('townsPanel').hidden;
+  if(!show){ if(!el.hidden) el.hidden=true; return; }
+  if(el.hidden) el.hidden=false;
+  var g=state.track?trackedGroup():null, nm='NAV DROID', info='';
+  if(g){ nm=g.d.name; info=g.far?g.dTxt:(g.dTxt+(g.eta!=null?' · ETA '+clockStr(g.eta):'')); if(g.late) info+=' · LATE'; }
+  var n=$('dcName'), inf=$('dcInfo');
+  if(n.textContent!==nm) n.textContent=nm; if(inf.textContent!==info) inf.textContent=info;
+  el.classList.toggle('idle',!g); el.classList.toggle('on',!!g);
+  el.classList.toggle('tut-glow', tutAt(3) && !state.dock && !state.route);
+  el.setAttribute('aria-label', g?'Nav droid, tracking '+nm+(info?', '+info:''):'Nav droid: route, jobs and loads');
+}
+/* ---------- panel ---------- */
+function openNav(){ if(state.mode!=='space'||state.dock||state.warp) return; openDroid('route'); }
+function closeNav(){ $('navPanel').hidden=true; document.body.classList.remove('droidopen'); }
+function openDroid(tab){
+  if(state.mode==='title' || !SYS || state.warp) return;
+  warpPanel.hidden=true; if(mapOpen) closeMap(); if(!$('townsPanel').hidden) closeTowns();
+  DR.tab=tab||(state.cargo.length?'jobs':state.mode==='space'&&!state.dock?'route':'loads');
+  DR.lineK=''; DR.sig=''; renderDroid();
+  $('navPanel').hidden=false; document.body.classList.add('droidopen'); joyEnd(); setHold(false);
+}
+function renderDroid(){
+  var G=jobGroups();
+  document.querySelectorAll('.dr-tabs button').forEach(function(b){ var on=b.dataset.dr===DR.tab; b.classList.toggle('on',on); b.setAttribute('aria-selected',on); });
+  $('drJobsN').textContent=G.length?'· '+G.length:'';
+  $('drLine').textContent=droidLine(G);
+  $('nvSys').textContent=SYS.name+' · FUEL '+Math.floor(state.fuel)+'/'+fuelCap();
+  $('nvOff').hidden=!state.ap && !state.route;
+  $('drRoute').hidden=DR.tab!=='route'; $('drJobs').hidden=DR.tab!=='jobs'; $('drLoads').hidden=DR.tab!=='loads';
+  if(DR.tab==='route') renderDroidRoute();
+  else if(DR.tab==='jobs') renderDroidJobs(G);
+  else renderDroidLoads();
+  DR.sig=droidSig(G);
+}
+/* ROUTE: the system nav list, as it always was (tap a row, or its GO, and the route flies itself) */
+function renderDroidRoute(){
+  var list=$('nvList'), note=$('drRouteNote'); list.innerHTML='';
+  var can=state.mode==='space' && !state.dock;
+  note.hidden=can;
+  if(!can){
+    var h=state.dock?'Docked at <b>'+SYS.station.name+'</b>. Undock and the system list is back.':
+      state.mode==='atmo'||state.mode==='surface'?'Down on <b>'+(S?S.biome.name:'the surface')+'</b>. The planet map lists the pads, and every one has a GO.':'Nothing to plot from here.';
+    note.innerHTML=h+((state.mode==='atmo'||state.mode==='surface') && !termLoc?'<div class="dr-acts"><button type="button" class="dr-trk" data-dr-act="map">OPEN PLANET MAP</button></div>':'');
+    return;
+  }
   apTargets().forEach(function(t){
     var row=document.createElement('button'); row.type='button'; row.className='wp-row'+(t.drop?' drop':'');
     var on=state.ap && state.ap.kind===t.kind && (t.kind==='station'||state.ap.idx===t.idx);
     row.innerHTML='<span class="wp-star" style="color:'+t.col+';background:'+t.col+'"></span>'+
       '<span class="wp-name">'+t.name+(on?' · <span style="color:var(--cyan)">ENGAGED</span>':'')+'</span><span class="wp-dist">'+shortKm(t.dist)+' · ETA '+clockStr(apEta(t.dist))+'</span>'+
+      '<span class="dr-go" aria-hidden="true">GO</span>'+
       (t.drop?'<span class="wp-drop">▸ DROP · '+t.drop+' CRATE'+(t.drop>1?'S':'')+' FOR '+t.dropTo+'</span>':'')+
       '<span class="wp-meta">'+t.meta+'</span>';
+    row.setAttribute('aria-label','Go to '+t.name);
     row.addEventListener('click',function(){ startRoute(t.kind==='station'?stationLoc():siteLoc(SYS,t.idx,t.site||0)); });
     if(t.kind==='station' && (tutAt(0)||tutAt(1))) row.classList.add('tut-glow');
     list.appendChild(row);
   });
-  $('nvSys').textContent=SYS.name+' · FUEL '+Math.floor(state.fuel)+'/'+fuelCap();
-  $('nvOff').hidden=!state.ap && !state.route;
-  $('navPanel').hidden=false;
 }
-function closeNav(){ $('navPanel').hidden=true; }
+/* JOBS: one card per drop-off */
+function renderDroidJobs(G){
+  var h='', used=holdUsed(), recent=Object.keys(DR.done).filter(function(k){ return Date.now()-DR.done[k].t<120000 && !G.some(function(g){ return g.key===k; }); });
+  h+='<div class="dr-sum"><span><b>'+used+'/'+holdCap()+'</b> HOLD · <b>'+G.length+'</b> DROP'+(G.length===1?'':'S')+'</span>'+(state.track?'<span>TRACKING 1</span>':'')+'</div>';
+  if(!G.length && !recent.length) h+='<div class="dr-empty">No crates aboard. Load up at any station or town board, then come back here to <b>Track</b> a drop and hit <b>GO</b>.</div>';
+  G.forEach(function(g){
+    var trk=g.key===state.track, st=jobStatus(g), on=state.route && !state.route.project && state.route.loc.key===g.key, glow=tutAt(3)&&!state.dock&&!state.route;
+    h+='<div class="dr-card'+(trk?' trk':'')+(g.far?' warp':'')+'" data-key="'+g.key+'">'+
+      '<span class="dr-name">'+(isProject(g.d)?'★ ':'')+g.d.name+'</span>'+
+      '<span class="dr-st '+(g.late?'s-late':'s-'+st)+'" data-dr-f="st">'+(g.late?'LATE':DR_STATUS[st])+'</span>'+
+      '<span class="dr-meta">'+(g.d.kind==='station'?'Station':g.d.pname+(g.d.outpost?' · outpost':''))+(g.far?' · '+g.d.sysName+' system':'')+' · <b>'+g.n+' crate'+(g.n===1?'':'s')+'</b>'+(g.frag?' · fragile':'')+(g.tl&&!g.late?' · due '+g.tl:'')+'</span>'+
+      '<span class="dr-meta" data-dr-f="dist">'+jobDistTxt(g)+'</span>'+
+      '<div class="dr-acts"><button type="button" class="dr-trk'+(trk?' on':'')+'" data-dr-act="track" aria-pressed="'+trk+'">'+(trk?'✓ TRACKED':'TRACK')+'</button>'+
+      '<button type="button" class="dr-go'+(on?' ghost':'')+(glow&&g===G[0]?' tut-glow':'')+'" data-dr-act="go">'+(on?'STOP':'GO')+'</button></div></div>';
+  });
+  recent.forEach(function(k){ var d=DR.done[k];
+    h+='<div class="dr-card done"><span class="dr-name">'+d.name+'</span><span class="dr-st s-done">'+DR_STATUS.done+'</span><span class="dr-meta">'+d.n+' crate'+(d.n===1?'':'s')+' signed for</span></div>'; });
+  $('drJobs').innerHTML=h;
+}
+function jobDistTxt(g){ return g.far?g.dTxt:'<b>'+g.dTxt+'</b>'+(g.eta!=null?' · ETA '+clockStr(g.eta):''); }
+/* LOADS: the project's loads (FIND LOAD) and how far the town is from city */
+function renderDroidLoads(){
+  var P=state.project, h='';
+  if(!P){
+    h='<div class="dr-empty">No project yet. Pick a town to build up from its <b>Town</b> tab or <b>My Towns</b>, and every board in its system posts ★ loads for it.</div>'+
+      '<div class="dr-acts"><button type="button" class="dr-trk" data-dr-act="towns">MY TOWNS</button></div>';
+    $('drLoads').innerHTML=h; return;
+  }
+  var t=townRec(P), lv=t.lvl, here=!!projectLoc(), pon=!!(state.route && state.route.project), pb=here?projectBoards().length:0;
+  h+='<div class="dr-card proj"><span class="dr-name">★ '+P.name+'</span><span class="dr-st">'+townTitle(P)+'</span>';
+  h+='<span class="dr-meta">'+P.pname+(here?'':' · '+P.sysName+' system')+'</span>';
+  h+='<div class="dr-pips">'+TOWN_LVLS.map(function(n,i){ return '<span class="'+(i<lv?'on':i===lv?'cur':'')+'">'+n+'</span>'; }).join('')+'</div>';
+  if(lv<3){ var pct=Math.round(townProgress(P)*100), need=TOWN_NEED[lv]-t.g;
+    h+='<div class="dr-bar"><span><i style="width:'+pct+'%"></i></span>'+pct+'%</div>';
+    h+='<span class="dr-meta">Next: <b>'+TOWN_LVLS[lv+1]+'</b> · '+t.g+' / '+TOWN_NEED[lv]+' growth · about '+need+' crates or '+Math.ceil(need/3)+' construction loads to go</span>'; }
+  else h+='<div class="dr-bar"><span><i style="width:100%"></i></span>CITY</div><span class="dr-meta"><b>Fully grown.</b> ★ loads now come from its businesses.</span>';
+  h+='<span class="dr-meta">'+(here?(pb?'★ loads waiting at <b>'+pb+' stop'+(pb>1?'s':'')+'</b>':'No ★ loads posted right now. Boards refresh.'):'★ loads post on boards in the '+P.sysName+' system')+'</span>';
+  h+='<div class="dr-acts"><button type="button" class="dr-go'+(pon?' ghost':'')+'" data-dr-act="find">'+(pon?'STOP ROUTE':here?'FIND LOAD':'GO · WARP')+'</button>'+
+    '<button type="button" class="dr-trk" data-dr-act="towns">MY TOWNS</button></div></div>';
+  $('drLoads').innerHTML=h;
+}
+/* re-render only when what's listed changes; distances and statuses update in place */
+function droidSig(G){ return DR.tab+'|'+G.map(function(g){ return g.key+':'+g.n+':'+(g.late?1:0); }).join(',')+'|'+state.track+'|'+(state.route?state.route.loc.key+(state.route.project?'p':''):'')+'|'+(state.ap?state.ap.kind+state.ap.idx:'')+'|'+
+  (state.project?state.project.key+townRec(state.project).g+townRec(state.project).lvl:'')+'|'+state.mode+(state.dock?'d':'')+'|'+Object.keys(DR.done).length; }
+function droidSync(){
+  if(!SYS || state.mode==='title') return;
+  var G=jobGroups(); droidReconcile(G);
+  if($('navPanel').hidden) return;
+  if(droidSig(G)!==DR.sig){ renderDroid(); return; }
+  if(DR.tab==='jobs') G.forEach(function(g){ var c=$('drJobs').querySelector('.dr-card[data-key="'+g.key+'"]'); if(!c) return;
+    var d=c.querySelector('[data-dr-f="dist"]'), s=c.querySelector('[data-dr-f="st"]'), st=g.late?'late':jobStatus(g), txt=jobDistTxt(g), lab=g.late?'LATE':DR_STATUS[st];
+    if(d.innerHTML!==txt) d.innerHTML=txt; if(s.textContent!==lab){ s.textContent=lab; s.className='dr-st s-'+st; } });
+  $('nvSys').textContent=SYS.name+' · FUEL '+Math.floor(state.fuel)+'/'+fuelCap();
+}
+/* twice a second: chip, panel distances, low-fuel and arrival warnings */
+function droidTick(){
+  if($('navPanel').hidden && document.body.classList.contains('droidopen')) document.body.classList.remove('droidopen');   // closed by something else
+  if(state.mode==='title' || !SYS) return;
+  droidSync(); droidChip(false);
+  var ff=state.fuel/fuelCap(), W=DR.warn;
+  if(ff>.3){ W.f25=false; W.f10=false; }
+  if(ff<.1 && !W.f10){ W.f10=W.f25=true; drToast(drPick(DROID_WARN.fuel10)); }
+  else if(ff<.25 && !W.f25){ W.f25=true; drToast(drPick(DROID_WARN.fuel25)); }
+  var g=state.track?trackedGroup():null, st=g?jobStatus(g):'';
+  if(g && st==='range' && DR.st[g.key]!=='range' && !termLoc) drToast(drPick(DROID_WARN.range),{dest:g.d.name});
+  DR.st={}; if(g) DR.st[g.key]=st;
+}
+setInterval(droidTick,500);
+$('droidChip').addEventListener('click',function(e){ e.stopPropagation(); SND.click(); if($('navPanel').hidden) openDroid(); else closeNav(); });
+['pointerdown','touchstart'].forEach(function(ev){ $('droidChip').addEventListener(ev,function(e){ e.stopPropagation(); },{passive:true}); });
+document.querySelector('.dr-tabs').addEventListener('click',function(e){ var b=e.target.closest('button[data-dr]'); if(!b) return; SND.click(); DR.tab=b.dataset.dr; renderDroid(); });
+$('navPanel').addEventListener('click',function(e){
+  var b=e.target.closest('[data-dr-act]'); if(!b) return; SND.click();
+  var act=b.dataset.drAct, card=b.closest('.dr-card'), key=card&&card.dataset.key;
+  if(act==='map'){ closeNav(); openMap(); return; }
+  if(act==='towns'){ openTowns(); return; }
+  if(act==='find'){ projectTap(); if(!$('navPanel').hidden) renderDroid(); return; }
+  var loc=null; for(var i=0;i<state.cargo.length;i++) if(state.cargo[i].dest.key===key){ loc=state.cargo[i].dest; break; }
+  if(!loc) return;
+  if(act==='track'){ setTrack(state.track===key?null:key); return; }
+  if(act==='go'){
+    if(state.route && !state.route.project && state.route.loc.key===key){ apOff(''); cancelRoute('ROUTE CANCELLED'); renderDroid(); return; }
+    state.track=key; startRoute(loc); droidChip(true);
+  }
+});
 
 /* ---------- My towns: every town in this system, or every town you've had a hand in, in one place ---------- */
 var twView='here';
@@ -5926,15 +6182,19 @@ function updateSpace(dt){
   else setPrompt(null);
   spaceAmbient(dt);
   updateDust(-.05-(f.boosting?.05:0)+(state.pulseK||0)*.03, clamp((state.vel.length()-8)/50,0,.7));
-  var dests=activeDests();
-  var cm=planets.map(function(p){ var dx=p.pos.x-ship.position.x, dz=p.pos.z-ship.position.z;
-    var drop=dests.some(function(d){ return d.loc.kind==='town' && d.loc.planet===p.index; });
-    return {bearing:bearingTo(dx,dz), color:drop?'#ffb24d':p.biome.crystal, label:drop?'DROP':(p===best||(state.ap&&state.ap.idx===p.index&&state.ap.kind==='planet')?fmt(Math.max(0,ship.position.distanceTo(p.pos)-p.radius))+'km':'')}; });
-  if(station){ var sdrop=dests.some(function(d){ return d.loc.kind==='station'; });
-    cm.push({bearing:bearingTo(station.center.x-ship.position.x,station.center.z-ship.position.z), color:sdrop?'#ffb24d':'#eef6ff', label:sdrop?'DROP':(sd<600?'STATION':'')}); }
+  var dests=activeDests(), TL=trackedLoc(), tl=TL&&TL.sys===SYS.seed?TL:null;
+  var cm=planets.map(function(p){ var dx=p.pos.x-ship.position.x, dz=p.pos.z-ship.position.z, pd=Math.max(0,ship.position.distanceTo(p.pos)-p.radius);
+    var drop=dests.some(function(d){ return d.loc.kind==='town' && d.loc.planet===p.index; }), trk=!!(tl && tl.kind==='town' && tl.planet===p.index);
+    if(trk) return {bearing:bearingTo(dx,dz), color:'#ffb24d', big:true, label:shortKm(pd)};
+    if(drop) return {bearing:bearingTo(dx,dz), color:'#ffb24d', small:true, label:''};
+    return {bearing:bearingTo(dx,dz), color:p.biome.crystal, label:(p===best||(state.ap&&state.ap.idx===p.index&&state.ap.kind==='planet')?fmt(pd)+'km':'')}; });
+  if(station){ var sdrop=dests.some(function(d){ return d.loc.kind==='station'; }), strk=!!(tl && tl.kind==='station'), sb=bearingTo(station.center.x-ship.position.x,station.center.z-ship.position.z);
+    cm.push(strk?{bearing:sb, color:'#ffb24d', big:true, label:shortKm(Math.max(0,sd-60))}:sdrop?{bearing:sb, color:'#ffb24d', small:true, label:''}:{bearing:sb, color:'#eef6ff', label:sd<600?'STATION':''}); }
   drawCompass(cm.concat(lawCompass()));
   var ri=planets.map(function(p){ return {x:p.pos.x, z:p.pos.z, color:p.biome.crystal, kind:'planet', size:p.radius}; });
   if(station) ri.push({x:station.center.x, z:station.center.z, color:'#eef6ff', kind:'station'});
+  dests.forEach(function(d){ var at=d.loc.kind==='station'?(station&&station.center):planets[d.loc.planet]&&planets[d.loc.planet].pos; if(!at) return;
+    ri.push({x:at.x, z:at.z, color:'#ffb24d', kind:tl&&tl.key===d.loc.key?'track':'job'}); });
   ri=ri.concat(lawRadar());
   var rr=Math.min(sd,best?bd:1e9); rr=clamp(rr*1.3,1100,90000);
   drawRadar(ship.position, state.yaw, rr, ri, sd<DOCK_RANGE?SYS.station.name:(best?best.biome.name:''));
@@ -6832,7 +7092,7 @@ function surfaceRadarItems(includeShip, focus){
   var items=[];
   S.fauna.forEach(function(c){ if(c.root.visible && Math.hypot(c.pos.x-focus.x,c.pos.z-focus.z)<170) items.push({x:c.pos.x, z:c.pos.z, color:state.found[c.sp.key]?c.sp.accent:'rgba(238,246,255,.75)', kind:'life'}); });
   S.resources.forEach(function(r){ if(r.scanned && !r.collected) items.push({x:r.x, z:r.z, color:S.biome.crystal, kind:'dot'}); });
-  S.towns.forEach(function(T){ items.push({x:T.x, z:T.z, color:townColor(T,townDest(T)), kind:'town'}); });
+  S.towns.forEach(function(T){ var dd=townDest(T); items.push({x:T.x, z:T.z, color:townColor(T,dd), kind:'town'}); if(dd && T.key===state.track) items.push({x:T.x, z:T.z, color:'#ffb24d', kind:'track'}); });
   if(includeShip) items.push({x:S.ship.position.x, z:S.ship.position.z, color:'#e7e1d2', kind:'ship'});
   return items;
 }
@@ -6847,8 +7107,9 @@ function aimLamp(from, dir, k){
 function destMarkersSurface(from){
   var m=[];
   S.towns.forEach(function(T){
-    var isDest=!!townDest(T), dt=Math.hypot(T.x-from.x,T.z-from.z);
-    m.push({bearing:bearingTo(T.x-from.x,T.z-from.z), color:state.waypoint===T.key&&!isDest?'#e7e1d2':townColor(T,isDest), label:(isDest?'DROP · ':'')+(dt>=1000?(dt/1000).toFixed(1)+'km':Math.round(dt)+'m')});
+    var isDest=!!townDest(T), dt=Math.hypot(T.x-from.x,T.z-from.z), trk=isDest && T.key===state.track;
+    if(isDest && !trk){ m.push({bearing:bearingTo(T.x-from.x,T.z-from.z), color:townColor(T,true), small:true, label:''}); return; }
+    m.push({bearing:bearingTo(T.x-from.x,T.z-from.z), color:state.waypoint===T.key&&!isDest?'#e7e1d2':townColor(T,isDest), big:trk, label:(isDest?'DROP · ':'')+(dt>=1000?(dt/1000).toFixed(1)+'km':Math.round(dt)+'m')});
   });
   return m;
 }
@@ -7184,16 +7445,18 @@ function renderMapList(){
       var T=o.T, row=document.createElement('button'), col=townColor(T,o.dest), flying=state.mode==='atmo' && !state.landing, apOn=state.ap && state.ap.kind==='town' && state.ap.key===T.key;
       row.type='button'; row.className='wp-row'+(o.dest?' drop':'')+(state.waypoint===T.key?' wpt':'');
       row.innerHTML='<span class="mp-ico" style="background:'+col+'"></span><span class="wp-name">'+T.name+'</span><span class="wp-dist">'+fmtDist(o.d)+'</span>'+
+        '<span class="dr-go'+(apOn?' ghost':'')+'" role="button" data-go aria-label="Go to '+T.name+'">GO</span>'+
         (o.dest?'<span class="wp-drop">▸ DROP · '+o.dest.crates+' CRATE'+(o.dest.crates>1?'S':'')+'</span>':'')+
         '<span class="wp-meta">'+T.label+(flying?(apOn?' · <span style="color:var(--cyan)">AUTOPILOT ENGAGED</span>':' · TAP TO FLY HERE ON AUTOPILOT · ETA '+clockStr(o.d/Math.max(1,atmoCruise())+4)):(state.waypoint===T.key?' · WAYPOINT SET':' · TAP TO SET WAYPOINT'))+'</span>';
-      row.addEventListener('click',function(){ if(flying){ startRoute(townLoc(S.idx,T.j||0)); return; } state.waypoint=state.waypoint===T.key?null:T.key; toast(state.waypoint?'WAYPOINT · '+T.name:'WAYPOINT CLEARED'); renderMapList(); drawMap(); });
+      row.addEventListener('click',function(e){ if(flying || e.target.closest('[data-go]')){ var gl=townLoc(S.idx,T.j||0); if(o.dest) state.track=gl.key; startRoute(gl); return; } state.waypoint=state.waypoint===T.key?null:T.key; toast(state.waypoint?'WAYPOINT · '+T.name:'WAYPOINT CLEARED'); renderMapList(); drawMap(); });
       list.appendChild(row);
     });
   var HT=homeT();
   if(HT){ var hrow=document.createElement('button'), hd=Math.hypot(HT.x-f.x,HT.z-f.z), hfly=state.mode==='atmo' && !state.landing, hon=state.ap && state.ap.key==='home'; hrow.type='button'; hrow.className='wp-row home';
     hrow.innerHTML='<span class="mp-ico" style="background:#e8c66a"></span><span class="wp-name">⌂ HOME</span><span class="wp-dist">'+fmtDist(hd)+'</span>'+
+      '<span class="dr-go'+(hon?' ghost':'')+'" role="button" data-go aria-label="Go home">GO</span>'+
       '<span class="wp-meta">'+homeTier().name+(hfly?(hon?' · <span style="color:var(--cyan)">AUTOPILOT ENGAGED</span>':' · TAP TO FLY HOME ON AUTOPILOT'):' · YOUR PRIVATE PAD')+'</span>';
-    hrow.addEventListener('click',function(){ if(hfly) startRoute(homeLoc()); });
+    hrow.addEventListener('click',function(e){ if(hfly || e.target.closest('[data-go]')) startRoute(homeLoc()); });
     list.insertBefore(hrow,list.children[state.mode==='atmo' && !state.landing?1:0]||null); }
 }
 function drawMap(){
@@ -7266,6 +7529,11 @@ function drawRadar(center, yaw, range, items, caption){
       rctx.save(); rctx.translate(X,Y);  rctx.beginPath(); rctx.moveTo(0,-8); rctx.lineTo(7,-1); rctx.lineTo(5,-1); rctx.lineTo(5,6); rctx.lineTo(-5,6); rctx.lineTo(-5,-1); rctx.lineTo(-7,-1); rctx.closePath(); rctx.fill(); rctx.restore();
     } else if(it.kind==='station'){
       rctx.save(); rctx.translate(X,Y); rctx.lineWidth=2; rctx.strokeRect(-5,-5,10,10); rctx.fillRect(-2,-2,4,4); rctx.restore();
+    } else if(it.kind==='track'){
+      rctx.lineWidth=2; rctx.beginPath(); rctx.arc(X,Y,9,0,TAU); rctx.stroke();
+      rctx.save(); rctx.translate(X,Y); rctx.rotate(Math.PI/4); rctx.fillRect(-3,-3,6,6); rctx.restore();
+    } else if(it.kind==='job'){
+      rctx.beginPath(); rctx.arc(X,Y,2.4,0,TAU); rctx.fill();
     } else if(it.kind==='life'){
       rctx.beginPath(); rctx.arc(X,Y,2.6,0,TAU); rctx.fill();
     } else {
@@ -7294,7 +7562,7 @@ function navTags(list){
     d.innerHTML='<span class="dia"></span><span class="lbl"><span class="nm"></span><b></b></span>'; navWrap.appendChild(d); navPool.push(d); }
   navPool.forEach(function(el,i){
     var it=list[i]; if(!it){ if(!el.hidden) el.hidden=true; return; }
-    el.hidden=false; el.classList.toggle('drop',!!it.drop);
+    el.hidden=false; el.classList.toggle('drop',!!it.drop); el.classList.toggle('mini',!!it.mini);
     var nm=el.querySelector('.nm'), sb=el.querySelector('b');
     if(nm.textContent!==it.name) nm.textContent=it.name; if(sb.textContent!==it.sub) sb.textContent=it.sub;
     projectTag(el,it.pos);
@@ -7308,6 +7576,7 @@ function spaceNav(){
     else { var p=planets[d.loc.planet], st=planetTerrain(p.biome).sites[d.loc.site||0];
       pos=st?p.pos.clone().addScaledVector(normalFromSurf(st.x,st.z),p.radius*1.08):p.pos.clone().add(new THREE.Vector3(0,p.radius*1.3,0));
       dist=Math.max(0,ship.position.distanceTo(p.pos)-p.radius); }
+    if(d.loc.key!==state.track) return {pos:pos, name:'', sub:'', drop:true, mini:true};
     return {pos:pos, name:'▸ '+d.loc.name, sub:d.crates+' CRATE'+(d.crates>1?'S':'')+' · '+shortKm(dist), drop:true};
   });
 }
@@ -7317,6 +7586,7 @@ function surfaceNav(from){
   S.towns.forEach(function(T){
     var d=Math.hypot(T.x-from.x,T.z-from.z), dest=townDest(T);
     if(d<28 || (!dest && d>900 && state.waypoint!==T.key)) return;
+    if(dest && T.key!==state.track){ out.push({pos:V3.set(T.x,T.pad.y+14,T.z).clone(), name:'', sub:'', drop:true, mini:true}); return; }
     out.push({pos:V3.set(T.x,T.pad.y+14,T.z).clone(), name:(dest?'▸ ':'')+T.name, sub:(dest?dest.crates+' CRATE'+(dest.crates>1?'S':'')+' · ':'')+(d>=1000?(d/1000).toFixed(1)+' KM':Math.round(d)+' M'), drop:!!dest});
   });
   return out;
@@ -7712,13 +7982,13 @@ function firstLoadDest(){
 function tutAt(i){ return !!(state.tut && !state.tut.done && state.tut.step===i); }
 function guideDest(){ var c=state.cargo[0]; return c?c.dest.name:(firstLoadDest()||{}).name||'the town'; }
 var GUIDE=[
-  {text:function(){ return 'Your rig is at the warp-in point. <b>Tap the radar</b> (top right, or press N) to open System Nav.'; },
+  {text:function(){ return 'Your rig is at the warp-in point. <b>Tap the radar</b> (top right, or press N) to open the nav droid.'; },
    done:function(){ return !$('navPanel').hidden || !!state.ap || !!state.dock || state.cargo.length>0; }},
   {text:function(){ return 'Pick <b>'+SYS.station.name+'</b>. The autopilot flies you in and docks you at the freight pier.'; },
    done:function(){ return (state.dock && state.dock.phase==='docked') || state.cargo.length>0; }},
   {text:function(){ return 'This is the job board. <b>LOAD</b> the Tool Crates for <b>'+guideDest()+'</b>, your first contract.'; },
    done:function(){ return state.cargo.length>0; }},
-  {text:function(){ return 'Tap <b>UNDOCK</b>, then tap your cargo line under the status panel (▸ 1 → '+guideDest()+'). The autopilot flies the whole route.'; },
+  {text:function(){ return 'Tap <b>UNDOCK</b>, then tap the <b>nav droid</b> chip (bottom left) and hit <b>GO</b> on '+guideDest()+'. The autopilot flies the whole route.'; },
    done:function(){ return (!!state.route && !state.dock) || !!(termLoc && termLoc.kind==='town'); }},
   {text:function(){ return 'Sit back. The rig pulses across, drops into the atmosphere and sets down on the pad at <b>'+guideDest()+'</b>. Touching the stick takes control.'; },
    done:function(){ return !!(termLoc && termLoc.kind==='town'); }},
@@ -7751,7 +8021,7 @@ function guideTick(){
   var T=state.tut;
   if(T && !T.done){
     var was=T.step; while(T.step<GUIDE.length && GUIDE[T.step].done()) T.step++;
-    if(was!==T.step || (T.step===3 && !state.dock && !state.route && !document.querySelector('#invrow .jobline.tut-glow'))){ renderInv(); if(termLoc) renderTerminal(); }
+    if(was!==T.step || (T.step===3 && !state.dock && !state.route && !document.querySelector('#droidChip.tut-glow'))){ renderInv(); if(termLoc) renderTerminal(); }
     if(T.step>=GUIDE.length){ guideFinish(); return; }
     guideShow('FIRST SHIFT · '+(T.step+1)+' OF '+GUIDE.length, GUIDE[T.step].text(), true); return;
   }
@@ -7820,7 +8090,7 @@ async function boot(){
   frame();
   setTimeout(streamShipModels,1500);
 }
-window.__nh={town:{grow:function(loc,p){ return growTown(loc,p); }, rec:townRec, kit:function(){ return TOWN_KIT; }, prompt:kitPrompt, invest:investIn, road:{fire:function(i){ ROAD_EVENTS[i].run(); }, ok:function(){ return ROAD_EVENTS.map(function(e){ return e.ok(); }); }, R:ROAD}, fleetVisit:function(tier,j){ var T=S&&S.towns[j||0]; return fleetVisit({tier:tier||2, name:'TF-09', pilot:{name:'WREN TEST', grade:'veteran'}},T); }, fleetVis:function(){ return fleetVis; }, home:{pt:function(){ return homeT(); }, loc:function(){ return homeLoc(); }, land:function(){ var H=homeT(); if(!H) return false; S.ship.position.set(H.x,H.pad.y+hullGear(S.ship),H.z); state.landing={t:1, pad:true, town:H, y0:H.pad.y+10, y1:H.pad.y}; disembark(); state.camFrom=null; return true; }}, shares:function(mins,eff){ return simShares(mins,eff==null?1:eff); }, terminal:openTerminal}, stationLoc:function(){ return stationLoc(); }, lineup:function(){ var sc=new THREE.Scene(); sc.background=new THREE.Color(.16,.165,.17); sc.environment=spaceScene.environment;
+window.__nh={droid:{DR:DR, groups:function(){ return jobGroups(); }, open:openDroid, close:closeNav, sites:function(){ return SYS?sysSiteLocs(SYS):[]; }, project:function(loc){ setProject(loc); renderInv(); }, deliver:function(loc){ var r=deliverHere(loc); renderInv(); return r; }}, town:{grow:function(loc,p){ return growTown(loc,p); }, rec:townRec, kit:function(){ return TOWN_KIT; }, prompt:kitPrompt, invest:investIn, road:{fire:function(i){ ROAD_EVENTS[i].run(); }, ok:function(){ return ROAD_EVENTS.map(function(e){ return e.ok(); }); }, R:ROAD}, fleetVisit:function(tier,j){ var T=S&&S.towns[j||0]; return fleetVisit({tier:tier||2, name:'TF-09', pilot:{name:'WREN TEST', grade:'veteran'}},T); }, fleetVis:function(){ return fleetVis; }, home:{pt:function(){ return homeT(); }, loc:function(){ return homeLoc(); }, land:function(){ var H=homeT(); if(!H) return false; S.ship.position.set(H.x,H.pad.y+hullGear(S.ship),H.z); state.landing={t:1, pad:true, town:H, y0:H.pad.y+10, y1:H.pad.y}; disembark(); state.camFrom=null; return true; }}, shares:function(mins,eff){ return simShares(mins,eff==null?1:eff); }, terminal:openTerminal}, stationLoc:function(){ return stationLoc(); }, lineup:function(){ var sc=new THREE.Scene(); sc.background=new THREE.Color(.16,.165,.17); sc.environment=spaceScene.environment;
     sc.add(new THREE.HemisphereLight(0xdfe6ee,0x30302c,.8)); var dl=new THREE.DirectionalLight(0xffffff,2.2); dl.position.set(-30,50,40); sc.add(dl);
     var x=0; [0,1,4,2,3].forEach(function(t){ var h=buildHull(t,true,{value:.4}); var bb=new THREE.Box3().setFromObject(h); h.position.set(x-bb.min.x,-h.userData.gear,0); x+=bb.max.x-bb.min.x+3; sc.add(h); });
     var cam=new THREE.PerspectiveCamera(30,innerWidth/innerHeight,.1,1000); cam.position.set(x/2,22,x*.95); cam.lookAt(x/2,0,0); SHOWCASE={scene:sc, cam:cam, ground:new THREE.Object3D()}; },
