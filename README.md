@@ -192,6 +192,15 @@ The game ships its own engine flames, glows, nav lights and lights, so models do
 - Tune town growth pace once it's been played (currently 30 / 70 / 160 growth per stage; construction ×3, business goods ×2).
 - Split `index.html` into modules and restore an automated test run, so new features can't quietly break old ones.
 
+## Trailer
+
+`tools/trailer.js` makes the 30-second trailer from the game itself. Open the game with `?trailer` on the address (served over HTTP), and it loads a director that plays eight scripted shots (title, freight pier, warp, re-entry, landing, city at night with a fleet rig, your estate, orbit and end card), renders every frame at a fixed 30 fps step at 1920×1080 (smooth whatever the machine manages live), draws the titles and 2.39:1 letterbox bars, mixes a stretch of the soundtrack with a few game sounds, and encodes an H.264/AAC MP4 in the browser with WebCodecs and [mp4-muxer](https://github.com/Vanilagy/mp4-muxer). In the console:
+
+- `__trailer.still(i, t)` saves a JPEG of shot `i` at `t` seconds, for framing.
+- `__trailer.render()` makes the whole film.
+
+Both POST their output to `/save?name=…`, so serve the repo with a small server that writes those into `trailer/` (ignored by git). The shots are staged in your current save, so set up a showcase save first: a city with businesses, a hilltop estate in it and a company.
+
 ## Sound credits
 
 Music in `audio/music/`: ambient soundscapes 001, 002, 003, 005, 006 and 007 by audiopapkin, and "Space Music Ambient" by freesound_community, from Pixabay under the Pixabay Content License (loudness-matched and re-encoded).

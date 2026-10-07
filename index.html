@@ -814,8 +814,8 @@ function buildComposer(){
   resize();
 }
 function resize(){
-  var w=window.innerWidth, h=window.innerHeight;
-  var pr = basePR()*resScale;
+  var w=DIRECTOR&&DIRECTOR.w||window.innerWidth, h=DIRECTOR&&DIRECTOR.h||window.innerHeight;   // the trailer renders at a fixed size
+  var pr = DIRECTOR&&DIRECTOR.w?1:basePR()*resScale;
   renderer.setPixelRatio(pr); renderer.setSize(w,h,false);
   if(composer){ composer.setPixelRatio(pr); composer.setSize(w,h); finalPass.uniforms.resolution.value.set(w*pr,h*pr); if(aaPass) aaPass.uniforms.rcp.value.set(1/(w*pr),1/(h*pr)); }
   camera.aspect=w/h; camera.updateProjectionMatrix();
@@ -7327,11 +7327,16 @@ function updateTitle(dt){
 
 var clock=new THREE.Clock(), fpsAcc=0, fpsN=0, fpsT=0, lastResChange=0;
 var SHOWCASE=null;   // test hook: render a hull on its own
-var CAMHOLD=null;    // test hook: pin the camera for screenshots
+var CAMHOLD=null;    // test hook: pin the camera for screenshots (or a function(camera, dt) that places it)
+var DIRECTOR=null;   // trailer hook: while set, the trailer tool drives frames itself at a fixed step (tools/trailer.js)
 function frame(){
   requestAnimationFrame(frame);
+  if(DIRECTOR) return;
+  tick(Math.min(.05,clock.getDelta()));
+}
+function tick(dtIn){
   if(SHOWCASE){ renderer.setRenderTarget(null); renderer.toneMapping=THREE.ACESFilmicToneMapping; renderer.outputEncoding=THREE.sRGBEncoding; renderer.render(SHOWCASE.scene,SHOWCASE.cam); return; }
-  var dt=Math.min(.05,clock.getDelta()); state.t+=dt;
+  var dt=dtIn; state.t+=dt;
   navSet=false; ENTRY_HEAT.value=0;
   if(state.mode==='title') updateTitle(dt);
   else if(state.mode==='space') updateSpace(dt);
@@ -7350,14 +7355,14 @@ function frame(){
     else pl.setRGB(.9,.88,.84); }
   if(rsc===spaceScene && state.mode!=='title') hullTrouble(dt, ship, spaceScene, false);
   var shk=applyShake(dt);
-  if(CAMHOLD){ camera.position.copy(CAMHOLD.p); camera.lookAt(CAMHOLD.l); }
+  if(typeof CAMHOLD==='function') CAMHOLD(camera,dt); else if(CAMHOLD){ camera.position.copy(CAMHOLD.p); camera.lookAt(CAMHOLD.l); }
   composer.render(dt);
   if(shk) camera.quaternion.copy(SHQ);
   $('enFill').style.width=state.energy.toFixed(1)+'%'; $('scFill').style.width=(state.scan*100).toFixed(1)+'%';
   fpsAcc+=dt; fpsN++; fpsT+=dt;
   if(fpsT>1.2){
     var fps=fpsN/fpsAcc; $('fps').textContent=Math.round(fps)+' FPS · '+Math.round(resScale*100)+'% RES';
-    if(state.t-lastResChange>2.5){
+    if(state.t-lastResChange>2.5 && !DIRECTOR){
       var ns=resScale;
       if(fps<34 && resScale>.55) ns=Math.max(.55,resScale-.12);
       else if(fps>55 && resScale<1) ns=Math.min(1,resScale+.08);
@@ -7588,6 +7593,8 @@ window.__nh={town:{grow:function(loc,p){ return growTown(loc,p); }, rec:townRec,
   warp:startWarp, dock:startDock, cam:function(){ return camera; }, station:function(){ return station; }, ship:function(){ return ship; }, state:state, getS:function(){ return S; }, sys:function(){ return SYS; }, enter:function(){ $('enterBtn').click(); },
   queue:queueSurface, terrain:planetTerrain, normalFromSurf:normalFromSurf, openMap:openMap, chunkBuilder:chunkBuilder, planets:function(){ return planets; }, offers:boardOffers, townLoc:townLoc,
   au:function(){ return AU; }, mu:function(){ return MU; }, law:{hall:function(){ return station&&station.gate; }, spawnPirates:spawnPirates, scan:customsScan, actors:function(){ return lawActors; }, heat:heatOf, sec:secOf}};
+if(/[?&]trailer\b/.test(location.search)){ window.__nh.director={tick:function(dt){ tick(dt); }, set:function(d){ DIRECTOR=d; }, cam:function(f){ CAMHOLD=f; }, renderer:renderer, composer:function(){ return composer; }, finalPass:function(){ return finalPass; }, camera:camera, station:function(){ return station; }, setScene:setScene, spaceScene:spaceScene, planets:function(){ return planets; }, surfaces:function(){ return surfaces; }, enterAtmosphere:enterAtmosphere, exitAtmosphere:exitAtmosphere, startWarp:startWarp, dockNow:function(){ state.resume={kind:'dock', sys:state.sysSeed}; resumeGame(); closeTerminal(); termLoc=null; }, undock:function(){ termLoc=null; $('stationPanel').hidden=true; undock(); }, homeT:homeT, enterHome:enterHome, exitHome:exitHome, rebuildTownAt:rebuildTownAt, fleetVisit:fleetVisit, buildHull:buildHull, setShipFlying:setShipFlying, resize:resize, Q:function(){ return Q; }, setRes:function(){ resize(); } };
+  var ts=document.createElement('script'); ts.src='tools/trailer.js'; document.head.appendChild(ts); }
 boot().catch(function(e){ console.error(e); $('loader').firstChild.nodeValue='Your device could not start the renderer: '+(e&&e.message||e); });
 })();
 </script>
