@@ -46,6 +46,13 @@ Each freighter hull has its own turn rate and weight: the Skiff snaps into turns
 ### The job
 - **Freight contracts:** take standard, fragile, perishable and hazardous loads between the station and towns in each system; your hold has limited crate slots. In-system legs pay about 150–250 a crate by distance (more for fragile, perishable and hazardous loads), warp legs about 500–650, and contraband several times that. Big hulls (Longhaul and up) also see **bulk** loads of 3–4 crates, no permit needed, so a bigger hold means more work, not just fewer trips.
 - **Economy at a glance:** a careful early run earns a few thousand units an hour in a Skiff and around 8,000 in an Atlas on ordinary freight, more with special cargo and warp runs. That puts a Mule about 15 minutes in, an Atlas around 90 minutes, your own company in 2–3 hours, a cabin around 6 hours and an estate at 20+ hours of play. Fleet ships pay for themselves in roughly a day of play, and town shares in one to three days. Saves from before the October 2026 rebalance had their units, company account, cargo pay and share stakes scaled to a fifth, once, on load.
+- **Story contracts:** about half the boards carry one job with a reason behind it: a vaccine run to a fevered town, an axle for a stranded rig, a wedding cake, roof panels before a storm, shoring charges for a mine collapse, desks for a first school, and more. They're tagged in purple with the premise underneath, pay a quarter more (some come with a deadline), grow the town by 2 extra, and end with a short epilogue when you deliver.
+- **On the road:** while a route is flying itself, every four to eight minutes something wants one quick decision, and the route pauses until you answer:
+  - **Distress call:** send 20 fuel to a stranded hauler (they pay you back later), or keep flying. In rough systems it can be bait.
+  - **Broker:** sell a crate on the spot for 35% over the contract, but the town never gets it or grows from it.
+  - **Storm over the drop:** push through (hull wear, fragile cargo shaken) or circle until it passes (two minutes off your perishable deadlines).
+  - **Ride wanted:** take a passenger to where you're heading for a fare.
+  - **Customs tip-off,** when you're carrying contraband: dump it, or keep it and face a sharper scan.
 - **Delivery routes:** tap a cargo line under your status panel (or any destination in System Nav or the planet map) and the autopilot chains every leg: warp if it's in another system, pulse across, drop into the atmosphere, cruise to the town and land on its pad, or fly in and dock at the station. Raiders and patrols pause the route and hand you control; it resumes once things are quiet. Touching the stick cancels it.
 - **Local or warp at a glance:** jobs in the system you're in show in amber and jobs that need a warp show in blue, on the HUD cargo list and on every contract board. The HUD lists in-system drops first, then warp drops grouped by system, and boards tag warp jobs headed to a system you're already carrying freight to (**ON YOUR … RUN**), so you can stack a trip instead of zig-zagging.
 - **Project town:** pick one town as your project from its Town tab. Every board in its system keeps a slot for loads going there (two at the station): construction while it grows, its businesses' wants once they're open, at standard rates. They're marked ★ in gold and pinned to the top of each board. A ★ line on the HUD shows the project's stage and progress; tap it to fly to the nearest board with a project load (or to warp to the project's system if you're elsewhere). Each time your project reaches a new stage you get a card with what it unlocked and what you put in (crates hauled, units invested, fleet growth), a CB shout-out, and the choice to keep building or pick a new project.
@@ -161,6 +168,7 @@ The game ships its own engine flames, glows, nav lights and lights, so models do
 - **Your fleet in the world:** company rigs fly in and land at town pads on the planet you're on, and your pilots chat on the CB.
 - **Safer saves:** resume where you left off, rolling backups with automatic recovery, and save files you can export and import.
 - **Economy rebalance:** contract pay cut to about a fifth (it had drifted 10–20× high once the systems were widened), bulk loads for big hulls, fleet pay to a fifth, share yields to a quarter with per-town caps, and buying growth costs 400 units a point. Older saves are scaled to match on load.
+- **Stories on the road:** story contracts with a premise and an epilogue, and road events on autopilot runs (distress calls, brokers, storms, riders, customs tip-offs).
 
 ### Next up (in this order)
 1. **Town kit models.** Generate the town pieces from [docs/town-kit-prompts.md](docs/town-kit-prompts.md) and swap them in: start with the town core and one ring-2 block to check the look in-game, then the rest of the blocks and the five business buildings.
@@ -173,7 +181,7 @@ The game ships its own engine flames, glows, nav lights and lights, so models do
    - The big growth jumps (town to city) need bulk construction loads only a freighter can bring into orbit; your rigs ferry it down.
 3. **Bulk hauling.** Large station-to-station contracts sized for a freighter's hold.
 4. **Upkeep, threats and upgrades for freighters.** Daily running costs (fuel, crew wages), raiders that target a parked freighter, and upgrades such as more hangar bays, cargo pods, crew quarters and a fuel refinery.
-5. **More decisions on the road.** Moments like the contraband prompt, so autopilot runs stay interesting: distress calls, pirate offers, fuel-versus-time shortcuts.
+5. **More road stories.** More story contracts and events (multi-leg story chains, pirate offers, fuel-versus-time shortcuts on warps), and towns that remember the driver who helped them.
 
 ### Housekeeping along the way
 - ~~Load only the models needed at start and fetch the rest in the background.~~ Done: models are also meshopt-compressed (11.6 MB down to 4.7 MB).

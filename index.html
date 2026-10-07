@@ -358,6 +358,8 @@ button:focus-visible{outline:2px solid var(--cyan);outline-offset:3px;}
 .st-row.job.warp{box-shadow:inset 3px 0 0 var(--warp);} .st-row.job.warp .nm small{color:var(--warp);}
 .st-row.job.proj{box-shadow:inset 3px 0 0 #e8c66a;}
 .tag.k-run{color:#06101f;background:var(--warp);}
+.tag.k-story{color:#eef6ff;background:#5a3f6e;} .st-row.job.story{box-shadow:inset 3px 0 0 #9b7bbf;} .st-row .nm small.premise{font-style:italic;color:#cbb8de;}
+#lawPanel.law-story{border-color:rgba(155,123,191,.85);box-shadow:0 0 28px rgba(155,123,191,.3);} #lawPanel.law-story #lwEye{color:#cbb8de;}
 .st-note.legend i{display:inline-block;width:.6rem;height:.6rem;margin:0 .35rem 0 .1rem;vertical-align:-.05rem;border-radius:2px;}
 .st-note.legend .lg-warp{background:var(--warp);} .st-note.legend .lg-proj{background:#e8c66a;}
 .wp-meta{grid-column:2 / 4;font-family:var(--font-mono);font-size:.6rem;letter-spacing:.06em;color:var(--ink-dim);}
@@ -3353,12 +3355,12 @@ try{
   if(sv){
     state.credits=sv.credits||0; state.found=sv.found||{}; state.sysSeed=sv.sys||0; state.up=sv.up||{}; state.cargo=sv.cargo||[]; state.taken=sv.taken||{}; state.boardGen=sv.boardGen||{}; state.boardT=sv.boardT||{}; state.delivered=sv.delivered||0; state.towns=sv.towns||{};
     state.mods=sv.mods||[]; state.modsOwned=sv.modsOwned||{}; state.lic=sv.lic||{}; state.fuel=sv.fuel; state.hull=sv.hull==null?100:sv.hull; state.company=sv.company||null; state.hullSel=sv.hullSel==null?null:sv.hullSel; state.rooks=sv.rooks||{}; retireWedge(sv); state.fits=sv.fits||{}; state.fuelReserve=sv.fuelReserve||0; state.cleared=sv.cleared===undefined?(sv.sys||0):sv.cleared; state.heat=sv.heat||{}; state.flares=sv.flares==null?3:sv.flares;
-    state.food=sv.food==null?100:sv.food; state.rest=sv.rest==null?100:sv.rest; state.rations=sv.rations==null?2:sv.rations; state.fedT=sv.fedT||0; state.restedT=sv.restedT||0; state.needsOff=!!sv.needsOff; state.shareLast=sv.shareLast==null?null:sv.shareLast; state.shareAcc=sv.shareAcc||0; state.project=sv.project||null; state.home=sv.home||null; state.resume=sv.resume||null;
+    state.food=sv.food==null?100:sv.food; state.rest=sv.rest==null?100:sv.rest; state.rations=sv.rations==null?2:sv.rations; state.fedT=sv.fedT||0; state.restedT=sv.restedT||0; state.needsOff=!!sv.needsOff; state.shareLast=sv.shareLast==null?null:sv.shareLast; state.shareAcc=sv.shareAcc||0; state.project=sv.project||null; state.home=sv.home||null; state.resume=sv.resume||null; state.passenger=sv.passenger||null;
     Object.keys(sv.inv||{}).forEach(function(k){ var nk=OLD_KEYS[k]||k; if(ELEMENTS[nk]) state.inv[nk]=(state.inv[nk]||0)+sv.inv[k]; });
   }
 }catch(e){}
 drawThrottle();
-function save(){ if(saveLock) return; try{ snapResume(); }catch(e){} var data; try{ data=JSON.stringify({v:SAVE_V,resume:state.resume,credits:state.credits,inv:state.inv,found:state.found,sys:state.sysSeed,up:state.up,cargo:state.cargo,taken:state.taken,boardGen:state.boardGen,boardT:state.boardT,delivered:state.delivered,towns:state.towns,
+function save(){ if(saveLock) return; try{ snapResume(); }catch(e){} var data; try{ data=JSON.stringify({v:SAVE_V,resume:state.resume,passenger:state.passenger,credits:state.credits,inv:state.inv,found:state.found,sys:state.sysSeed,up:state.up,cargo:state.cargo,taken:state.taken,boardGen:state.boardGen,boardT:state.boardT,delivered:state.delivered,towns:state.towns,
   mods:state.mods,modsOwned:state.modsOwned,lic:state.lic,fuel:state.fuel,hull:state.hull,company:state.company,hullSel:state.hullSel,rooks:state.rooks,fits:state.fits,fuelReserve:state.fuelReserve,cleared:state.cleared,heat:state.heat,flares:state.flares,
   food:state.food,rest:state.rest,rations:state.rations,fedT:state.fedT,restedT:state.restedT,needsOff:state.needsOff,shareLast:state.shareLast,shareAcc:state.shareAcc,project:state.project,home:state.home}); localStorage.setItem('nh_save',data); rollBackup(data); }catch(e){} }
 /* ---------- keeping saves safe: a rolling backup every 10 minutes (two kept), a fallback to it if the main save is
@@ -3917,8 +3919,30 @@ function boardOffers(loc){
     out.push({id:id2, kind:kind2, name:B.export[Math.floor(r()*B.export.length)], crates:cr2, reward:Math.round(jobBase(dist2,0)*KIND_MULT[kind2]*(cr2===2?1.75:1)*1.2/10)*10,
       from:loc.name+' · '+B.name, dest:dest2, ly:0, limit:kind2==='perishable'?Math.round((dist2/90+4)*60):0}); });
   if(loc.kind==='town') out=out.concat(contrabandOffers(loc,g));
+  storyOffer(out,loc,g);
   return out;
 }
+/* ---------- story contracts: now and then a job comes with a reason. It pays a quarter more, grows the town a little
+   extra, and ends with an epilogue when you deliver it. {D} is the destination. ---------- */
+var STORIES=[
+  {k:['perishable'], t:'VACCINE RUN', n:'Vaccine Batch', p:'A fever is going round the bunkhouses at {D}. The batch has to get there cold and fast.', e:'The medic at {D} logs the batch in. Nobody else gets sick this week.', lim:600},
+  {k:['standard','construction'], t:'STRANDED RIG', n:'Axle Assembly', p:'A hauler broke an axle outside {D}. These parts get them rolling again.', e:'Somewhere outside {D} a rig fires up and rolls. They owe you one.'},
+  {k:['fragile'], t:'WEDDING CAKE', n:'Wedding Cake', p:'Three tiers, one chance. The wedding at {D} starts whether you\u2019re there or not.', e:'The cake survives the trip. They save you a slice at {D}.', lim:720},
+  {k:['construction'], t:'BEFORE THE STORM', n:'Roof Panels', p:'{D} needs its roof panels up before the weather turns.', e:'The panels go up at {D} an hour before the storm hits. Dry beds tonight.', lim:900},
+  {k:['hazardous'], t:'MINE COLLAPSE', n:'Shoring Charges', p:'Shoring charges for a collapsed shaft near {D}. There are miners on the other side.', e:'They blast a way through at {D}. Everyone walks out.'},
+  {k:['standard'], t:'FIRST SCHOOL', n:'School Desks', p:'The first school at {D} opens tomorrow and the desks are still at the depot.', e:'Thirty kids at {D} sit at real desks for the first time.'},
+  {k:['fragile'], t:'SECOND-HAND TELESCOPE', n:'Telescope Lens', p:'An old stargazer at {D} saved for years for this lens.', e:'That night at {D}, somebody sees the rings of another world for the first time.'},
+  {k:['perishable'], t:'FRESH CATCH', n:'Fresh Catch', p:'The cantina at {D} promised fresh fish tonight. Keep them honest.', e:'Fish on the grill at {D}. The cook raises a glass to the sky.', lim:720},
+  {k:['standard','construction'], t:'DEAD PUMP', n:'Well Pump', p:'The well pump at {D} died. They\u2019re carrying water by hand until you show.', e:'Water runs again at {D}. Somebody paints your rig number on the pump house.'},
+  {k:['oversize'], t:'TURBINE FOR THE GRID', n:'Turbine Blades', p:'Half of {D} is on rationed power until this turbine is spinning.', e:'The lights come back on across {D}.'}
+];
+function storyOffer(out, loc, g){
+  var r=rng(ihash(ihash(SYS.seed+91,loc.planet+20+(loc.site||0)*100),g*31+41)); if(r()>.45) return;
+  var pool=out.filter(function(o){ return o.dest.kind==='town' && o.kind!=='contraband' && !isProject(o.dest) && STORIES.some(function(S0){ return S0.k.indexOf(o.kind)>=0; }); }); if(!pool.length) return;
+  var o=pool[Math.floor(r()*pool.length)], fits=STORIES.map(function(S0,i){ return S0.k.indexOf(o.kind)>=0?i:-1; }).filter(function(i){ return i>=0; }), si=fits[Math.floor(r()*fits.length)];
+  o.story=si; o.name=STORIES[si].n; o.reward=Math.round(o.reward*1.25/10)*10; if(STORIES[si].lim && !o.limit) o.limit=STORIES[si].lim;
+}
+function storyText(si, field, dest){ var S0=STORIES[si]; return S0?S0[field].replace(/\{D\}/g,dest.name):''; }
 /* systems (other than this one) you are carrying freight for */
 function remoteDests(){
   var m={};
@@ -3928,7 +3952,7 @@ function remoteDests(){
 function acceptOffer(o, loc){
   if(holdUsed()+o.crates>holdCap() || kindNeeds(o.kind)) return false;
   state.taken[o.id]=1;
-  state.cargo.push({id:o.id, kind:o.kind, biz:o.biz||null, grade:o.grade, name:o.name, crates:o.crates, reward:o.reward, from:o.from, dest:o.dest, cond:1,
+  state.cargo.push({id:o.id, kind:o.kind, biz:o.biz||null, story:o.story==null?null:o.story, grade:o.grade, name:o.name, crates:o.crates, reward:o.reward, from:o.from, dest:o.dest, cond:1,
     expires:o.limit?Date.now()+o.limit*1000:0});
   if(!boardOffers(loc).length) bumpBoard(loc.key);
   return true;
@@ -4412,14 +4436,14 @@ setInterval(function(){
   renderInv(); save();
 },5000);
 function deliverHere(loc){
-  var total=0, n=0, late=0, pts=0;
+  var total=0, n=0, late=0, pts=0, stories=[];
   state.cargo=state.cargo.filter(function(c){
     if(c.dest.key!==loc.key) return true;
     if(c.kind!=='contraband' && !isCleared()) return true;
-    var p=cargoPay(c); total+=p.pay; n+=c.crates; if(p.late) late++; pts+=c.crates*(c.kind==='construction'?3:c.biz?2:1); return false;
+    var p=cargoPay(c); total+=p.pay; n+=c.crates; if(p.late) late++; pts+=c.crates*(c.kind==='construction'?3:c.biz?2:1)+(c.story!=null?2:0); if(c.story!=null) stories.push({si:c.story, pay:p.pay, late:p.late}); return false;
   });
   if(n){ state.credits+=total; state.delivered=(state.delivered||0)+n; if(isProject(loc)) state.project.crates=(state.project.crates||0)+n; }
-  return {total:total, n:n, late:late, grew:growTown(loc,pts)};
+  return {total:total, n:n, late:late, grew:growTown(loc,pts), stories:stories};
 }
 var lastImpactToast=0;
 function cargoImpact(v){
@@ -4788,7 +4812,7 @@ function updateDock(dt){
 
 var stTab='cargo', termLoc=null;
 function openTerminal(loc){
-  closeMap(); termLoc=loc;
+  closeMap(); termLoc=loc; payPassenger(loc);
   $('stEye').textContent=loc.kind==='home'?'HOME · '+loc.town+' · '+loc.pname:(loc.kind==='station'?'DOCKED':'LANDED')+' · '+(loc.kind==='station'?SYS.name:loc.pname+' · '+SYS.name);
   $('stName').textContent=loc.kind==='home'?'YOUR '+homeTier().name:loc.name;
   var tabs=loc.kind==='home'?['home','garage','services']:loc.kind==='station'?['cargo','trade','services','upgrades','fleet']:['cargo','trade','services','town'];
@@ -4833,7 +4857,7 @@ function renderTerminal(tab){
     if(other.length){
       h+='<div class="st-sub">IN YOUR HOLD</div>';
       other.forEach(function(c){ var tl=timeLeft(c), fr=SYS&&c.dest.sys!==SYS.seed;
-        h+='<div class="st-row job'+(fr?' warp':'')+(isProject(c.dest)?' proj':'')+'"><span class="nm">'+(isProject(c.dest)?'★ ':'')+c.name+tagHTML(c.kind,c.grade)+'<small>To '+destLabel(c.dest)+'</small>'+
+        h+='<div class="st-row job'+(fr?' warp':'')+(isProject(c.dest)?' proj':'')+(c.story!=null?' story':'')+'"><span class="nm">'+(isProject(c.dest)?'★ ':'')+c.name+(c.story!=null?'<span class="tag k-story">'+STORIES[c.story].t+'</span>':'')+tagHTML(c.kind,c.grade)+'<small>To '+destLabel(c.dest)+'</small>'+
           '<small class="fx">'+fmt(cargoPay(c).pay)+' units'+(tl?' · '+tl+' left':'')+(c.kind==='fragile'?' · condition '+Math.round(c.cond*100)+'%':'')+'</small></span></div>'; });
     }
     var offers=boardOffers(loc);
@@ -4847,7 +4871,7 @@ function renderTerminal(tab){
     offers=offers.map(function(o,i){ return {o:o, i:i}; }).sort(function(a,b){ return rank(a.o)-rank(b.o) || a.i-b.i; }).map(function(x){ return x.o; });
     offers.forEach(function(o){
       var fits=used+o.crates<=cap, need=kindNeeds(o.kind), pj=isProject(o.dest);
-      h+='<div class="st-row job'+(need?' locked':'')+(o.ly?' warp':'')+(pj?' proj':'')+'"><span class="nm">'+(pj?'★ ':'')+o.name+tagHTML(o.kind,o.grade)+(o.ly&&runs[o.dest.sys]?'<span class="tag k-run">ON YOUR '+o.dest.sysName+' RUN</span>':'')+'<small>'+o.crates+' crate'+(o.crates>1?'s':'')+' to '+destLabel(o.dest)+'</small>'+
+      h+='<div class="st-row job'+(need?' locked':'')+(o.ly?' warp':'')+(pj?' proj':'')+(o.story!=null?' story':'')+'"><span class="nm">'+(pj?'★ ':'')+o.name+tagHTML(o.kind,o.grade)+(o.story!=null?'<span class="tag k-story">'+STORIES[o.story].t+'</span><small class="premise">'+storyText(o.story,'p',o.dest)+' Pays a quarter more.</small>':'')+(o.ly&&runs[o.dest.sys]?'<span class="tag k-run">ON YOUR '+o.dest.sysName+' RUN</span>':'')+'<small>'+o.crates+' crate'+(o.crates>1?'s':'')+' to '+destLabel(o.dest)+'</small>'+
         '<small class="fx">'+(o.ly?'<span class="xs">WARP '+o.ly+' LY</span> ':'')+'Pays '+fmt(o.reward)+' units'+(o.limit?' · '+Math.round(o.limit/60)+' min limit':'')+(o.kind==='fragile'?' · pay drops if you crash':'')+'</small></span>'+
         '<span class="acts"><button class="pri" data-act="accept" data-id="'+o.id+'"'+(fits&&!need?'':' disabled')+'>'+(need?need:fits?'LOAD':'HOLD FULL')+'</button></span></div>';
     });
@@ -5124,7 +5148,7 @@ $('stationPanel').addEventListener('click',function(e){
   else if(act==='invest'){ var ia=+t.dataset.amt, ir=investIn(loc,ia); if(!ir) return;
     SND.cash(); toast('INVESTED '+fmt(ia)+' IN '+loc.name+(ir.pts?' · +'+ir.pts+' GROWTH':''),'life');
     if(ir.grew==null) CB.queue=cbPick(['Word is somebody’s putting real money into '+loc.name+'. Cranes going up.','Fresh money in '+loc.name+'. Expect more work out that way.']); }
-  else if(act==='deliver'){ var r=deliverHere(loc); if(r.n){ SND.cash(); sfx('forklift',.5,1.06); AU.forkT=Math.max(AU.forkT,10); } if(r.n) toast('DELIVERED '+r.n+' CRATE'+(r.n>1?'S':'')+' · +'+fmt(r.total)+' UNITS'+(r.late?' · '+r.late+' LATE':''),'life'); }
+  else if(act==='deliver'){ var r=deliverHere(loc); if(r.stories && r.stories.length) setTimeout(function(){ showEpilogue(r.stories,loc); },700); if(r.n){ SND.cash(); sfx('forklift',.5,1.06); AU.forkT=Math.max(AU.forkT,10); } if(r.n) toast('DELIVERED '+r.n+' CRATE'+(r.n>1?'S':'')+' · +'+fmt(r.total)+' UNITS'+(r.late?' · '+r.late+' LATE':''),'life'); }
   renderInv(); save(); renderTerminal();
 });
 $('undockBtn').addEventListener('click',function(){ if(termLoc && termLoc.kind==='station') undock(); else closeTerminal(); });
@@ -5492,7 +5516,7 @@ function routeTick(dt){
   }
   if(state.scale){ R.paused=true; R.clearT=0; R.scaled=true; return; }   // on the customs scale: not a hostile pause
   // hostiles pause the route; it picks up again once things are quiet
-  if(hostileNow()){ if(!R.paused){ R.paused=true; if(state.ap) apOff(''); toast('ROUTE PAUSED · YOU HAVE CONTROL'); } R.clearT=0; return; }
+  if(hostileNow()){ if(!R.paused){ R.paused=true; if(state.ap) apOff(''); if(!(state.law && (state.law.type==='road'||state.law.type==='project'))) toast('ROUTE PAUSED · YOU HAVE CONTROL'); } R.clearT=0; return; }
   if(R.paused){ R.clearT+=.4; if(R.clearT<(R.scaled?1.2:3)) return; R.paused=false; toast((R.scaled&&isCleared()?'CUSTOMS CLEARED · ':'')+'ROUTE RESUMED · '+L.name,'life'); R.scaled=false; }
   if(state.ap) return;   // a leg is already flying
   if(state.mode==='space' && inCustomsHall()){   // roll out the far end before turning for the drop
@@ -5524,6 +5548,76 @@ function routeTick(dt){
     if(L.sys===SYS.seed && (L.kind==='town'||L.kind==='home') && S && S.idx===L.planet && (townByKey(L.key)||(L.kind==='home'&&townByKey(state.home.key)))){ startAtmoAutopilot(townByKey(L.key)||townByKey(state.home.key)); if(state.ap) state.ap.route=true; }
     else { startOrbitAutopilot(); if(state.ap) state.ap.route=true; }
   }
+}
+
+/* =========================================================================
+   On the road: while a route is flying itself, every few minutes something comes up that wants one quick decision.
+   The panel pauses the route; it carries on once you've answered.
+   ========================================================================= */
+var ROAD={t:0, next:200};
+function roadTick(dt){
+  if(!state.route || !state.ap || state.law || state.dock || state.warp || state.spool || state.landing || state.sleeping || termLoc || hostileNow()) return;
+  if(state.mode!=='space' && state.mode!=='atmo') return;
+  ROAD.t+=dt; if(ROAD.t<ROAD.next) return;
+  ROAD.t=0; ROAD.next=230+Math.random()*250;
+  var ev=ROAD_EVENTS.filter(function(e){ return e.ok(); }); if(!ev.length) return;
+  var tot=ev.reduce(function(a,e){ return a+e.w; },0), x=Math.random()*tot;
+  for(var i=0;i<ev.length;i++){ x-=ev[i].w; if(x<=0){ ev[i].run(); sfx('confirm',.5,.8); return; } }
+}
+function roadPanel(o){ o.type='road'; o.tone=o.tone||'story'; showLaw(o); }
+function sellable(){ return state.cargo.filter(function(c){ return c.kind!=='contraband' && c.story==null && !isProject(c.dest); }); }
+var ROAD_EVENTS=[
+  {w:3, ok:function(){ return state.mode==='space' && state.fuel>=30; }, run:function(){
+    var sec=secOf(SYS.seed), rough=sec.pirates>.5;
+    roadPanel({eye:'CH9 · DISTRESS', title:'“Running on fumes out here…”',
+      body:'<p>A stranded hauler off the lane is asking for 20 fuel to make the station.'+(rough?' This is rough space. It could be genuine. It could be bait.':' Sounds genuine.')+'</p>',
+      buttons:[{label:'SEND 20 FUEL', cls:'pri', fn:function(){ state.fuel-=20;
+          if(Math.random()<sec.pirates*.35){ toast('IT WAS BAIT'); setTimeout(spawnPirates,800); return; }
+          var back=150+Math.round(Math.random()*25)*10; toast('FUEL SENT · THEY’RE MOVING AGAIN','life');
+          setTimeout(function(){ state.credits+=back; renderInv(); save(); toast('THE HAULER YOU HELPED SENT '+fmt(back)+' UNITS · “WE OWE YOU”','life'); CB.queue={who:'MAYDAY MIKE', line:'That’s the driver who stopped for me. Drinks are on me, wherever you are.'}; },25000); }},
+        {label:'KEEP FLYING', fn:function(){ CB.queue=cbPick(['Somebody just flew past a mayday. Cold, driver.','Heard that call go unanswered. Hope they made it.']); }}]});
+  }},
+  {w:3, ok:function(){ return sellable().length>0; }, run:function(){
+    var c=sellable().sort(function(a,b){ return b.reward-a.reward; })[0], offer=Math.round(cargoPay(c).pay*1.35/10)*10;
+    roadPanel({eye:'CH19 · BROKER', title:'“I’ll take that off your hands.”',
+      body:'<p>A broker on the channel wants your <b>'+c.name+'</b> ('+c.crates+' crate'+(c.crates>1?'s':'')+') and will pay <b>'+fmt(offer)+'</b> right now, '+fmt(offer-cargoPay(c).pay)+' over the contract. '+c.dest.name+' doesn’t get it, and won’t grow from it.</p>',
+      buttons:[{label:'SELL · +'+fmt(offer), cls:'pri', fn:function(){ state.cargo=state.cargo.filter(function(x){ return x!==c; }); state.credits+=offer; SND.cash(); toast('SOLD ON THE ROAD · +'+fmt(offer)+' UNITS','life'); if(state.route && !state.route.project && state.route.loc.kind!=='home' && !state.cargo.some(function(x){ return x.dest.key===state.route.loc.key; })) cancelRoute('NOTHING LEFT FOR '+state.route.loc.name+' · ROUTE CLEARED'); }},
+        {label:'KEEP THE CONTRACT', fn:function(){ toast(c.dest.name+' IS COUNTING ON IT'); }}]});
+  }},
+  {w:2, ok:function(){ return state.mode==='atmo' && state.route && state.route.loc.kind==='town'; }, run:function(){
+    var L=state.route.loc, frag=state.cargo.some(function(c){ return c.kind==='fragile'; }), per=state.cargo.some(function(c){ return c.expires; });
+    roadPanel({eye:'WEATHER · '+(S?S.biome.name:''), title:'Storm cell over '+L.name,
+      body:'<p>A squall line is sitting between you and the pad. Push through for a rough ride'+(frag?' (fragile cargo will get shaken)':'')+', or circle until it passes'+(per?' and let the clock run on your perishables':'')+'.</p>',
+      buttons:[{label:'PUSH THROUGH', cls:'pri', fn:function(){ wearHull(5); addShake(.7); state.cargo.forEach(function(c){ if(c.kind==='fragile') c.cond=Math.max(.3,c.cond-(hasMod('shock')?.05:.15)); }); toast('ROUGH RIDE · HULL '+Math.round(state.hull)+'%'); }},
+        {label:'CIRCLE AND WAIT', fn:function(){ state.cargo.forEach(function(c){ if(c.expires) c.expires-=120000; }); toast('YOU WAIT IT OUT · 2 MINUTES LOST'); }}]});
+  }},
+  {w:2, ok:function(){ return !state.passenger && state.mode==='space' && state.route && state.route.loc.kind!=='home'; }, run:function(){
+    var L=state.route.loc, fare=120+Math.round(Math.random()*18)*10;
+    roadPanel({eye:'CH19 · RIDE WANTED', title:'“Got room in the cab?”',
+      body:'<p>A miner whose shuttle fell through needs to get to <b>'+L.name+'</b>, same as you. '+fmt(fare)+' units when you get there.</p>',
+      buttons:[{label:'TAKE THEM · +'+fmt(fare), cls:'pri', fn:function(){ state.passenger={key:L.key, name:L.name, fare:fare}; toast('PASSENGER ABOARD · TO '+L.name,'life'); }},
+        {label:'NO ROOM', fn:function(){}}]});
+  }},
+  {w:3, ok:function(){ return contrabandAboard().length && secOf(SYS.seed).customs && state.scanHot!==SYS.seed; }, run:function(){
+    var hot=contrabandAboard();
+    roadPanel({eye:'CH19 · TIP-OFF', tone:'warn', title:'“Scanners are running hot today.”',
+      body:'<p>A friend on the channel says customs at '+SYS.station.name+' turned the scanners up. Dump the hot cargo now and lose it, or keep it and take your chances with a closer look.</p>',
+      buttons:[{label:'DUMP IT', fn:function(){ state.cargo=state.cargo.filter(function(c){ return hot.indexOf(c)<0; }); toast('CONTRABAND DUMPED · CLEAN AS A WHISTLE'); }},
+        {label:'KEEP IT', cls:'pri', fn:function(){ state.scanHot=SYS.seed; toast('YOU KEEP IT · THE NEXT SCAN HERE LOOKS HARDER'); }}]});
+  }}
+];
+function payPassenger(loc){
+  var P=state.passenger; if(!P || !loc || P.key!==loc.key) return;
+  state.passenger=null; state.credits+=P.fare; renderInv(); save();
+  setTimeout(function(){ toast('YOUR PASSENGER HOPS OUT AT '+loc.name+' · +'+fmt(P.fare)+' UNITS','life'); },400);
+}
+/* a story job's ending */
+function showEpilogue(list, loc){
+  if(state.law){ setTimeout(function(){ showEpilogue(list,loc); },1500); return; }
+  var s0=list[0], S0=STORIES[s0.si]; if(!S0) return;
+  roadPanel({eye:'DELIVERED · '+S0.t, title:loc.name,
+    body:'<p>'+storyText(s0.si,'e',loc)+'</p><p>+'+fmt(s0.pay)+' units'+(s0.late?' (late)':'')+' · +2 growth for '+loc.name+'.</p>'+(list.length>1?'<p>And '+(list.length-1)+' more story job'+(list.length>2?'s':'')+' delivered here.</p>':''),
+    buttons:[{label:'ON TO THE NEXT ONE', cls:'pri', fn:function(){}}]});
 }
 
 /* =========================================================================
@@ -6073,9 +6167,10 @@ function customsScan(source, then){
   if(state.spool) cancelSpool('WARP ABORTED · CUSTOMS HOLD');
   var sec=secOf(SYS.seed), harsh=source==='patrol'?1.25:source==='chase'?1.6:1, heat=heatOf(SYS.seed), found=[];
   contrabandAboard().forEach(function(c){
-    var p=CB_GRADES[c.grade].detect*Math.max(sec.scan,.5)*harsh*(hasMod('hidden')?.45:1)*(1+heat*.12);
+    var p=CB_GRADES[c.grade].detect*Math.max(sec.scan,.5)*harsh*(hasMod('hidden')?.45:1)*(1+heat*.12)*(state.scanHot===SYS.seed?1.6:1);
     if(source==='chase' || Math.random()<Math.min(.97,p)) found.push(c);
   });
+  state.scanHot=null;
   var wanted=heat>=3, late=!isCleared() && (source==='patrol'||source==='chase');
   if(!found.length && !wanted){
     var lateFine=(late?250:0)+logbookFine(); state.credits-=lateFine; state.cleared=SYS.seed; state.clearedT=state.t; setHeat(SYS.seed,Math.min(heat,2));
@@ -7225,7 +7320,7 @@ function frame(){
   else if(state.mode==='space') updateSpace(dt);
   else if(state.mode==='atmo' && S) updateAtmo(dt);
   else if(state.mode==='surface' && S) updateSurface(dt);
-  if(state.mode!=='title'){ updateLaw(dt); updateNeeds(dt); updateSpool(dt); routeTick(dt); cbTick(dt); }
+  if(state.mode!=='title'){ updateLaw(dt); updateNeeds(dt); updateSpool(dt); routeTick(dt); roadTick(dt); cbTick(dt); }
   audioUpdate(dt); syncHullWear();
   state.exposure=lerp(state.exposure,state.exposureTarget,1-Math.pow(.25,dt));
   var u=finalPass.uniforms; u.exposure.value=state.exposure; u.time.value=state.t;
@@ -7389,7 +7484,7 @@ async function boot(){
   frame();
   setTimeout(streamShipModels,1500);
 }
-window.__nh={town:{grow:function(loc,p){ return growTown(loc,p); }, rec:townRec, kit:function(){ return TOWN_KIT; }, prompt:kitPrompt, invest:investIn, fleetVisit:function(tier,j){ var T=S&&S.towns[j||0]; return fleetVisit({tier:tier||2, name:'TF-09', pilot:{name:'WREN TEST', grade:'veteran'}},T); }, fleetVis:function(){ return fleetVis; }, home:{pt:function(){ return homeT(); }, loc:function(){ return homeLoc(); }, land:function(){ var H=homeT(); if(!H) return false; S.ship.position.set(H.x,H.pad.y+hullGear(S.ship),H.z); state.landing={t:1, pad:true, town:H, y0:H.pad.y+10, y1:H.pad.y}; disembark(); state.camFrom=null; return true; }}, shares:function(mins,eff){ return simShares(mins,eff==null?1:eff); }, terminal:openTerminal}, stationLoc:function(){ return stationLoc(); }, lineup:function(){ var sc=new THREE.Scene(); sc.background=new THREE.Color(.16,.165,.17); sc.environment=spaceScene.environment;
+window.__nh={town:{grow:function(loc,p){ return growTown(loc,p); }, rec:townRec, kit:function(){ return TOWN_KIT; }, prompt:kitPrompt, invest:investIn, road:{fire:function(i){ ROAD_EVENTS[i].run(); }, ok:function(){ return ROAD_EVENTS.map(function(e){ return e.ok(); }); }, R:ROAD}, fleetVisit:function(tier,j){ var T=S&&S.towns[j||0]; return fleetVisit({tier:tier||2, name:'TF-09', pilot:{name:'WREN TEST', grade:'veteran'}},T); }, fleetVis:function(){ return fleetVis; }, home:{pt:function(){ return homeT(); }, loc:function(){ return homeLoc(); }, land:function(){ var H=homeT(); if(!H) return false; S.ship.position.set(H.x,H.pad.y+hullGear(S.ship),H.z); state.landing={t:1, pad:true, town:H, y0:H.pad.y+10, y1:H.pad.y}; disembark(); state.camFrom=null; return true; }}, shares:function(mins,eff){ return simShares(mins,eff==null?1:eff); }, terminal:openTerminal}, stationLoc:function(){ return stationLoc(); }, lineup:function(){ var sc=new THREE.Scene(); sc.background=new THREE.Color(.16,.165,.17); sc.environment=spaceScene.environment;
     sc.add(new THREE.HemisphereLight(0xdfe6ee,0x30302c,.8)); var dl=new THREE.DirectionalLight(0xffffff,2.2); dl.position.set(-30,50,40); sc.add(dl);
     var x=0; [0,1,4,2,3].forEach(function(t){ var h=buildHull(t,true,{value:.4}); var bb=new THREE.Box3().setFromObject(h); h.position.set(x-bb.min.x,-h.userData.gear,0); x+=bb.max.x-bb.min.x+3; sc.add(h); });
     var cam=new THREE.PerspectiveCamera(30,innerWidth/innerHeight,.1,1000); cam.position.set(x/2,22,x*.95); cam.lookAt(x/2,0,0); SHOWCASE={scene:sc, cam:cam, ground:new THREE.Object3D()}; },
@@ -7403,7 +7498,7 @@ window.__nh={town:{grow:function(loc,p){ return growTown(loc,p); }, rec:townRec,
   SHOWCASE.ground.position.y=landed!==false?-h.userData.gear:-h.userData.gear-2;
   var R=Math.max(h.userData.len,h.userData.beam)*1.55, a=az==null?-2.35:az, e=el==null?.32:el; SHOWCASE.cam.position.set(Math.sin(a)*Math.cos(e)*R,Math.sin(e)*R,Math.cos(a)*Math.cos(e)*R); SHOWCASE.cam.lookAt(0,.3,0);
   return {len:+h.userData.len.toFixed(1), beam:+h.userData.beam.toFixed(1), height:+h.userData.height.toFixed(1), gear:h.userData.gear, crates:h.userData.cargo.length}; },
-  wx:function(k){ if(S){ if(!S.wx) buildWeather(S); S.wx.k=S.wx.target=k; S.wx.timer=999; } }, gfx:{foot:function(){ var T=S.towns[0], x=T.x+40, z=T.z+40; S.ship.position.set(x,S.heightAt(x,z)+hullGear(S.ship),z); state.landing=null; disembark(); state.camFrom=null; }, chunks:function(x,z){ if(S) updateChunks(S,x,z,true); }, day:function(ph){ if(S){ S.day.phase=ph; updateDay(0); state.exposure=state.exposureTarget; } }, Q:function(){ return Q; }}, step:function(n,dt){ dt=dt||.05; for(var i=0;i<n;i++){ state.t+=dt; if(state.mode==='space') updateSpace(dt); else if(state.mode==='atmo'&&S) updateAtmo(dt); else if(state.mode==='surface'&&S) updateSurface(dt); updateLaw(dt); updateSpool(dt); routeTick(dt); }  }, pulse:{engage:function(){ return engagePulse(false); }, drop:function(){ dropPulse(''); }, block:function(){ return pulseBlock(); }, targets:function(){ return apTargets(); }, ap:function(i){ startAutopilot(apTargets()[i]); }, apTo:function(kind,idx){ startAutopilot(apTargets().filter(function(t){ return t.kind===kind && (kind==='station'||t.idx===idx); })[0]); }, nav:function(){ openNav(); }, orbit:function(){ startOrbitAutopilot(); }, route:function(loc){ startRoute(loc); }, inv:function(){ renderInv(); }, remote:function(){ var ns=neighbourSeeds(SYS.seed,3)[0], sy=sysInfo(ns); return {key:ns+':S', kind:'station', name:sy.station.name, planet:-1, sys:ns, sysName:sy.name}; }, cb:function(){ return CB; }, cbLine:function(){ return cbLine(); }, atmoTo:function(i){ var T=S.towns.slice().sort(function(a,b){ return Math.hypot(b.x-S.ship.position.x,b.z-S.ship.position.z)-Math.hypot(a.x-S.ship.position.x,a.z-S.ship.position.z); })[i||0]; startAtmoAutopilot(T); return T.name; }, speed:function(){ return pulseSpeed(); }}, fx:{hasMod:hasMod, modSlots:modSlots, holdCap:holdCap, fuelCap:fuelCap, kindNeeds:kindNeeds, wearHull:wearHull, save:save, swap:swapPlayerHull}, enterPlanet:function(i){ enterAtmosphere(planets[i]); }, ready:function(i){ return !!surfaces[i]; }, land:land, board:board, exitAtmo:exitAtmosphere,
+  wx:function(k){ if(S){ if(!S.wx) buildWeather(S); S.wx.k=S.wx.target=k; S.wx.timer=999; } }, gfx:{foot:function(){ var T=S.towns[0], x=T.x+40, z=T.z+40; S.ship.position.set(x,S.heightAt(x,z)+hullGear(S.ship),z); state.landing=null; disembark(); state.camFrom=null; }, chunks:function(x,z){ if(S) updateChunks(S,x,z,true); }, day:function(ph){ if(S){ S.day.phase=ph; updateDay(0); state.exposure=state.exposureTarget; } }, Q:function(){ return Q; }}, step:function(n,dt){ dt=dt||.05; for(var i=0;i<n;i++){ state.t+=dt; if(state.mode==='space') updateSpace(dt); else if(state.mode==='atmo'&&S) updateAtmo(dt); else if(state.mode==='surface'&&S) updateSurface(dt); updateLaw(dt); updateSpool(dt); routeTick(dt); roadTick(dt); }  }, pulse:{engage:function(){ return engagePulse(false); }, drop:function(){ dropPulse(''); }, block:function(){ return pulseBlock(); }, targets:function(){ return apTargets(); }, ap:function(i){ startAutopilot(apTargets()[i]); }, apTo:function(kind,idx){ startAutopilot(apTargets().filter(function(t){ return t.kind===kind && (kind==='station'||t.idx===idx); })[0]); }, nav:function(){ openNav(); }, orbit:function(){ startOrbitAutopilot(); }, route:function(loc){ startRoute(loc); }, inv:function(){ renderInv(); }, remote:function(){ var ns=neighbourSeeds(SYS.seed,3)[0], sy=sysInfo(ns); return {key:ns+':S', kind:'station', name:sy.station.name, planet:-1, sys:ns, sysName:sy.name}; }, cb:function(){ return CB; }, cbLine:function(){ return cbLine(); }, atmoTo:function(i){ var T=S.towns.slice().sort(function(a,b){ return Math.hypot(b.x-S.ship.position.x,b.z-S.ship.position.z)-Math.hypot(a.x-S.ship.position.x,a.z-S.ship.position.z); })[i||0]; startAtmoAutopilot(T); return T.name; }, speed:function(){ return pulseSpeed(); }}, fx:{hasMod:hasMod, modSlots:modSlots, holdCap:holdCap, fuelCap:fuelCap, kindNeeds:kindNeeds, wearHull:wearHull, save:save, swap:swapPlayerHull}, enterPlanet:function(i){ enterAtmosphere(planets[i]); }, ready:function(i){ return !!surfaces[i]; }, land:land, board:board, exitAtmo:exitAtmosphere,
   warp:startWarp, dock:startDock, cam:function(){ return camera; }, station:function(){ return station; }, ship:function(){ return ship; }, state:state, getS:function(){ return S; }, sys:function(){ return SYS; }, enter:function(){ $('enterBtn').click(); },
   queue:queueSurface, terrain:planetTerrain, normalFromSurf:normalFromSurf, openMap:openMap, chunkBuilder:chunkBuilder, planets:function(){ return planets; }, offers:boardOffers, townLoc:townLoc,
   au:function(){ return AU; }, mu:function(){ return MU; }, law:{hall:function(){ return station&&station.gate; }, spawnPirates:spawnPirates, scan:customsScan, actors:function(){ return lawActors; }, heat:heatOf, sec:secOf}};
