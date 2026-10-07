@@ -37,6 +37,7 @@ The installed app opens full screen in landscape and works offline after the fir
 | Scan | SCAN button | F |
 | Terminal, board ship | On-screen prompt | E |
 | Planet map | Tap the radar | M |
+| My towns | Town button by the radar | T |
 
 Each freighter hull has its own turn rate and weight: the Skiff snaps into turns, the Atlas swings wide and coasts out of them.
 
@@ -49,6 +50,7 @@ Each freighter hull has its own turn rate and weight: the Skiff snaps into turns
 - **Project town:** pick one town as your project from its Town tab. Every board in its system keeps a slot for loads going there (two at the station): construction while it grows, its businesses' wants once they're open, at standard rates. They're marked ★ in gold and pinned to the top of each board. A ★ line on the HUD shows the project's stage and progress; tap it to fly to the nearest board with a project load (or to warp to the project's system if you're elsewhere). Each time your project reaches a new stage you get a card with what it unlocked and what you put in (crates hauled, units invested, fleet growth), a CB shout-out, and the choice to keep building or pick a new project.
 - **Fresh boards:** every board posts a new set of contracts every 15 minutes (real time, so they also turn over while the game is closed), or as soon as you've taken everything on it. The board header shows when the next set arrives.
 - **Tidy HUD:** the cargo list under your status panel has a header line with your crates and drops; tap it to fold the list away (it remembers).
+- **My towns:** the town button by the radar (or T) opens an overview of every town and outpost in the system you're in, or every town you've had a hand in across the galaxy, grouped by system. Each shows its stage and progress, what the next stage takes (in crates, construction loads or units invested), its businesses and free plots, your stake and what it pays, your fleet's contribution and, for your project, how many stops have ★ loads for it. Set or stop your project, or route straight there (warp included), from the list.
 - **Customs on the route:** in a customs system you haven't checked into, the route flies you through the customs hall first, rolls you onto the scale, and carries on to the drop once you're cleared. Carrying contraband? It asks first: skip the hall and go straight to the drop, or take your chances with the scanner. Wanted pilots are never routed into the hall.
 - **Pilot needs:** your pilot gets hungry and tired while you play (never while the game is closed). Eat a hot meal at a diner or cantina, carry ration packs (tap the fork on the HUD), and sleep at a motel, a station bunk or in your cab when landed. Sleeping jumps the clock 8 hours, so perishable deadlines keep running. Running on empty slows energy and scans; exhaustion dims the screen, dulls handling and causes microsleeps, and customs fines you for flying over your hours. Galley and sleeper cab modules help on long hauls, fleet pilots take rest breaks, and a relaxed mode in Services turns it all off.
 
@@ -139,6 +141,7 @@ The game ships its own engine flames, glows, nav lights and lights, so models do
 - **Fleet runs grow towns:** your hired crews' runs drop at towns in the system you're in and add a little growth, so a company and town shares pay off together.
 - **Project town and warp colours:** focus on building one town at a time with guaranteed ★ loads on every board in its system, and see at a glance which jobs need a warp.
 - **Fresh boards, project milestones, foldable cargo list:** boards turn over every 15 minutes, a project stage-up gets its own moment, and the HUD cargo list folds away.
+- **My towns overview:** every town you've touched in one list, with progress, needs, businesses, stake and fleet help, plus set-project and route buttons.
 
 ### Next up (in this order)
 1. **Town kit models.** Generate the town pieces from [docs/town-kit-prompts.md](docs/town-kit-prompts.md) and swap them in: start with the town core and one ring-2 block to check the look in-game, then the rest of the blocks and the five business buildings.

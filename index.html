@@ -211,6 +211,31 @@ button:focus-visible{outline:2px solid var(--cyan);outline-offset:3px;}
   display:flex;align-items:center;justify-content:center;color:var(--cyan);cursor:pointer;font-family:var(--font-display);font-weight:700;font-size:.6rem;letter-spacing:.04em;}
 #cbBtn.off{color:var(--ink-dim);text-decoration:line-through;}
 @media (max-width:560px){ #cbBtn{right:9.7rem;} }
+#townsBtn{position:absolute;right:11.2rem;top:calc(6rem + env(safe-area-inset-top,0px));pointer-events:auto;width:2.2rem;height:2.2rem;padding:0;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;color:var(--cyan);cursor:pointer;}
+#townsBtn svg{width:1.05rem;height:1.05rem;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;}
+@media (max-width:560px){ #townsBtn{right:9.7rem;top:calc(5.8rem + env(safe-area-inset-top,0px));} }
+#townsPanel{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:31;width:min(92vw,29rem);max-height:86%;overflow:hidden;
+  padding:1rem;pointer-events:auto;display:flex;flex-direction:column;gap:.55rem;background:rgba(6,11,22,.9);}
+#townsPanel .wp-head{padding-right:2.8rem;}
+.tw-tabs{display:flex;gap:.4rem;} .tw-tabs button{flex:1;font-family:var(--font-mono);font-size:.6rem;letter-spacing:.16em;color:var(--ink-dim);background:none;
+  border:1px solid var(--line);border-radius:2px;padding:.5rem .4rem;cursor:pointer;} .tw-tabs button.on{color:#170c02;background:var(--amber);border-color:var(--amber);}
+#twList{display:flex;flex-direction:column;gap:.5rem;overflow-y:auto;min-height:0;flex:1 1 auto;-webkit-overflow-scrolling:touch;}
+.tw-sys{font-family:var(--font-mono);font-size:.58rem;letter-spacing:.2em;color:var(--warp);margin-top:.3rem;}
+.tw-sys.here{color:var(--cyan);}
+.tw-row{border:1px solid var(--line);border-radius:.45rem;background:rgba(255,255,255,.03);padding:.65rem .8rem;display:flex;flex-direction:column;gap:.28rem;}
+.tw-row.proj{border-color:rgba(232,198,106,.75);background:rgba(232,198,106,.07);}
+.tw-row.quiet{opacity:.72;}
+.tw-top{display:flex;align-items:center;gap:.45rem;} .tw-name{font-family:var(--font-display);font-weight:700;font-size:.92rem;letter-spacing:.08em;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.tw-row.proj .tw-name{color:#e8c66a;}
+.tw-meta,.tw-line{font-family:var(--font-mono);font-size:.58rem;letter-spacing:.06em;color:var(--ink-dim);line-height:1.45;}
+.tw-line b{color:var(--ink);font-weight:400;}
+.tw-bar{display:flex;align-items:center;gap:.5rem;font-family:var(--font-mono);font-size:.58rem;color:var(--ink-dim);}
+.tw-bar span{flex:1;height:.3rem;background:rgba(255,255,255,.1);border-radius:99px;overflow:hidden;} .tw-bar i{display:block;height:100%;background:#c9a24a;}
+.tw-acts{display:flex;gap:.4rem;flex-wrap:wrap;margin-top:.15rem;}
+.tw-acts button{font-family:var(--font-mono);font-size:.56rem;letter-spacing:.1em;color:var(--ink);background:rgba(255,255,255,.05);border:1px solid var(--line);border-radius:2px;padding:.4rem .6rem;cursor:pointer;}
+.tw-acts button.pri{color:#170c02;background:#e8c66a;border-color:#e8c66a;}
+.tw-empty{font-size:.8rem;color:var(--ink-dim);line-height:1.4;padding:.4rem .1rem;}
 #cbMsg{position:absolute;left:50%;bottom:calc(1rem + env(safe-area-inset-bottom,0px));transform:translate(-50%,8px);max-width:min(46vw,25rem);z-index:12;
   font-family:var(--font-mono);font-size:.66rem;line-height:1.35;color:var(--ink);background:rgba(6,12,22,.66);border-left:3px solid var(--amber);
   padding:.4rem .7rem;border-radius:.3rem;opacity:0;transition:opacity .4s ease,transform .4s ease;pointer-events:none;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);}
@@ -472,6 +497,7 @@ body.mapopen #joywrap,body.mapopen #actions,body.mapopen #throttle{visibility:hi
     <button id="gfxBtn" class="panel" type="button">GFX <b id="gfxName">HIGH</b></button>
     <button id="sndBtn" class="panel" type="button" aria-pressed="true" aria-label="Sound on or off"><svg viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9z"/><path class="w" d="M16 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12"/><path class="x" d="M16 9l5 6M21 9l-5 6"/></svg></button>
     <button id="cbBtn" class="panel" type="button" aria-pressed="true" aria-label="CB radio on or off">CB</button>
+    <button id="townsBtn" class="panel" type="button" aria-label="My towns" title="My towns (T)"><svg viewBox="0 0 24 24"><path d="M3 21h18M5 21V11l4-3 4 3v10M13 21V7l3-3 3 3v14M8 14h2M8 17h2M15 10h2M15 13h2M15 16h2"/></svg></button>
     <div id="cbMsg"></div>
     <button id="musBtn" class="panel" type="button" aria-pressed="true" aria-label="Music on or off"><svg viewBox="0 0 24 24"><path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/><path class="x" d="M3 3l18 18"/></svg></button>
     <div id="radarWrap" role="button" aria-label="Open planet map"><canvas id="radar" width="200" height="200"></canvas><div id="radarCap"></div><div class="maptap">TAP · MAP</div></div>
@@ -503,6 +529,13 @@ body.mapopen #joywrap,body.mapopen #actions,body.mapopen #throttle{visibility:hi
       <div class="wp-title">Set autopilot</div>
       <div id="nvList"></div>
       <div class="nv-btns"><button id="nvOff" type="button" hidden>AUTOPILOT OFF</button><button id="nvClose" type="button">CANCEL</button></div>
+    </div>
+    <div id="townsPanel" class="panel" hidden>
+      <button class="panel-x" id="twX" type="button" aria-label="Close my towns">&#x2715;</button>
+      <div class="wp-head">MY TOWNS &middot; <span id="twSum"></span></div>
+      <div class="tw-tabs" role="tablist"><button type="button" role="tab" data-tw="here">THIS SYSTEM</button><button type="button" role="tab" data-tw="all">ALL MY TOWNS</button></div>
+      <div id="twList"></div>
+      <div class="nv-btns"><button id="twClose" type="button">CLOSE</button></div>
     </div>
     <button id="apChip" type="button" hidden aria-label="Autopilot, tap to turn off"><span class="ap-eye">AUTOPILOT</span><span id="apName"></span><span id="apInfo"></span><span class="ap-x">&#x2715;</span></button>
     <div id="mapPanel" class="panel" hidden>
@@ -4867,6 +4900,81 @@ function openNav(){
   $('navPanel').hidden=false;
 }
 function closeNav(){ $('navPanel').hidden=true; }
+
+/* ---------- My towns: every town in this system, or every town you've had a hand in, in one place ---------- */
+var twView='here';
+function locFromKey(k){
+  var m=/^(\d+):T(\d+)(?:\.(\d+))?$/.exec(k); if(!m) return null;
+  var sy=SYS && SYS.seed===+m[1] ? SYS : sysInfo(+m[1]), i=+m[2], j=m[3]?+m[3]:0;
+  if(!sy.biomes[i] || !planetTerrain(sy.biomes[i]).sites[j]) return null;
+  return siteLoc(sy,i,j);
+}
+// a town gets a saved record the first time you grow it, invest in it, open a business or your fleet drops there
+function townTouched(k){ return !!state.towns[k] || !!(state.project && state.project.key===k); }
+function townRowHTML(loc){
+  var t=townRec(loc), lv=t.lvl, pj=isProject(loc), here=SYS && loc.sys===SYS.seed, h='';
+  var plots=BIZ_PLOTS[lv], biz=(t.biz||[]).filter(Boolean), touched=townTouched(loc.key);
+  h+='<div class="tw-row'+(pj?' proj':'')+(touched?'':' quiet')+'">';
+  h+='<div class="tw-top"><span class="tw-name">'+(pj?'★ ':'')+loc.name+'</span><span class="tag hi">'+townTitle(loc)+'</span></div>';
+  h+='<div class="tw-meta">'+loc.pname+(here?'':' · '+loc.sysName+' system')+(loc.outpost&&lv>0?' · founded as a '+(loc.label||'outpost').toLowerCase():'')+'</div>';
+  if(lv<3){ var need=TOWN_NEED[lv]-t.g;
+    h+='<div class="tw-bar"><span><i style="width:'+Math.round(townProgress(loc)*100)+'%"></i></span>'+t.g+' / '+TOWN_NEED[lv]+'</div>';
+    h+='<div class="tw-line">Next: <b>'+TOWN_LVLS[lv+1]+'</b> · '+need+' growth to go: about '+need+' crates, '+Math.ceil(need/3)+' construction loads, or '+fmt(need*INVEST_PER_G)+' units invested</div>'; }
+  else h+='<div class="tw-line"><b>Fully grown.</b> The biggest boards in the system, +24% pay.</div>';
+  if(plots) h+='<div class="tw-line">Businesses: '+(biz.length?'<b>'+biz.map(function(b){ return BIZ[b].name; }).join(', ')+'</b>':'none yet')+(plots>biz.length?' · '+(plots-biz.length)+' plot'+(plots-biz.length>1?'s':'')+' for lease':'')+'</div>';
+  else if(lv<2) h+='<div class="tw-line">Business plots open at TOWN.</div>';
+  if(t.inv || t.fleet) h+='<div class="tw-line">'+(t.inv?'Your stake <b>'+fmt(t.inv)+'</b> · ~'+fmt(shareRate(t))+'/hr':'')+(t.inv&&t.fleet?' · ':'')+(t.fleet?'Fleet brought <b>'+fmt(t.fleet)+' growth</b>':'')+'</div>';
+  if(pj && (t.lvl<3 || biz.length)) h+='<div class="tw-line">'+(here?projectBoards().length+' stop'+(projectBoards().length===1?'':'s')+' with ★ loads for it right now':'★ loads post on boards in the '+loc.sysName+' system')+'</div>';
+  h+='<div class="tw-acts"><button type="button" data-tw-act="proj" data-key="'+loc.key+'"'+(pj?'':' class="pri"')+'>'+(pj?'STOP PROJECT':'★ SET PROJECT')+'</button>'+
+    '<button type="button" data-tw-act="go" data-key="'+loc.key+'">'+(here?'ROUTE HERE':'ROUTE HERE · WARP')+'</button></div>';
+  return h+'</div>';
+}
+function renderTowns(){
+  if(!SYS) return;
+  document.querySelectorAll('.tw-tabs button').forEach(function(b){ var on=b.dataset.tw===twView; b.classList.toggle('on',on); b.setAttribute('aria-selected',on); });
+  var h='', locs;
+  var order=function(a,b){ return isProject(b)-isProject(a) || townTouched(b.key)-townTouched(a.key) || townRec(b).lvl-townRec(a).lvl || townProgress(b)-townProgress(a) || a.name.localeCompare(b.name); };
+  if(twView==='here'){
+    locs=sysSiteLocs(SYS).sort(order);
+    h+='<div class="tw-sys here">'+SYS.name+' SYSTEM · '+locs.length+' TOWNS &amp; OUTPOSTS</div>';
+    locs.forEach(function(l){ h+=townRowHTML(l); });
+  } else {
+    var keys=Object.keys(state.towns).filter(townTouched); if(state.project && keys.indexOf(state.project.key)<0) keys.push(state.project.key);
+    locs=keys.map(locFromKey).filter(Boolean);
+    if(!locs.length) h+='<div class="tw-empty">No towns yet. Deliver to a town, invest in it, open a business there or make it your project, and it shows up here.</div>';
+    var bySys={}; locs.forEach(function(l){ (bySys[l.sys]=bySys[l.sys]||[]).push(l); });
+    Object.keys(bySys).sort(function(a,b){ return (+b===SYS.seed)-(+a===SYS.seed) || bySys[a][0].sysName.localeCompare(bySys[b][0].sysName); }).forEach(function(s){
+      var L=bySys[s].sort(order), here=+s===SYS.seed;
+      h+='<div class="tw-sys'+(here?' here':'')+'">'+L[0].sysName+' SYSTEM'+(here?' · YOU ARE HERE':'')+'</div>';
+      L.forEach(function(l){ h+=townRowHTML(l); });
+    });
+  }
+  $('twList').innerHTML=h;
+  var mine=Object.keys(state.towns).filter(townTouched).length, ph=sharesPerHour();
+  $('twSum').textContent=mine+' TOWN'+(mine===1?'':'S')+(ph?' · ~'+fmt(ph)+'/HR IN SHARES':'')+(state.project?' · ★ '+state.project.name:'');
+}
+function openTowns(){
+  if(state.mode==='title' || !SYS) return;
+  closeNav(); if(mapOpen) closeMap();
+  renderTowns(); $('townsPanel').hidden=false;
+}
+function closeTowns(){ $('townsPanel').hidden=true; }
+$('townsBtn').addEventListener('click',function(e){ e.stopPropagation(); SND.click(); if($('townsPanel').hidden) openTowns(); else closeTowns(); });
+$('twX').addEventListener('click',closeTowns); $('twClose').addEventListener('click',closeTowns);
+document.querySelector('.tw-tabs').addEventListener('click',function(e){ var b=e.target.closest('button'); if(!b) return; SND.click(); twView=b.dataset.tw; renderTowns(); });
+$('twList').addEventListener('click',function(e){
+  var b=e.target.closest('button[data-tw-act]'); if(!b) return; SND.click();
+  var loc=locFromKey(b.dataset.key); if(!loc) return;
+  if(b.dataset.twAct==='proj'){ var was=isProject(loc); if(state.route && state.route.project) cancelRoute('');
+    setProject(was?null:loc); toast(was?'PROJECT CLEARED':'PROJECT SET · '+loc.name+' · LOOK FOR ★ LOADS ON BOARDS','life');
+    renderInv(); save(); if(termLoc) renderTerminal(); renderTowns(); }
+  else { closeTowns(); startRoute(loc); }
+});
+window.addEventListener('keydown',function(e){
+  if(e.target && e.target.tagName==='INPUT') return;
+  if(e.code==='KeyT' && state.mode!=='title'){ if($('townsPanel').hidden) openTowns(); else closeTowns(); }
+  if(e.code==='Escape') closeTowns();
+});
 $('nvX').addEventListener('click',closeNav); $('nvClose').addEventListener('click',closeNav);
 $('nvOff').addEventListener('click',function(){ apOff('AUTOPILOT OFF'); cancelRoute(''); if(state.pulse) dropPulse(''); closeNav(); });
 $('apChip').addEventListener('click',function(){ apOff('AUTOPILOT OFF'); cancelRoute('ROUTE CANCELLED'); if(state.pulse) dropPulse(''); });
