@@ -4543,8 +4543,22 @@ function fleetDrop(s, eff, quiet){
 /* Your fleet in the world: a crew dropping at a town on the planet you're on flies in, sets down on the pad, unloads and
    leaves. If your rig is on that pad (or you're coming in to land) it makes a low pass instead, or lifts off early. */
 var fleetVis=[], FV_PREV=new THREE.Vector3();
+/* you're coming in to this town: flying within FLEET_CLEAR m of it, or your autopilot or route is headed for it */
+var FLEET_CLEAR=700;
+function playerInbound(T){
+  if(!S || state.mode!=='atmo' || !S.ship) return false;
+  if(state.ap && state.ap.key===T.key) return true;
+  if(state.route && state.route.loc && state.route.loc.key===T.key) return true;
+  if(state.landing && state.landing.town===T) return true;
+  return Math.hypot(S.ship.position.x-T.x,S.ship.position.z-T.z)<FLEET_CLEAR;
+}
+/* a heading out of town that points away from you, so a departing rig never crosses your approach */
+function awayFromPlayer(T, out, alt){
+  var dx=T.x-S.ship.position.x, dz=T.z-S.ship.position.z, d=Math.hypot(dx,dz)||1, a=Math.atan2(dx/d,dz/d)+(Math.random()-.5)*.5;
+  return out.set(T.x+Math.sin(a)*900, T.hs+alt, T.z+Math.cos(a)*900);
+}
 function fleetVisit(s, T){
-  if(!S || !T || T.key==='home' || fleetVis.length>=2 || fleetVis.some(function(v){ return v.T===T; })) return false;
+  if(!S || !T || T.key==='home' || fleetVis.length>=2 || fleetVis.some(function(v){ return v.T===T; }) || playerInbound(T)) return false;
   var h=buildHull(s.tier,true,{value:.35}); h.userData.dyn=true; setShipFlying(h,true); S.scene.add(h);
   var a=Math.random()*TAU, R=900, from=new THREE.Vector3(T.x+Math.sin(a)*R, T.hs+240, T.z+Math.cos(a)*R), out=new THREE.Vector3(T.x-Math.sin(a+.6)*R, T.hs+260, T.z-Math.cos(a+.6)*R);
   var busy=!!(S.ship && Math.hypot(S.ship.position.x-T.x,S.ship.position.z-T.z)<16);
@@ -4559,13 +4573,17 @@ function updateFleetVis(dt){
     var v=fleetVis[i], h=v.h; if(v.S!==S){ if(v.S && v.S.scene) v.S.scene.remove(h); disposeObject(h); fleetVis.splice(i,1); continue; }
     v.t+=dt; var prev=FV_PREV.copy(h.position), k, e, flying=true, gone=false;
     var near=Math.hypot(camera.position.x-h.position.x,camera.position.z-h.position.z), vol=clamp(1-near/500,0,1);
-    if(v.ph==='in'){ k=Math.min(1,v.t/18); e=k*k*(3-2*k); h.position.lerpVectors(v.from,v.hover,e); h.position.y=lerp(v.from.y,v.hover.y,Math.sqrt(e));
+    if((v.ph==='in'||v.ph==='down'||v.ph==='pass') && playerInbound(v.T)){
+      v.ph='giveway'; v.t=0; v.gwFrom=h.position.clone(); awayFromPlayer(v.T,v.out,Math.max(h.position.y-v.T.hs+60,160)); if(v.gear){ v.gear=false; setShipFlying(h,true); }
+      fleetSay(v,['You take the pad, boss. I’ll come round after.','Holding off '+v.T.name+' for you, boss.']); }
+    if(v.ph==='giveway'){ k=Math.min(1,v.t/16); e=k*k*(3-2*k); h.position.lerpVectors(v.gwFrom,v.out,e); if(k>=1) gone=true; }
+    else if(v.ph==='in'){ k=Math.min(1,v.t/18); e=k*k*(3-2*k); h.position.lerpVectors(v.from,v.hover,e); h.position.y=lerp(v.from.y,v.hover.y,Math.sqrt(e));
       if(k>=1){ v.ph='down'; v.t=0; if(vol>.05) sfx('landing',.5*vol); } }
     else if(v.ph==='down'){ k=Math.min(1,v.t/6); e=k*k*(3-2*k); h.position.lerpVectors(v.hover,v.land,e); if(k>.7 && !v.gear){ v.gear=true; setShipFlying(h,false); if(vol>.05) sfx('gear',.5*vol); }
       if(k>=1){ v.ph='sit'; v.t=0; fleetSay(v,['That’s me on the pad at '+v.T.name+', boss. Unloading.','Down at '+v.T.name+'. Wave if you’re out there.','On the ground in '+v.T.name+'. Give us twenty.']); } }
-    else if(v.ph==='sit'){ flying=false; var pl=S.ship && state.mode==='atmo' && Math.hypot(S.ship.position.x-v.T.x,S.ship.position.z-v.T.z)<140;
-      if(v.t>24 || pl){ v.ph='up'; v.t=0; v.gear=false; setShipFlying(h,true); if(vol>.05) sfx('landing',.45*vol,1.1); if(pl) fleetSay(v,['Pad’s yours, boss. Clearing out.']); } }
-    else if(v.ph==='up'){ k=Math.min(1,v.t/5); e=k*k; h.position.lerpVectors(v.land,v.hover,e); if(k>=1){ v.ph='out'; v.t=0; } }
+    else if(v.ph==='sit'){ flying=false; var pl=playerInbound(v.T);
+      if(v.t>24 || pl){ v.ph='up'; v.t=0; v.gear=false; v.quick=pl; setShipFlying(h,true); if(pl) awayFromPlayer(v.T,v.out,200); if(vol>.05) sfx('landing',.45*vol,1.1); if(pl) fleetSay(v,['Pad’s yours, boss. Clearing out.','Heard you coming in, boss. Pad’s all yours.']); } }
+    else if(v.ph==='up'){ k=Math.min(1,v.t/(v.quick?3.2:5)); e=k*k; h.position.lerpVectors(v.land,v.hover,e); if(k>=1){ v.ph='out'; v.t=0; } }
     else if(v.ph==='out'){ k=Math.min(1,v.t/18); e=k*k; h.position.lerpVectors(v.hover,v.out,e); if(k>=1) gone=true; }
     else if(v.ph==='pass'){ k=Math.min(1,v.t/26); var mid=v.passPt;
       if(k<.5){ e=k*2; h.position.lerpVectors(v.from,mid,e); h.position.y=lerp(v.from.y,mid.y,Math.sqrt(e)); } else { e=(k-.5)*2; h.position.lerpVectors(mid,v.out,e); h.position.y=lerp(mid.y,v.out.y,e*e); }
