@@ -112,7 +112,13 @@ Each freighter hull has its own turn rate and weight: the Skiff snaps into turns
 - **From orbit:** planets with continents, coastlines, mountain ridges, swirling cloud bands, rings and city lights on their night side.
 - **Scales to the device:** Low, High and Epic graphics settings plus automatic dynamic resolution.
 
-Progress (units, cargo, upgrades, fleet, current system) is saved in the browser's local storage.
+### Saves
+- **Pick up where you left off:** the game remembers where you were. Docked, you start docked; parked on a town pad, your home pad or open ground, you start there (inside your home if that's where you were); in open space, at the same spot and heading. If you closed it mid-flight in an atmosphere or mid-warp, you start at the last pad or dock you touched. The title card shows where you'll resume.
+- **Saved as you go:** every 15 seconds while you play, and the moment the game is hidden or closed.
+- **Backups:** a copy of your save is kept every 10 minutes (the last two are kept). If the main save is ever missing or can't be read, the game loads the backup and tells you so. The game also asks the browser to keep its storage persistent.
+- **Save files:** **EXPORT SAVE** (title screen, or Services at any terminal) downloads your game as a `.json` file; **IMPORT SAVE** on the title screen loads one back, on this device or another, after a confirm. The save it replaces is kept aside.
+
+Everything is stored in the browser's local storage.
 
 ## 3D models
 
@@ -152,6 +158,7 @@ The game ships its own engine flames, glows, nav lights and lights, so models do
 - **My towns overview:** every town you've touched in one list, with progress, needs, businesses, stake and fleet help, plus set-project and route buttons.
 - **Your home:** build a cabin in your project town and grow it into a house and an estate, with a private pad, a garage for your spare rigs, a workshop and free food and rest. Walk inside: from a one-room cabin to an estate with a trophy room and a glass lounge.
 - **Your fleet in the world:** company rigs fly in and land at town pads on the planet you're on, and your pilots chat on the CB.
+- **Safer saves:** resume where you left off, rolling backups with automatic recovery, and save files you can export and import.
 
 ### Next up (in this order)
 1. **Town kit models.** Generate the town pieces from [docs/town-kit-prompts.md](docs/town-kit-prompts.md) and swap them in: start with the town core and one ring-2 block to check the look in-game, then the rest of the blocks and the five business buildings.

@@ -189,6 +189,10 @@ button:focus-visible{outline:2px solid var(--cyan);outline-offset:3px;}
 #loader .lb{display:block;width:12rem;height:2px;margin-top:.4rem;background:rgba(255,255,255,.1);}
 #loader .lb i{display:block;height:100%;width:0;background:var(--cyan);transition:width .2s;}
 #title .install-row{display:flex;align-items:center;gap:.8rem;min-height:0;}
+#title .save-row{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;}
+#title .save-row button{font-family:var(--font-mono);font-size:.6rem;letter-spacing:.14em;color:var(--ink-dim);background:none;border:1px solid var(--line);border-radius:2px;padding:.45rem .8rem;cursor:pointer;}
+#title .save-row button.confirm{color:#170c02;background:var(--amber);border-color:var(--amber);}
+#saveNote{font-family:var(--font-mono);font-size:.6rem;letter-spacing:.05em;color:var(--ink-dim);}
 #installBtn{font-family:var(--font-mono);font-size:.68rem;letter-spacing:.16em;color:var(--ink);background:rgba(231,225,210,.1);
   border:1px solid rgba(231,225,210,.55);border-radius:.35rem;padding:.6rem 1rem;cursor:pointer;}
 #iosHint{font-family:var(--font-mono);font-size:.66rem;letter-spacing:.05em;color:var(--ink-dim);}
@@ -571,6 +575,7 @@ body.mapopen #joywrap,body.mapopen #actions,body.mapopen #throttle{visibility:hi
         <button id="enterBtn" type="button" disabled>START SHIFT</button>
         <div id="loader">Generating universe&hellip;<span class="lb"><i id="loadFill"></i></span></div>
       </div>
+      <div class="save-row"><button id="saveExport" type="button">EXPORT SAVE</button><button id="saveImport" type="button">IMPORT SAVE</button><input id="saveFile" type="file" accept=".json,application/json" hidden><span id="saveNote"></span></div>
       <div class="install-row"><button id="installBtn" type="button" hidden>INSTALL APP</button><span id="iosHint" hidden>Install: tap <b>Share</b>, then <b>Add to Home Screen</b></span></div>
       <div class="hint">Left thumb moves &middot; drag anywhere to look &middot; best in landscape &middot; WASD + drag + Space/E/F on desktop</div>
     </div>
@@ -3344,18 +3349,36 @@ var state={towns:{}, throttle:0, yawRate:0, pitchRate:0, mode:'title', yaw:Math.
   pos:new THREE.Vector3(), vy:0, grounded:true, bob:0, fovKick:0, exposure:1, exposureTarget:1, t:0, warp:null};
 var OLD_KEYS={'CINDER REACH':'PYRITE','GLASSWATER':'CYANITE','VERDANT HOLLOW':'AMETHINE','PALE SILICATE':'AURUM'};
 try{
-  var sv=JSON.parse(localStorage.getItem('nh_save')||'null');
+  var sv=readSaveSlot();
   if(sv){
     state.credits=sv.credits||0; state.found=sv.found||{}; state.sysSeed=sv.sys||0; state.up=sv.up||{}; state.cargo=sv.cargo||[]; state.taken=sv.taken||{}; state.boardGen=sv.boardGen||{}; state.boardT=sv.boardT||{}; state.delivered=sv.delivered||0; state.towns=sv.towns||{};
     state.mods=sv.mods||[]; state.modsOwned=sv.modsOwned||{}; state.lic=sv.lic||{}; state.fuel=sv.fuel; state.hull=sv.hull==null?100:sv.hull; state.company=sv.company||null; state.hullSel=sv.hullSel==null?null:sv.hullSel; state.rooks=sv.rooks||{}; retireWedge(sv); state.fits=sv.fits||{}; state.fuelReserve=sv.fuelReserve||0; state.cleared=sv.cleared===undefined?(sv.sys||0):sv.cleared; state.heat=sv.heat||{}; state.flares=sv.flares==null?3:sv.flares;
-    state.food=sv.food==null?100:sv.food; state.rest=sv.rest==null?100:sv.rest; state.rations=sv.rations==null?2:sv.rations; state.fedT=sv.fedT||0; state.restedT=sv.restedT||0; state.needsOff=!!sv.needsOff; state.shareLast=sv.shareLast==null?null:sv.shareLast; state.shareAcc=sv.shareAcc||0; state.project=sv.project||null; state.home=sv.home||null;
+    state.food=sv.food==null?100:sv.food; state.rest=sv.rest==null?100:sv.rest; state.rations=sv.rations==null?2:sv.rations; state.fedT=sv.fedT||0; state.restedT=sv.restedT||0; state.needsOff=!!sv.needsOff; state.shareLast=sv.shareLast==null?null:sv.shareLast; state.shareAcc=sv.shareAcc||0; state.project=sv.project||null; state.home=sv.home||null; state.resume=sv.resume||null;
     Object.keys(sv.inv||{}).forEach(function(k){ var nk=OLD_KEYS[k]||k; if(ELEMENTS[nk]) state.inv[nk]=(state.inv[nk]||0)+sv.inv[k]; });
   }
 }catch(e){}
 drawThrottle();
-function save(){ try{ localStorage.setItem('nh_save',JSON.stringify({credits:state.credits,inv:state.inv,found:state.found,sys:state.sysSeed,up:state.up,cargo:state.cargo,taken:state.taken,boardGen:state.boardGen,boardT:state.boardT,delivered:state.delivered,towns:state.towns,
+function save(){ if(saveLock) return; try{ snapResume(); }catch(e){} var data; try{ data=JSON.stringify({v:SAVE_V,resume:state.resume,credits:state.credits,inv:state.inv,found:state.found,sys:state.sysSeed,up:state.up,cargo:state.cargo,taken:state.taken,boardGen:state.boardGen,boardT:state.boardT,delivered:state.delivered,towns:state.towns,
   mods:state.mods,modsOwned:state.modsOwned,lic:state.lic,fuel:state.fuel,hull:state.hull,company:state.company,hullSel:state.hullSel,rooks:state.rooks,fits:state.fits,fuelReserve:state.fuelReserve,cleared:state.cleared,heat:state.heat,flares:state.flares,
-  food:state.food,rest:state.rest,rations:state.rations,fedT:state.fedT,restedT:state.restedT,needsOff:state.needsOff,shareLast:state.shareLast,shareAcc:state.shareAcc,project:state.project,home:state.home})); }catch(e){} }
+  food:state.food,rest:state.rest,rations:state.rations,fedT:state.fedT,restedT:state.restedT,needsOff:state.needsOff,shareLast:state.shareLast,shareAcc:state.shareAcc,project:state.project,home:state.home}); localStorage.setItem('nh_save',data); rollBackup(data); }catch(e){} }
+/* ---------- keeping saves safe: a rolling backup every 10 minutes (two kept), a fallback to it if the main save is
+   missing or unreadable, and a save the moment the game is hidden or closed ---------- */
+var SAVE_V=2, saveLock=false, saveRestored, BAK_EVERY=10*60000;   // saveRestored is set by the loader above, so no initializer here
+function readSaveSlot(){
+  var keys=['nh_save','nh_save_bak','nh_save_bak2'];
+  for(var i=0;i<keys.length;i++){ try{ var raw=localStorage.getItem(keys[i]); if(!raw) continue; var o=JSON.parse(raw); if(o && typeof o.credits==='number'){ if(i>0) saveRestored=keys[i]; return o; } }catch(e){} }
+  return null;
+}
+function rollBackup(data){
+  var t=+(localStorage.getItem('nh_bak_t')||0); if(Date.now()-t<BAK_EVERY) return;
+  var prev=localStorage.getItem('nh_save_bak'); if(prev) localStorage.setItem('nh_save_bak2',prev);
+  localStorage.setItem('nh_save_bak',data); localStorage.setItem('nh_bak_t',String(Date.now()));
+}
+document.addEventListener('visibilitychange',function(){ if(document.visibilityState==='hidden' && state.mode!=='title') save(); });
+window.addEventListener('pagehide',function(){ if(state.mode!=='title') save(); });
+setInterval(function(){ if(state.mode!=='title') save(); },15000);
+try{ if(navigator.storage && navigator.storage.persisted) navigator.storage.persisted().then(function(p){ if(!p && navigator.storage.persist) navigator.storage.persist(); }); }catch(e){}
+
 
 function toast(msg, cls){ if(typeof SND!=='undefined' && state.mode!=='title' && !(typeof AU!=='undefined' && AU.hush)){ if(cls==='life') SND.good(); else SND.blip(); } var el=document.createElement('div'); el.className='toast'+(cls?' '+cls:''); el.textContent=msg; $('toastWrap').appendChild(el); setTimeout(function(){ el.remove(); },2400); }
 var invFold=false;
@@ -3511,7 +3534,7 @@ function showBanner(eyebrow, name, meta){
   var bn=$('locBanner'); bn.classList.remove('show'); void bn.offsetWidth; bn.classList.add('show');
 }
 
-function enterAtmosphere(p){
+function enterAtmosphere(p, quiet){
   state.camYaw=null; state.camPitch=null;
   S=surfaces[p.index];
   if(S.ship.userData.tier!==hullTier()){
@@ -3520,7 +3543,7 @@ function enterAtmosphere(p){
     renderer.compile(S.scene,camera);
   }
   updateHullCargo();
-  state.entryNormal=ship.position.clone().sub(p.pos).normalize(); wearHull(.4); if(AU.buf.reentry){ sfx('reentry',.95); sfx('whoosh',.25,1.35); } else sfx('whoosh',.55,1.35);
+  state.entryNormal=ship.position.clone().sub(p.pos).normalize(); if(!quiet){ wearHull(.4); if(AU.buf.reentry){ sfx('reentry',.95); sfx('whoosh',.25,1.35); } else sfx('whoosh',.55,1.35); }
   setDayFromElevation(S, state.entryNormal.dot(V3.copy(SPACE_SUN).sub(p.pos).normalize()));
   if(state.ap) apOff(state.route?'':'AUTOPILOT OFF · YOU HAVE CONTROL'); state.pulse=null; state.pulseK=0;
   state.mode='atmo'; setScene(S.scene); setModeUI('atmo');
@@ -4928,6 +4951,7 @@ function renderTerminal(tab){
       h+='<div class="st-row upg"><span class="nm">'+PR.bedName+'<small>Sleep 8 hours, wake well rested · perishable deadlines keep running</small></span><span class="acts"><button class="pri" data-act="bed"'+(state.credits>=PR.bed?'':' disabled')+'>'+(PR.bed?'SLEEP · '+PR.bed:'SLEEP · FREE')+'</button>'+(loc.kind==='home'?'':'<button data-act="cab">CAB · FREE</button>')+'</span></div>';
     }
     h+='<div class="st-row upg"><span class="nm">PILOT NEEDS · '+(needsOn()?'ON':'OFF')+'<small>'+(needsOn()?'Hunger, fatigue and logbook checks are on. Relaxed mode turns them off.':'Relaxed mode: no hunger, fatigue or logbook checks.')+'</small></span><span class="acts"><button data-act="needs">'+(needsOn()?'RELAXED MODE':'TURN ON')+'</button></span></div>';
+    h+='<div class="st-row upg"><span class="nm">BACK UP YOUR GAME<small>Download your save as a file. Load it again from IMPORT SAVE on the title screen, on this device or another.</small></span><span class="acts"><button data-act="exportsave">EXPORT SAVE</button></span></div>';
     var hz=heatOf(SYS.seed);
     if(loc.kind==='station' && hz>.05) h+='<div class="st-row upg"><span class="nm">CRIMINAL RECORD<small>Heat '+hz.toFixed(1)+' / 5 in '+SYS.name+' · more patrols and tougher scans</small></span><span class="acts"><button class="pri" data-act="clearrec"'+(state.credits>=Math.ceil(hz*700)?'':' disabled')+'>PAY OFF · '+fmt(Math.ceil(hz*700))+'</button></span></div>';
     var R=serviceRates(loc), cap2=fuelCap(), need2=Math.max(0,cap2-state.fuel), fu=fuelUnit(loc), fillCost=Math.ceil(need2*fu);
@@ -5059,6 +5083,7 @@ $('stationPanel').addEventListener('click',function(e){
     if(!BIZ[bz] || pl>=BIZ_PLOTS[tr2.lvl] || tr2.biz[pl] || tr2.biz.indexOf(bz)>=0 || state.credits<BIZ_COST) return;
     state.credits-=BIZ_COST; tr2.biz[pl]=bz; rebuildTownAt(loc); sfx('confirm',.8);
     toast(BIZ[bz].name+' OPENS IN '+loc.name,'life'); CB.queue=cbPick(['New '+BIZ[bz].name.toLowerCase()+' just opened in '+loc.name+'. Freight’s gonna be flowing.','Somebody built a '+BIZ[bz].name.toLowerCase()+' out at '+loc.name+'. About time.']); }
+  else if(act==='exportsave'){ if(exportSave()) toast('SAVE FILE DOWNLOADED','life'); }
   else if(act==='homebuild'){ var c1=HOME_TIERS[1].cost; if(state.home || !isProject(loc) || state.credits<c1) return;
     state.credits-=c1; state.home={key:loc.key, sys:loc.sys, planet:loc.planet, site:loc.site||0, name:loc.name, pname:loc.pname, sysName:loc.sysName, tier:1, spent:c1, ang:null};
     rebuildTownAt(loc); sfx('confirm',.9); SND.good(); showBanner('HOME', HOME_TIERS[1].name, 'JUST OUTSIDE '+loc.name);
@@ -7243,8 +7268,83 @@ $('enterBtn').addEventListener('click',function(){
   var near=planets[0], d=near.pos.clone().sub(ship.position).normalize();
   state.yaw=Math.atan2(d.x,d.z)+.25; state.pitch=Math.asin(clamp(d.y,-1,1))*.4;
   try{ if(screen.orientation && screen.orientation.lock) screen.orientation.lock('landscape').catch(function(){}); }catch(e){}
+  resumeGame();
+  if(saveRestored) setTimeout(function(){ toast('LOADED FROM A BACKUP SAVE','life'); },3000);
 });
 
+/* ---------- pick up where you left off: docked, on a pad or patch of ground, inside your home, or at your spot in
+   space. Flying in an atmosphere or warping keeps the last pad or dock you touched. ---------- */
+function snapResume(){
+  if(state.mode==='title' || state.warp || state.spool || !SYS) return;
+  var sys=state.sysSeed;
+  if(state.dock){ if(state.dock.phase==='docked') state.resume={kind:'dock', sys:sys}; return; }
+  if(state.mode==='space'){ var p=ship.position; state.resume={kind:'space', sys:sys, pos:[p.x,p.y,p.z], yaw:state.yaw, pitch:state.pitch}; return; }
+  if(state.mode==='surface' && S && !state.landing){ var sp=S.ship.position, np=nearestPad(sp.x,sp.z);
+    if(np && np.d<12) state.resume={kind:'pad', sys:sys, planet:S.idx, key:np.T.key, inside:!!state.inHome};
+    else state.resume={kind:'ground', sys:sys, planet:S.idx, x:sp.x, z:sp.z, yaw:state.yaw}; }
+}
+function resumeLabel(){
+  var R=state.resume; if(!R || !SYS || R.sys!==state.sysSeed) return '';
+  if(R.kind==='dock') return SYS.station.name;
+  if(R.kind==='space') return 'IN SPACE';
+  if(R.kind==='pad' && R.key==='home') return 'HOME'+(R.inside?' (INSIDE)':'');
+  if(R.kind==='pad'){ var L=locFromKey(R.key); return L?L.name:SYS.biomes[R.planet].name; }
+  return SYS.biomes[R.planet]?SYS.biomes[R.planet].name:'';
+}
+function resumeGame(){
+  var R=state.resume; if(!R || !SYS || R.sys!==state.sysSeed) return;
+  if(R.kind==='space'){ ship.position.set(R.pos[0],R.pos[1],R.pos[2]); state.yaw=R.yaw||0; state.pitch=R.pitch||0; state.vel.set(0,0,0); setThrottle(0);
+    V1.set(Math.sin(state.yaw)*Math.cos(state.pitch),Math.sin(state.pitch),Math.cos(state.yaw)*Math.cos(state.pitch)); M4.lookAt(V3.copy(ship.position).sub(V1),ship.position,UP); ship.quaternion.setFromRotationMatrix(M4); return; }
+  if(R.kind==='dock' && station){
+    var E=station.mouthW.clone().addScaledVector(station.dirW,30);
+    state.dock={phase:'docked', t:0, p0:E.clone(), E:E, I:dockPoint(), D:station.dirW.clone(), dur:2, ctrl:E.clone()}; ship.position.copy(state.dock.I);
+    state.yaw=Math.atan2(station.dirW.x,station.dirW.z); state.pitch=0; state.vel.set(0,0,0); setThrottle(0); showFlightControls(false); setPrompt(null);
+    setTimeout(function(){ if(state.dock && state.dock.phase==='docked') openTerminal(stationLoc()); },700); return; }
+  if((R.kind==='pad'||R.kind==='ground') && planets[R.planet]){
+    var fd=$('fade'); fd.style.opacity=1; queueSurface(R.planet,true); var t0=Date.now();
+    var iv=setInterval(function(){
+      if(!surfaces[R.planet]){ if(Date.now()-t0>30000){ clearInterval(iv); fd.style.opacity=0; } return; }
+      clearInterval(iv);
+      enterAtmosphere(planets[R.planet],true);
+      var T=R.kind==='pad'?(R.key==='home'?homeT():townByKey(R.key)):null, x=T?T.x:R.x, z=T?T.z:R.z;
+      var y=T?T.pad.y:Math.max(S.heightAt(x,z),S.waterLevel-.6);
+      S.ship.position.set(x,y+hullGear(S.ship),z); updateChunks(S,x,z,true);
+      if(R.kind==='ground' && R.yaw!=null) state.yaw=R.yaw;
+      state.landing={t:1, pad:!!T, town:T, x0:x, y0:y+4, z0:z, x1:x, y1:y, z1:z}; disembark(); state.camFrom=null;
+      if(R.inside && R.key==='home') setTimeout(enterHome,250);
+      setTimeout(function(){ fd.style.opacity=0; },350);
+    },150);
+  }
+}
+/* ---------- save files: export to a .json you keep anywhere, import one back (title screen) ---------- */
+function exportSave(){
+  if(state.mode!=='title') save();
+  var raw=localStorage.getItem('nh_save'); if(!raw){ $('saveNote').textContent='No save yet.'; return false; }
+  var prefs={}; ['nh_quality','nh_invert','nh_cb','nh_cargoFold'].forEach(function(k){ var v=localStorage.getItem(k); if(v!=null) prefs[k]=v; });
+  var file={game:'nomad-horizon', v:SAVE_V, exported:new Date().toISOString(), save:JSON.parse(raw), prefs:prefs};
+  var a=document.createElement('a'), url=URL.createObjectURL(new Blob([JSON.stringify(file)],{type:'application/json'}));
+  a.href=url; a.download='nomad-horizon-save-'+new Date().toISOString().slice(0,10)+'.json'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(function(){ URL.revokeObjectURL(url); },4000);
+  return true;
+}
+var pendingImport=null;
+$('saveExport').addEventListener('click',function(){ if(exportSave()) $('saveNote').textContent='Save file downloaded. Keep it somewhere safe.'; });
+$('saveImport').addEventListener('click',function(){
+  if(pendingImport){ saveLock=true; try{ var cur=localStorage.getItem('nh_save'); if(cur) localStorage.setItem('nh_save_pre_import',cur);
+      localStorage.setItem('nh_save',JSON.stringify(pendingImport.save)); Object.keys(pendingImport.prefs||{}).forEach(function(k){ localStorage.setItem(k,pendingImport.prefs[k]); }); }catch(e){ saveLock=false; $('saveNote').textContent='Could not store that save.'; return; }
+    location.reload(); return; }
+  $('saveFile').value=''; $('saveFile').click();
+});
+$('saveFile').addEventListener('change',function(){
+  var f=this.files&&this.files[0]; if(!f) return; var rd=new FileReader();
+  rd.onload=function(){ var o=null; try{ o=JSON.parse(rd.result); }catch(e){}
+    var sv2=o && (o.save||o); if(!sv2 || typeof sv2.credits!=='number'){ $('saveNote').textContent='That file isn’t a Nomad Horizon save.'; return; }
+    pendingImport={save:sv2, prefs:o.save?o.prefs:null};
+    $('saveImport').textContent='CONFIRM IMPORT'; $('saveImport').classList.add('confirm');
+    $('saveNote').textContent=fmt(sv2.credits)+' units'+(sv2.company?' · '+sv2.company.name:'')+(sv2.home?' · home in '+sv2.home.name:'')+(o.exported?' · saved '+o.exported.slice(0,10):'')+'. This replaces your current game.';
+  };
+  rd.readAsText(f);
+});
+if(saveRestored) $('saveNote').textContent='Your last save couldn’t be read, so the game loaded a backup.';
 async function boot(){
   var lf=$('loadFill'), ld=$('loader');
   function prog(p,msg){ lf.style.width=(p*100)+'%'; ld.firstChild.nodeValue=msg; }
@@ -7260,7 +7360,7 @@ async function boot(){
   renderer.compile(spaceScene,camera);
   prog(1,'Ready');
   $('enterBtn').disabled=false;
-  $('titleCard').innerHTML='RIG <b>HX-417</b><span>HULL <b>'+Math.round(state.hull)+'%</b></span><span>UNITS <b>'+fmt(state.credits)+'</b></span><span>SYSTEM <b>'+(SYS?SYS.name:'ORIGIN')+'</b></span>';
+  $('titleCard').innerHTML='RIG <b>HX-417</b><span>HULL <b>'+Math.round(state.hull)+'%</b></span><span>UNITS <b>'+fmt(state.credits)+'</b></span><span>SYSTEM <b>'+(SYS?SYS.name:'ORIGIN')+'</b></span>'+(resumeLabel()?'<span>RESUME AT <b>'+resumeLabel()+'</b></span>':'');
   setTimeout(function(){ ld.style.opacity=0; },400);
   frame();
   setTimeout(streamShipModels,1500);
