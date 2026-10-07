@@ -3494,7 +3494,7 @@ thTrack.addEventListener('pointerup',function(e){ if(e.pointerId===thPtr) thPtr=
 thTrack.addEventListener('pointercancel',function(){ thPtr=null; });
 ['touchstart','touchmove'].forEach(function(ev){ thTrack.addEventListener(ev,function(e){ e.stopPropagation(); },{passive:true}); });
 var holdA=false, btnA=$('btnA');
-function setHold(v){ holdA=v; btnA.classList.toggle('held',v); }
+function setHold(v){ holdA=v; btnA.classList.toggle('held',v); if(v && state.seated) launch(); }
 btnA.addEventListener('touchstart',function(e){ setHold(true); e.preventDefault(); },{passive:false});
 btnA.addEventListener('touchend',function(){ setHold(false); });
 btnA.addEventListener('touchcancel',function(){ setHold(false); });
@@ -3694,6 +3694,12 @@ function setModeUI(mode){
   if(mode!=='space') $('warpPanel').hidden=true;
   $('radarWrap').classList.toggle('planet',mode!=='space'); if(mode==='space') closeMap();
   thWrap.hidden=foot; $('joyCap').textContent=foot?'MOVE':'STEER';
+  state.seated=false; state.launch=null;   // any mode change leaves the cockpit; board() sits you back down after
+}
+/* sitting on the ground in the cockpit: the boost button reads LAUNCH, the stick looks around */
+function seatUI(){
+  var ground=!!(state.seated||state.launch);
+  btnA.textContent=state.seated?'LAUNCH':'BOOST'; thWrap.hidden=ground; $('joyCap').textContent=state.seated?'LOOK':'STEER';
 }
 function setShipFlying(obj, flying){
   obj.userData.legs.forEach(function(l){ l.visible=!flying; });
@@ -4546,7 +4552,7 @@ var fleetVis=[], FV_PREV=new THREE.Vector3();
 /* you're coming in to this town: flying within FLEET_CLEAR m of it, or your autopilot or route is headed for it */
 var FLEET_CLEAR=700;
 function playerInbound(T){
-  if(!S || state.mode!=='atmo' || !S.ship) return false;
+  if(!S || state.mode!=='atmo' || !S.ship || state.seated || state.launch) return false;   // sitting on (or lifting off) the ground isn't coming in
   if(state.ap && state.ap.key===T.key) return true;
   if(state.route && state.route.loc && state.route.loc.key===T.key) return true;
   if(state.landing && state.landing.town===T) return true;
@@ -5652,8 +5658,9 @@ function startRoute(loc){
   closeNav(); if(mapOpen) closeMap();
   var far=SYS && loc.sys!==SYS.seed;
   toast('ROUTE SET · '+loc.name+(far?' ('+loc.sysName+')':''),'life');
-  if(state.mode==='surface') toast('BOARD YOUR SHIP AND THE AUTOPILOT TAKES IT FROM THERE');
+  if(state.mode==='surface') toast('BOARD YOUR SHIP AND PRESS LAUNCH · THE AUTOPILOT TAKES IT FROM THERE');
   routeT=0; renderInv(); cbEvent('route',loc);
+  if(state.seated) launch();
 }
 function inCustomsHall(){
   var G=station&&station.gate; if(!G || !G.group.visible) return false;
@@ -5689,7 +5696,7 @@ function routeTick(dt){
     else if(nt && nt.T.key===L.key && nt.d<40){ routeDone('ARRIVED · '+L.name+(R.project&&!isProject(L)?' · PROJECT LOADS AT THE TERMINAL':' · DELIVER AT THE TERMINAL')); }
     return;
   }
-  if(state.mode==='atmo' && state.landing){ return; }
+  if(state.mode==='atmo' && (state.landing || state.seated)){ return; }   // parked in the cockpit: waits for LAUNCH
   if(R.cust && R.cust[SYS.seed]==='ask'){            // waiting on the skip-customs question
     if(state.law && state.law.type==='routeask') return;
     if(hostileNow()) return; delete R.cust[SYS.seed];  // something else took the panel: ask again once it's quiet
@@ -6278,7 +6285,7 @@ function tapSleep(){
   if(!needsOn()) return;
   if(termLoc){ renderTerminal('services'); return; }
   if(state.mode==='surface'){ sleep('cab'); return; }
-  if(state.mode==='atmo'){ toast('LAND FIRST, THEN SLEEP IN YOUR CAB'); return; }
+  if(state.mode==='atmo'){ toast(state.seated?'STEP OUT, THEN SLEEP IN YOUR CAB':'LAND FIRST, THEN SLEEP IN YOUR CAB'); return; }
   if(state.mode==='space'){
     if(state.dock){ toast('DOCKED · USE THE CREW BUNK IN SERVICES'); return; }
     if(state.law || state.chase || pirateActive()){ toast('NOT NOW'); return; }
@@ -6853,11 +6860,13 @@ function startAtmoAutopilot(T){
   if(state.mode!=='atmo' || state.landing || !T) return;
   state.ap={kind:'town', key:T.key, name:T.name, t:0}; state.waypoint=T.key;
   closeMap(); toast('AUTOPILOT ENGAGED · '+T.name,'life'); updateApChip(true);
+  if(state.seated) launch();
 }
 function startOrbitAutopilot(){
   if(state.mode!=='atmo' || state.landing) return;
   state.ap={kind:'orbit', name:'BACK TO ORBIT', t:0};
   closeMap(); toast('AUTOPILOT ENGAGED · CLIMBING TO ORBIT','life'); updateApChip(true);
+  if(state.seated) launch();
 }
 function updateAtmoAutopilot(dt){
   var A=state.ap; if(!A || (A.kind!=='town' && A.kind!=='orbit')) return;
@@ -6906,7 +6915,10 @@ function updateAtmo(dt){
     if(L.t>.4) sh.userData.legs.forEach(function(l){ l.visible=true; });
     (sh.userData.tilts||[]).forEach(function(pv){ pv.rotation.x*=Math.pow(.02,dt); });
     if(L.t>=1){ disembark(); return; }
+  } else if(state.seated || state.launch){
+    updateLaunch(dt, sh);
   } else {
+    (sh.userData.tilts||[]).forEach(function(pv){ pv.rotation.x+=(-Math.PI/2-pv.rotation.x)*(1-Math.pow(.05,dt)); });   // pods swing aft after a vertical lift
     updateAtmoAutopilot(dt);
     f=flyShip(dt, sh, 1.5, 26*speedMul(), 62*speedMul());
     var g=Math.max(S.heightAt(sh.position.x,sh.position.z), S.waterLevel)+hullGear(sh)+.35;
@@ -6935,7 +6947,9 @@ function updateAtmo(dt){
 
   updateApChip(false);
   var spd=state.vel.length(), nt=nearestTown(sh.position.x,sh.position.z), padD=nt?nt.d:1e9;
-  if(!state.landing){
+  if(state.seated) setPrompt('DISEMBARK','STEP OUT',unboard);
+  else if(state.launch) setPrompt(null);
+  else if(!state.landing){
     if(nt && padD<34 && alt<45 && spd<24) setPrompt('LAND ON PAD',nt.T.name,function(){ land(true); });
     else if(alt<14 && spd<18 && S.slopeAt(sh.position.x,sh.position.z)<.6 && S.heightAt(sh.position.x,sh.position.z)>S.waterLevel+.4) setPrompt('LAND','SET DOWN HERE',function(){ land(false); });
     else setPrompt(null);
@@ -6974,14 +6988,82 @@ function disembark(){
   else if(onPad){ setTimeout(function(){ if(state.mode==='surface' && S) openTerminal(townLoc(S.idx,padT.j)); },900); }
   else if(!state.landedHere){ state.landedHere=true; toast('SHIP PARKED · FOLLOW THE BEACON OR RADAR TO RETURN'); }
 }
+/* Boarding sits you in the cockpit on the ground. LAUNCH (or picking a route / autopilot target) lifts the
+   ship straight up until it clears the town's buildings or the ground clutter, then it flies on. */
 function board(){
   if(!S) return; setPrompt(null); closeTerminal(); sfx('hatchClose',.7,1.15);
-  var lift=sfx('landing',.6,1.12,.25); sfxFade(lift,2.6,1.2);
-  var up=sfx('gear',.45,1.15,.3); sfxFade(up,2,.8);
+  var sh=S.ship, f=V3.set(0,0,-1).applyQuaternion(sh.quaternion);
   state.mode='atmo'; setModeUI('atmo');
-  setShipFlying(S.ship,true);
-  state.vel.set(0,11,0); state.pitch=.05; state.landHint=true; stopRates(); setThrottle(.35);
+  state.yaw=Math.atan2(f.x,f.z); state.pitch=0; state.vel.set(0,0,0); stopRates(); setThrottle(0);
+  state.seated=true; state.landHint=true; seatUI();
   S.beacon.visible=false;
+  if(state.route) toast('ROUTE · '+state.route.loc.name+' · PRESS LAUNCH TO LIFT OFF','life');
+  else if(!state.hints.launch){ state.hints.launch=1; toast('PRESS LAUNCH TO LIFT OFF · OR PICK A ROUTE AND THE AUTOPILOT LAUNCHES FOR YOU'); }
+}
+function unboard(){
+  if(!state.seated || !S) return;
+  var sh=S.ship; setPrompt(null); sfx('hatchOpen',.9);
+  var right=new THREE.Vector3(-Math.cos(state.yaw),0,Math.sin(state.yaw));
+  var off=hullBeam(sh)/2+2.5, px=sh.position.x+right.x*off, pz=sh.position.z+right.z*off, np=nearestPad(sh.position.x,sh.position.z);
+  var gy=np && np.d<12?np.T.pad.y:Math.max(S.heightAt(px,pz),S.waterLevel-.6);
+  state.pos.set(px, gy+1.7, pz); state.vy=0; state.grounded=true; state.pitch=-.05;
+  state.camFrom={p:camera.position.clone(), q:camera.quaternion.clone(), t:1};
+  state.mode='surface'; setModeUI('surface');
+  camera.fov=68; camera.updateProjectionMatrix(); finalPass.uniforms.boost.value=0; state.fovKick=0;
+  updateGrass(true);
+}
+function launch(){
+  if(!state.seated || !S) return;
+  var sh=S.ship, p=sh.position, top=Math.max(S.heightAt(p.x,p.z),S.waterLevel);
+  for(var i=0;i<8;i++){ var a=i/8*TAU; top=Math.max(top,S.heightAt(p.x+Math.sin(a)*18,p.z+Math.cos(a)*18)); }
+  var clr=top+20, np=nearestPad(p.x,p.z);
+  if(np && np.d<np.T.cityR+40) clr=Math.max(clr,np.T.hs+np.T.skyH+12);   // over the tallest buildings in town
+  state.seated=false; setHold(false); setPrompt(null);
+  state.launch={y0:p.y, y1:Math.max(clr+hullGear(sh),p.y+12), vy:0, legs:true};
+  var lift=sfx('landing',.6,1.12,.25); sfxFade(lift,2.6,1.2);
+  sh.userData.flames.forEach(function(fl){ fl.visible=true; }); (sh.userData.glows||[]).forEach(function(gl){ gl.visible=true; }); setThroat(sh,true);
+  seatUI();
+}
+/* chase camera while sitting or lifting off: same framing as flight, drag (or the stick, when seated) looks around */
+function seatCam(dt, sh, settle){
+  var sc=hullCam(sh);
+  if(state.seated){
+    var kx=joy.x+((keys.KeyD||keys.ArrowRight)?1:0)-((keys.KeyA||keys.ArrowLeft)?1:0), ky=joy.y+((keys.KeyS||keys.ArrowDown)?1:0)-((keys.KeyW||keys.ArrowUp)?1:0);
+    look.dx+=clamp(kx,-1,1)*dt*300; look.dy+=clamp(ky,-1,1)*dt*300;
+  }
+  state.lookYaw=wrapA((state.lookYaw||0)-look.dx*.006); state.lookPitch=clamp((state.lookPitch||0)-look.dy*.004,-.9,1.1); look.dx=look.dy=0;
+  if(settle && !look.active){ var e=1-Math.exp(-2.5*dt); state.lookYaw*=1-e; state.lookPitch*=1-e; }
+  state.camYaw=state.yaw; state.camPitch=0; state.fovKick=0;
+  camera.fov=62; camera.updateProjectionMatrix(); finalPass.uniforms.boost.value=0;
+  var cy=state.yaw+Math.PI+state.lookYaw, cp=.24+state.lookPitch;
+  CAMOFF.set(Math.sin(cy)*Math.cos(cp),Math.sin(cp),Math.cos(cy)*Math.cos(cp)).multiplyScalar(10*sc);
+  camera.position.copy(sh.position).add(CAMOFF).addScaledVector(UP,1.1*sc);
+  var cg=S.heightAt(camera.position.x,camera.position.z)+1.2; if(camera.position.y<cg) camera.position.y=cg;
+  var fl=Math.min(1,Math.max(Math.abs(state.lookYaw),Math.abs(state.lookPitch))*3);
+  camera.lookAt(V2.copy(sh.position).addScaledVector(V1.set(Math.sin(state.yaw),0,Math.cos(state.yaw)),9*sc*(1-fl)).addScaledVector(UP,1.1*sc));
+}
+function updateLaunch(dt, sh){
+  var hold=keys.Space||keys.ShiftLeft||keys.ShiftRight;   // the on-screen button launches straight from setHold
+  M4.lookAt(V3.set(sh.position.x-Math.sin(state.yaw),sh.position.y,sh.position.z-Math.cos(state.yaw)), sh.position, UP);
+  QT.setFromRotationMatrix(M4); sh.quaternion.slerp(QT,1-Math.pow(.01,dt));
+  if(state.seated){
+    state.vel.set(0,0,0);
+    seatCam(dt, sh, false);
+    if(hold) launch();
+    return;
+  }
+  var L=state.launch, rem=L.y1-sh.position.y;
+  // ease up to a steady climb, slow into the top so the hand-off to forward flight is smooth
+  var want=Math.min(14,Math.sqrt(Math.max(0,rem)*2*5)+2);
+  L.vy+=(want-L.vy)*(1-Math.exp(-2.2*dt)); sh.position.y+=L.vy*dt; state.vel.set(0,L.vy,0);
+  if(L.legs && sh.position.y-L.y0>2.5){ L.legs=false; sh.userData.legs.forEach(function(l){ l.visible=false; }); var up=sfx('gear',.45,1.15,.3); sfxFade(up,2,.8); }
+  sh.userData.flames.forEach(function(fl){ var u=fl.material.uniforms; u.intensity.value=lerp(u.intensity.value,1.1,.1); u.time.value=state.t; fl.scale.y=.9; });
+  addRumble(.05,.3);
+  seatCam(dt, sh, true);
+  if(rem<1.5){
+    state.launch=null; state.pitch=.04; seatUI();
+    if(!state.ap) setThrottle(.5);
+  }
 }
 
 function doScan(){
