@@ -108,6 +108,7 @@ Each freighter hull has its own turn rate and weight: the Skiff snaps into turns
 - **Settlements:** 1–2 habitable planets per system, each with 2–4 towns (landing pad, cargo terminal, residents); every other planet has 1–2 outposts (mining camps, research outposts, fuel depots). Short-hop contracts run between towns on the same planet.
 - **Planet map:** tap the radar (or press M) for a relief map with every town and outpost, your drops, your ship and a waypoint you can set.
 - **Living worlds:** day/night cycle, wildlife that grazes and flees, crystal deposits to mine and sell.
+- **Townspeople:** jointed figures (helmets, hard hats, caps and hoods, visors, backpacks) dressed by trade: orange dock crews, miners with head lamps, blue engineers, white medics and settlers in muted colours, with a town's businesses bringing in their trades. They walk with a proper stride along the plaza ring and the district sidewalks instead of through walls, step into buildings and come back out, sit on the plaza benches, stand chatting with their hands going, work the cargo terminal and the crate stack by the pad, glance at you as you pass and wait for you to get out of the way. A city has about 25, an outpost 6. Each body part is one instanced mesh per town (about a dozen draw calls), and towns out of range stop animating.
 
 ### Atmosphere
 - **CB radio:** other drivers chatter on channel 19: patrol and raider warnings for the system you're in, which station is paying top units, town gossip, and the odd word when you set out or arrive. Toggle it with the CB button.
