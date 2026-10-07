@@ -200,6 +200,10 @@ button:focus-visible{outline:2px solid var(--cyan);outline-offset:3px;}
 .jobline{pointer-events:auto;cursor:pointer;padding:.12rem 0;}
 .jobline .go{display:inline-block;margin-left:.4rem;padding:0 .35rem;border:1px solid rgba(255,178,77,.55);border-radius:99px;font-size:.52rem;letter-spacing:.12em;}
 .jobline.on .go{background:var(--amber);color:#170c02;border-color:var(--amber);}
+.invbody{display:flex;flex-direction:column;gap:.3rem;} .invbody[hidden]{display:none;}
+.jobhead{font-family:var(--font-mono);font-size:.55rem;letter-spacing:.14em;color:var(--ink-dim);text-shadow:0 1px 4px rgba(0,0,0,.9);
+  pointer-events:auto;cursor:pointer;padding:.12rem 0;max-width:15rem;}
+.jobhead.folded{color:var(--amber);}
 .jobline.warp{color:var(--warp);} .jobline.warp .go{border-color:rgba(143,184,255,.55);} .jobline.warp.on .go{background:var(--warp);color:#06101f;border-color:var(--warp);}
 .jobline.late{color:#ff7a5a;}
 .jobline.proj{color:#e8c66a;margin-bottom:.15rem;} .jobline.proj .go{border-color:rgba(232,198,106,.6);} .jobline.proj.on .go{background:#e8c66a;color:#170c02;border-color:#e8c66a;}
@@ -235,7 +239,7 @@ button:focus-visible{outline:2px solid var(--cyan);outline-offset:3px;}
 .st-row .acts.wrap{flex-wrap:wrap;justify-content:flex-end;}
 #lawPanel{position:absolute;left:50%;top:calc(3.6rem + env(safe-area-inset-top,0px));transform:translateX(-50%);z-index:32;width:min(92vw,25rem);
   padding:.8rem .9rem;pointer-events:auto;display:flex;flex-direction:column;gap:.35rem;background:rgba(10,8,14,.9);border-width:1px;}
-#lawPanel.law-bad{border-color:rgba(255,90,60,.75);box-shadow:0 0 24px rgba(255,90,60,.25);} #lawPanel.law-warn{border-color:rgba(127,168,255,.8);box-shadow:0 0 24px rgba(127,168,255,.25);}
+#lawPanel.law-bad{border-color:rgba(255,90,60,.75);box-shadow:0 0 24px rgba(255,90,60,.25);} #lawPanel.law-good{border-color:rgba(232,198,106,.85);box-shadow:0 0 28px rgba(232,198,106,.3);} #lawPanel.law-good #lwEye{color:#e8c66a;} #lawPanel.law-good #lwBody p{margin:.3rem 0;} #lawPanel.law-warn{border-color:rgba(127,168,255,.8);box-shadow:0 0 24px rgba(127,168,255,.25);}
 #lwHead{display:flex;justify-content:space-between;align-items:baseline;gap:.5rem;}
 #lwEye{font-family:var(--font-mono);font-size:.58rem;letter-spacing:.18em;color:var(--ink-dim);}
 #lwTimer{font-family:var(--font-mono);font-size:.9rem;color:#ff7a5c;font-variant-numeric:tabular-nums;}
@@ -277,6 +281,7 @@ button:focus-visible{outline:2px solid var(--cyan);outline-offset:3px;}
 #stBody{flex:1;min-height:0;overflow:auto;display:flex;flex-direction:column;gap:.45rem;padding-right:.15rem;}
 .st-note{margin:0 0 .2rem;font-size:.92rem;line-height:1.4;color:var(--ink-dim);}
 .st-sub{font-family:var(--font-mono);font-size:.6rem;letter-spacing:.2em;color:var(--cyan);margin-top:.4rem;}
+.st-sub-r{float:right;color:var(--ink-dim);letter-spacing:.12em;}
 .st-row{display:grid;grid-template-columns:auto 1fr auto auto;gap:.3rem .7rem;align-items:center;padding:.6rem .7rem;border:1px solid var(--line);
   border-radius:.45rem;background:rgba(255,255,255,.03);}
 .st-row.upg,.st-row.job{grid-template-columns:1fr auto;}
@@ -3299,26 +3304,28 @@ window.addEventListener('mouseup',function(){ setHold(false); });
 /* =========================================================================
    Game state + HUD
    ========================================================================= */
-var state={towns:{}, throttle:0, yawRate:0, pitchRate:0, mode:'title', yaw:Math.PI, pitch:0, vel:new THREE.Vector3(), energy:100, scan:1, credits:0, inv:{}, found:{}, sysSeed:0, up:{}, cargo:[], taken:{}, boardGen:{}, delivered:0, dock:null, mods:[], modsOwned:{}, lic:{}, fuel:null, hull:100, company:null, hullSel:null, rooks:{}, pulse:null, pulseK:0, ap:null, apAxes:null, route:null, fits:{}, fuelReserve:0, cleared:0, heat:{}, flares:3, food:100, rest:100, rations:2, fedT:0, restedT:0, needsOff:false, blinkT:0, sleeping:false, law:null, chase:null, arrivedT:0, pirateT:30,
+var state={towns:{}, throttle:0, yawRate:0, pitchRate:0, mode:'title', yaw:Math.PI, pitch:0, vel:new THREE.Vector3(), energy:100, scan:1, credits:0, inv:{}, found:{}, sysSeed:0, up:{}, cargo:[], taken:{}, boardGen:{}, boardT:{}, delivered:0, dock:null, mods:[], modsOwned:{}, lic:{}, fuel:null, hull:100, company:null, hullSel:null, rooks:{}, pulse:null, pulseK:0, ap:null, apAxes:null, route:null, fits:{}, fuelReserve:0, cleared:0, heat:{}, flares:3, food:100, rest:100, rations:2, fedT:0, restedT:0, needsOff:false, blinkT:0, sleeping:false, law:null, chase:null, arrivedT:0, pirateT:30,
   pos:new THREE.Vector3(), vy:0, grounded:true, bob:0, fovKick:0, exposure:1, exposureTarget:1, t:0, warp:null};
 var OLD_KEYS={'CINDER REACH':'PYRITE','GLASSWATER':'CYANITE','VERDANT HOLLOW':'AMETHINE','PALE SILICATE':'AURUM'};
 try{
   var sv=JSON.parse(localStorage.getItem('nh_save')||'null');
   if(sv){
-    state.credits=sv.credits||0; state.found=sv.found||{}; state.sysSeed=sv.sys||0; state.up=sv.up||{}; state.cargo=sv.cargo||[]; state.taken=sv.taken||{}; state.boardGen=sv.boardGen||{}; state.delivered=sv.delivered||0; state.towns=sv.towns||{};
+    state.credits=sv.credits||0; state.found=sv.found||{}; state.sysSeed=sv.sys||0; state.up=sv.up||{}; state.cargo=sv.cargo||[]; state.taken=sv.taken||{}; state.boardGen=sv.boardGen||{}; state.boardT=sv.boardT||{}; state.delivered=sv.delivered||0; state.towns=sv.towns||{};
     state.mods=sv.mods||[]; state.modsOwned=sv.modsOwned||{}; state.lic=sv.lic||{}; state.fuel=sv.fuel; state.hull=sv.hull==null?100:sv.hull; state.company=sv.company||null; state.hullSel=sv.hullSel==null?null:sv.hullSel; state.rooks=sv.rooks||{}; retireWedge(sv); state.fits=sv.fits||{}; state.fuelReserve=sv.fuelReserve||0; state.cleared=sv.cleared===undefined?(sv.sys||0):sv.cleared; state.heat=sv.heat||{}; state.flares=sv.flares==null?3:sv.flares;
     state.food=sv.food==null?100:sv.food; state.rest=sv.rest==null?100:sv.rest; state.rations=sv.rations==null?2:sv.rations; state.fedT=sv.fedT||0; state.restedT=sv.restedT||0; state.needsOff=!!sv.needsOff; state.shareLast=sv.shareLast==null?null:sv.shareLast; state.shareAcc=sv.shareAcc||0; state.project=sv.project||null;
     Object.keys(sv.inv||{}).forEach(function(k){ var nk=OLD_KEYS[k]||k; if(ELEMENTS[nk]) state.inv[nk]=(state.inv[nk]||0)+sv.inv[k]; });
   }
 }catch(e){}
 drawThrottle();
-function save(){ try{ localStorage.setItem('nh_save',JSON.stringify({credits:state.credits,inv:state.inv,found:state.found,sys:state.sysSeed,up:state.up,cargo:state.cargo,taken:state.taken,boardGen:state.boardGen,delivered:state.delivered,towns:state.towns,
+function save(){ try{ localStorage.setItem('nh_save',JSON.stringify({credits:state.credits,inv:state.inv,found:state.found,sys:state.sysSeed,up:state.up,cargo:state.cargo,taken:state.taken,boardGen:state.boardGen,boardT:state.boardT,delivered:state.delivered,towns:state.towns,
   mods:state.mods,modsOwned:state.modsOwned,lic:state.lic,fuel:state.fuel,hull:state.hull,company:state.company,hullSel:state.hullSel,rooks:state.rooks,fits:state.fits,fuelReserve:state.fuelReserve,cleared:state.cleared,heat:state.heat,flares:state.flares,
   food:state.food,rest:state.rest,rations:state.rations,fedT:state.fedT,restedT:state.restedT,needsOff:state.needsOff,shareLast:state.shareLast,shareAcc:state.shareAcc,project:state.project})); }catch(e){} }
 
 function toast(msg, cls){ if(typeof SND!=='undefined' && state.mode!=='title' && !(typeof AU!=='undefined' && AU.hush)){ if(cls==='life') SND.good(); else SND.blip(); } var el=document.createElement('div'); el.className='toast'+(cls?' '+cls:''); el.textContent=msg; $('toastWrap').appendChild(el); setTimeout(function(){ el.remove(); },2400); }
+var invFold=false;
+try{ invFold=localStorage.getItem('nh_cargoFold')==='1'; }catch(e){}
 function renderInv(){
-  var row=$('invrow'); row.innerHTML='';
+  var wrap=$('invrow'); wrap.innerHTML=''; var row=document.createElement('div'); row.className='invbody';
   Object.keys(ELEMENTS).forEach(function(k){ var n=state.inv[k]; if(!n) return;
     var c=document.createElement('div'); c.className='chip';
     c.innerHTML='<span class="dot" style="background:'+ELEMENTS[k]+';box-shadow:0 0 6px '+ELEMENTS[k]+'"></span>'+k+' &times;'+n;
@@ -3342,6 +3349,16 @@ function renderInv(){
     var go=document.createElement('span'); go.className='go'; go.textContent=on?'ROUTE ON':'AUTO'; c.appendChild(go);
     c.addEventListener('click',function(e){ e.stopPropagation(); if(state.route && state.route.loc.key===g.d.key){ apOff(''); cancelRoute('ROUTE CANCELLED'); } else startRoute(g.d); });
     row.appendChild(c); });
+  // a header line folds the whole list away so it doesn't cover the view
+  var nDrop=gk.length, nWarp=gk.filter(function(k){ return far(groups[k].d); }).length;
+  if(nDrop || state.project || row.children.length){
+    var hd=document.createElement('div'); hd.className='jobhead'+(invFold?' folded':'');
+    hd.textContent=(invFold?'▸ ':'▾ ')+'CARGO · '+holdUsed()+' CRATE'+(holdUsed()===1?'':'S')+' · '+nDrop+' DROP'+(nDrop===1?'':'S')+(nWarp?' ('+nWarp+' WARP)':'')+
+      (invFold && state.route?' · ROUTE ON':'')+(invFold?' · SHOW':' · HIDE');
+    hd.addEventListener('click',function(e){ e.stopPropagation(); invFold=!invFold; try{ localStorage.setItem('nh_cargoFold',invFold?'1':'0'); }catch(err){} renderInv(); });
+    wrap.appendChild(hd);
+  }
+  row.hidden=invFold; wrap.appendChild(row);
   $('holdVal').textContent=holdUsed()+'/'+holdCap();
   if(state.fuel==null) state.fuel=fuelCap();
   var ff=state.fuel/fuelCap(), fu=$('fuFill'); fu.style.width=Math.round(clamp(ff,0,1)*100)+'%'; fu.classList.toggle('low',ff<.25);
@@ -3773,8 +3790,22 @@ function remoteLoc(seed, r){
   var sy=sysInfo(seed), opts=[{key:seed+':S', kind:'station', name:sy.station.name, planet:-1, sys:seed, sysName:sy.name}].concat(sysSiteLocs(sy));
   return opts[Math.floor(r()*opts.length)];
 }
+/* Boards post a fresh set of contracts every BOARD_REFRESH (real time, so they also turn over while the game
+   is closed), or as soon as you've taken everything on them. Old "taken" marks for the board are dropped. */
+var BOARD_REFRESH=15*60000;
+function bumpBoard(k){
+  var g=state.boardGen[k]=(state.boardGen[k]||0)+1; state.boardT[k]=Date.now();
+  Object.keys(state.taken).forEach(function(id){ if(id.indexOf(k+':')===0 && id.indexOf(k+':'+g+':')!==0) delete state.taken[id]; });
+  return g;
+}
+function boardGen(loc){
+  var k=loc.key, t=state.boardT[k];
+  if(!t){ state.boardT[k]=Date.now(); return state.boardGen[k]||0; }
+  return Date.now()-t>=BOARD_REFRESH ? bumpBoard(k) : (state.boardGen[k]||0);
+}
+function boardRefreshIn(loc){ var t=state.boardT[loc.key]; return t?Math.max(0,BOARD_REFRESH-(Date.now()-t)):BOARD_REFRESH; }
 function boardOffers(loc){
-  var g=state.boardGen[loc.key]||0, r=rng(ihash(ihash(SYS.seed+11,loc.planet+20+(loc.site||0)*100),g*31+7));
+  var g=boardGen(loc), r=rng(ihash(ihash(SYS.seed+11,loc.planet+20+(loc.site||0)*100),g*31+7));
   var others=locations().filter(function(l){ return l.key!==loc.key; }), out=projectOffers(loc,g), nbs=neighbourSeeds(SYS.seed,3);
   if(!others.length) return out;
   var nOff=4+(loc.kind==='town'?Math.max(0,townLevel(loc)-1):1);
@@ -3818,7 +3849,7 @@ function acceptOffer(o, loc){
   state.taken[o.id]=1;
   state.cargo.push({id:o.id, kind:o.kind, biz:o.biz||null, grade:o.grade, name:o.name, crates:o.crates, reward:o.reward, from:o.from, dest:o.dest, cond:1,
     expires:o.limit?Date.now()+o.limit*1000:0});
-  if(!boardOffers(loc).length) state.boardGen[loc.key]=(state.boardGen[loc.key]||0)+1;
+  if(!boardOffers(loc).length) bumpBoard(loc.key);
   return true;
 }
 function cargoPay(c){ var late=c.expires && Date.now()>c.expires; return {pay:Math.round(c.reward*c.cond*(late?.4:1)), late:late}; }
@@ -3839,6 +3870,7 @@ function growTown(loc, pts, quiet){
   t.g+=pts;
   while(t.lvl<3 && t.g>=TOWN_NEED[t.lvl]){ t.g-=TOWN_NEED[t.lvl]; t.lvl++; up=t.lvl; }
   if(t.lvl>=3) t.g=0;
+  if(up!=null && isProject(loc)) projectUp={key:loc.key, name:loc.name, lvl:t.lvl};
   if(up!=null && quiet) rebuildTownAt(loc);
   else if(up!=null){
     var nm=TOWN_LVLS[up];
@@ -3868,6 +3900,7 @@ function investIn(loc, amt){
   if(!loc || loc.kind!=='town' || amt<=0 || state.credits<amt) return null;
   var t=state.towns[loc.key]=townRec(loc);
   state.credits-=amt; t.inv=(t.inv||0)+amt; t.earned=t.earned||0;
+  if(isProject(loc)) state.project.inv=(state.project.inv||0)+amt;
   t.name=loc.name; t.pname=loc.pname; t.sysName=loc.sysName;
   if(state.shareLast==null) state.shareLast=Date.now();
   var pts=t.lvl<3?Math.floor(amt/INVEST_PER_G):0;
@@ -3906,8 +3939,32 @@ function holdingsHTML(curKey){
 function projectLoc(){ var p=state.project; return p && SYS && p.sys===SYS.seed ? p : null; }
 function isProject(d){ return !!(state.project && d && d.key===state.project.key); }
 function setProject(loc){
-  state.project=loc?{key:loc.key, kind:'town', name:loc.name, label:loc.label, planet:loc.planet, site:loc.site, outpost:loc.outpost, pname:loc.pname, sys:loc.sys, sysName:loc.sysName}:null;
+  state.project=loc?{key:loc.key, kind:'town', name:loc.name, label:loc.label, planet:loc.planet, site:loc.site, outpost:loc.outpost, pname:loc.pname, sys:loc.sys, sysName:loc.sysName,
+    crates:0, inv:0, fleet:0}:null;
 }
+/* A project stage-up gets its own moment: what you put in, what the town unlocked, and whether to keep going. */
+var projectUp=null;
+var PROJECT_UNLOCK=['', 'A full town core: more homes, more residents, a busier pad.', 'A new district ring with traffic, 2 business plots, more contracts and +16% pay.',
+  'An outer city ring of taller blocks, 3 more business plots, the biggest boards in the system and +24% pay.'];
+function projectCelebrate(){
+  if(!projectUp || state.mode==='title' || state.law || state.warp || state.spool) return;
+  var U=projectUp, P=state.project; projectUp=null; if(!P || P.key!==U.key) return;
+  var who=state.company?state.company.name:'RIG HX-417', bits=[];
+  if(P.crates) bits.push('hauled <b>'+fmt(P.crates)+' crate'+(P.crates>1?'s':'')+'</b> in');
+  if(P.inv) bits.push('invested <b>'+fmt(P.inv)+' units</b>');
+  if(P.fleet) bits.push((state.company?state.company.name:'your fleet')+' added <b>'+fmt(P.fleet)+' growth</b>');
+  var city=U.lvl>=3, biz=(townRec(P).biz||[]).some(Boolean);
+  showLaw({type:'project', tone:'good', eye:'★ PROJECT · STAGE COMPLETE', title:U.name+' IS NOW A '+TOWN_LVLS[U.lvl],
+    body:'<p>'+PROJECT_UNLOCK[U.lvl]+'</p>'+(bits.length?'<p>Since you took it on, you '+(bits.length>1?bits.slice(0,-1).join(', ')+' and '+bits[bits.length-1]:bits[0])+'.</p>':'')+
+      (city?'<p>'+(biz?'It’s fully grown. ★ loads now come from its businesses.':'It’s fully grown. Open a business there to keep ★ loads coming, or pick a new project.')+'</p>'
+        :'<p>Next stage: '+TOWN_LVLS[U.lvl+1]+'.</p>'),
+    buttons:[{label:city?'KEEP IT AS MY PROJECT':'KEEP BUILDING', cls:'pri', fn:function(){}},
+      {label:'PICK A NEW PROJECT', fn:function(){ setProject(null); toast('PROJECT CLEARED · SET A NEW ONE FROM ANY TOWN TAB'); }}]});
+  sfx('confirm',.9); SND.good();
+  CB.queue=cbPick([who+', that '+TOWN_LVLS[U.lvl].toLowerCase()+' out at '+U.name+' is your doing. Folks there know your rig.',
+    'Big night in '+U.name+'. They’re toasting '+who+' at the cantina.','Whole channel’s talking about '+U.name+'. '+who+' built that, one load at a time.']);
+}
+setInterval(projectCelebrate,1000);
 function projectOffers(loc, g){
   var P=projectLoc(); if(!P || loc.key===P.key) return [];
   var tr=townRec(P), wants=(tr.biz||[]).filter(Boolean), out=[], n=loc.kind==='station'?2:1;
@@ -3928,7 +3985,7 @@ function projectBoards(){
   var pi=-1; if(S) Object.keys(surfaces).forEach(function(k){ if(surfaces[k]===S) pi=+k; });
   var from=pi>=0?SYS.planets[pi].pos:ship.position;
   return locations().filter(function(l){ return l.key!==P.key; }).map(function(l){
-    var n=projectOffers(l,state.boardGen[l.key]||0).length, d;
+    var n=projectOffers(l,boardGen(l)).length, d;
     if(pi>=0 && l.kind==='town' && l.planet===pi){ var st=planetTerrain(SYS.biomes[pi]).sites[l.site||0]; d=Math.hypot(st.x-S.ship.position.x,st.z-S.ship.position.z)*1e-3; }
     else d=from.distanceTo(locPos(l));
     return {loc:l, n:n, d:d};
@@ -3951,7 +4008,7 @@ function fleetDrop(s, eff, quiet){
   var loc=L[Math.floor(r()*L.length)]; s.lastDrop=loc.name+(sy===home?'':' ('+sy.name+')');
   if(r()>=.5*eff) return;
   var t=state.towns[loc.key]=townRec(loc), pts=(s.tier>=2?2:1)*(s.route==='long'?2:1);
-  t.fleet=(t.fleet||0)+pts; t.name=loc.name; t.pname=loc.pname; t.sysName=loc.sysName;
+  t.fleet=(t.fleet||0)+pts; if(isProject(loc)) state.project.fleet=(state.project.fleet||0)+pts; t.name=loc.name; t.pname=loc.pname; t.sysName=loc.sysName;
   var up=growTown(loc,pts,true);
   if(up!=null){ var m=loc.name+' IS NOW A '+TOWN_LVLS[up]+' · YOUR FLEET HELPED'; fleetLog(m); if(!quiet) toast('FLEET · '+m,'life'); }
 }
@@ -3970,7 +4027,7 @@ function deliverHere(loc){
     if(c.kind!=='contraband' && !isCleared()) return true;
     var p=cargoPay(c); total+=p.pay; n+=c.crates; if(p.late) late++; pts+=c.crates*(c.kind==='construction'?3:c.biz?2:1); return false;
   });
-  if(n){ state.credits+=total; state.delivered=(state.delivered||0)+n; }
+  if(n){ state.credits+=total; state.delivered=(state.delivered||0)+n; if(isProject(loc)) state.project.crates=(state.project.crates||0)+n; }
   return {total:total, n:n, late:late, grew:growTown(loc,pts)};
 }
 var lastImpactToast=0;
@@ -4388,7 +4445,8 @@ function renderTerminal(tab){
           '<small class="fx">'+fmt(cargoPay(c).pay)+' units'+(tl?' · '+tl+' left':'')+(c.kind==='fragile'?' · condition '+Math.round(c.cond*100)+'%':'')+'</small></span></div>'; });
     }
     var offers=boardOffers(loc);
-    h+='<div class="st-sub">CONTRACTS FROM '+loc.name+'</div>';
+    var rIn=Math.ceil(boardRefreshIn(loc)/60000);
+    h+='<div class="st-sub">CONTRACTS FROM '+loc.name+'<span class="st-sub-r">NEW BOARD IN '+rIn+' MIN</span></div>';
     if(!offers.length) h+='<p class="st-note">No contracts posted right now.</p>';
     var anyW=offers.some(function(o){ return o.ly; }), anyP=offers.some(function(o){ return isProject(o.dest); });
     if(anyW||anyP) h+='<p class="st-note legend">'+(anyW?'<i class="lg-warp"></i>Blue jobs need a warp to another system. ':'')+(anyP?'<i class="lg-proj"></i>★ Gold jobs build '+state.project.name+'.':'')+'</p>';
