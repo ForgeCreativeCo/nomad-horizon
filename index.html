@@ -266,6 +266,17 @@ button:focus-visible{outline:2px solid var(--cyan);outline-offset:3px;}
 .co-input{width:100%;box-sizing:border-box;font:inherit;font-family:var(--font-display);font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--ink);
   background:rgba(255,255,255,.05);border:1px solid var(--line);border-radius:.35rem;padding:.6rem .7rem;margin:.2rem 0 .5rem;}
 .st-row .acts.wrap{flex-wrap:wrap;justify-content:flex-end;}
+#guide{position:absolute;left:50%;top:calc(3.4rem + env(safe-area-inset-top,0px));transform:translateX(-50%);z-index:29;width:min(92vw,24rem);padding:.7rem .9rem;pointer-events:auto;
+  background:rgba(6,11,22,.88);border-color:rgba(255,178,77,.7);box-shadow:0 0 22px rgba(255,178,77,.18);}
+#guide.side{left:.75rem;top:auto;bottom:calc(1rem + env(safe-area-inset-bottom,0px));transform:none;width:min(46vw,22rem);}
+@keyframes tutglow{0%,100%{box-shadow:0 0 0 1px rgba(255,178,77,.9),0 0 10px rgba(255,178,77,.35);}50%{box-shadow:0 0 0 2px rgba(255,178,77,1),0 0 26px rgba(255,178,77,.7);}}
+.tut-glow{animation:tutglow 1.4s ease-in-out infinite;border-color:var(--amber)!important;}
+@media (prefers-reduced-motion:reduce){ .tut-glow{animation:none;box-shadow:0 0 0 2px var(--amber);} }
+#gdEye{font-family:var(--font-mono);font-size:.56rem;letter-spacing:.2em;color:var(--amber);}
+#gdText{font-size:.84rem;line-height:1.38;color:var(--ink);margin:.3rem 0 .45rem;} #gdText b{color:var(--amber);font-weight:600;}
+#gdBtns{display:flex;gap:.5rem;} #gdBtns button{font-family:var(--font-mono);font-size:.56rem;letter-spacing:.14em;color:var(--ink-dim);background:none;border:1px solid var(--line);border-radius:2px;padding:.4rem .7rem;cursor:pointer;}
+#gdBtns button#gdOk{color:#170c02;background:var(--amber);border-color:var(--amber);}
+@media (max-width:560px){ #guide.side{width:calc(100vw - 1.5rem);} }
 #lawPanel{position:absolute;left:50%;top:calc(3.6rem + env(safe-area-inset-top,0px));transform:translateX(-50%);z-index:32;width:min(92vw,25rem);
   padding:.8rem .9rem;pointer-events:auto;display:flex;flex-direction:column;gap:.35rem;background:rgba(10,8,14,.9);border-width:1px;}
 #lawPanel.law-bad{border-color:rgba(255,90,60,.75);box-shadow:0 0 24px rgba(255,90,60,.25);} #lawPanel.law-good{border-color:rgba(232,198,106,.85);box-shadow:0 0 28px rgba(232,198,106,.3);} #lawPanel.law-good #lwEye{color:#e8c66a;} #lawPanel.law-good #lwBody p{margin:.3rem 0;} #lawPanel.law-warn{border-color:rgba(127,168,255,.8);box-shadow:0 0 24px rgba(127,168,255,.25);}
@@ -528,6 +539,7 @@ body.mapopen #joywrap,body.mapopen #actions,body.mapopen #throttle{visibility:hi
       <div id="wpList"></div>
       <button id="wpClose" type="button">CANCEL</button>
     </div>
+    <div id="guide" class="panel" hidden><div id="gdEye"></div><div id="gdText"></div><div id="gdBtns"><button id="gdOk" type="button">GOT IT</button><button id="gdSkip" type="button">SKIP GUIDE</button></div></div>
     <div id="lawPanel" class="panel" hidden><div id="lwHead"><span id="lwEye"></span><span id="lwTimer"></span></div><div id="lwTitle"></div><div id="lwBody"></div><div id="lwBtns"></div></div>
     <div id="navPanel" class="panel" hidden>
       <button class="panel-x" id="nvX" type="button" aria-label="Close nav">&#x2715;</button>
@@ -3347,20 +3359,21 @@ window.addEventListener('mouseup',function(){ setHold(false); });
 /* =========================================================================
    Game state + HUD
    ========================================================================= */
-var state={towns:{}, throttle:0, yawRate:0, pitchRate:0, mode:'title', yaw:Math.PI, pitch:0, vel:new THREE.Vector3(), energy:100, scan:1, credits:0, inv:{}, found:{}, sysSeed:0, up:{}, cargo:[], taken:{}, boardGen:{}, boardT:{}, delivered:0, dock:null, mods:[], modsOwned:{}, lic:{}, fuel:null, hull:100, company:null, hullSel:null, rooks:{}, pulse:null, pulseK:0, ap:null, apAxes:null, route:null, fits:{}, fuelReserve:0, cleared:0, heat:{}, flares:3, food:100, rest:100, rations:2, fedT:0, restedT:0, needsOff:false, blinkT:0, sleeping:false, law:null, chase:null, arrivedT:0, pirateT:30,
+var state={hints:{}, towns:{}, throttle:0, yawRate:0, pitchRate:0, mode:'title', yaw:Math.PI, pitch:0, vel:new THREE.Vector3(), energy:100, scan:1, credits:0, inv:{}, found:{}, sysSeed:0, up:{}, cargo:[], taken:{}, boardGen:{}, boardT:{}, delivered:0, dock:null, mods:[], modsOwned:{}, lic:{}, fuel:null, hull:100, company:null, hullSel:null, rooks:{}, pulse:null, pulseK:0, ap:null, apAxes:null, route:null, fits:{}, fuelReserve:0, cleared:0, heat:{}, flares:3, food:100, rest:100, rations:2, fedT:0, restedT:0, needsOff:false, blinkT:0, sleeping:false, law:null, chase:null, arrivedT:0, pirateT:30,
   pos:new THREE.Vector3(), vy:0, grounded:true, bob:0, fovKick:0, exposure:1, exposureTarget:1, t:0, warp:null};
 var OLD_KEYS={'CINDER REACH':'PYRITE','GLASSWATER':'CYANITE','VERDANT HOLLOW':'AMETHINE','PALE SILICATE':'AURUM'};
 try{
   var sv=readSaveSlot(); if(sv && (sv.v||0)<3) econMigrate(sv);
+  if(!sv) state.tut={step:0};
   if(sv){
     state.credits=sv.credits||0; state.found=sv.found||{}; state.sysSeed=sv.sys||0; state.up=sv.up||{}; state.cargo=sv.cargo||[]; state.taken=sv.taken||{}; state.boardGen=sv.boardGen||{}; state.boardT=sv.boardT||{}; state.delivered=sv.delivered||0; state.towns=sv.towns||{};
     state.mods=sv.mods||[]; state.modsOwned=sv.modsOwned||{}; state.lic=sv.lic||{}; state.fuel=sv.fuel; state.hull=sv.hull==null?100:sv.hull; state.company=sv.company||null; state.hullSel=sv.hullSel==null?null:sv.hullSel; state.rooks=sv.rooks||{}; retireWedge(sv); state.fits=sv.fits||{}; state.fuelReserve=sv.fuelReserve||0; state.cleared=sv.cleared===undefined?(sv.sys||0):sv.cleared; state.heat=sv.heat||{}; state.flares=sv.flares==null?3:sv.flares;
-    state.food=sv.food==null?100:sv.food; state.rest=sv.rest==null?100:sv.rest; state.rations=sv.rations==null?2:sv.rations; state.fedT=sv.fedT||0; state.restedT=sv.restedT||0; state.needsOff=!!sv.needsOff; state.shareLast=sv.shareLast==null?null:sv.shareLast; state.shareAcc=sv.shareAcc||0; state.project=sv.project||null; state.home=sv.home||null; state.resume=sv.resume||null; state.passenger=sv.passenger||null;
+    state.food=sv.food==null?100:sv.food; state.rest=sv.rest==null?100:sv.rest; state.rations=sv.rations==null?2:sv.rations; state.fedT=sv.fedT||0; state.restedT=sv.restedT||0; state.needsOff=!!sv.needsOff; state.shareLast=sv.shareLast==null?null:sv.shareLast; state.shareAcc=sv.shareAcc||0; state.project=sv.project||null; state.home=sv.home||null; state.resume=sv.resume||null; state.passenger=sv.passenger||null; state.tut=sv.tut||null; state.hints=sv.hints||{};
     Object.keys(sv.inv||{}).forEach(function(k){ var nk=OLD_KEYS[k]||k; if(ELEMENTS[nk]) state.inv[nk]=(state.inv[nk]||0)+sv.inv[k]; });
   }
 }catch(e){}
 drawThrottle();
-function save(){ if(saveLock) return; try{ snapResume(); }catch(e){} var data; try{ data=JSON.stringify({v:SAVE_V,resume:state.resume,passenger:state.passenger,credits:state.credits,inv:state.inv,found:state.found,sys:state.sysSeed,up:state.up,cargo:state.cargo,taken:state.taken,boardGen:state.boardGen,boardT:state.boardT,delivered:state.delivered,towns:state.towns,
+function save(){ if(saveLock) return; try{ snapResume(); }catch(e){} var data; try{ data=JSON.stringify({v:SAVE_V,resume:state.resume,passenger:state.passenger,tut:state.tut,hints:state.hints,credits:state.credits,inv:state.inv,found:state.found,sys:state.sysSeed,up:state.up,cargo:state.cargo,taken:state.taken,boardGen:state.boardGen,boardT:state.boardT,delivered:state.delivered,towns:state.towns,
   mods:state.mods,modsOwned:state.modsOwned,lic:state.lic,fuel:state.fuel,hull:state.hull,company:state.company,hullSel:state.hullSel,rooks:state.rooks,fits:state.fits,fuelReserve:state.fuelReserve,cleared:state.cleared,heat:state.heat,flares:state.flares,
   food:state.food,rest:state.rest,rations:state.rations,fedT:state.fedT,restedT:state.restedT,needsOff:state.needsOff,shareLast:state.shareLast,shareAcc:state.shareAcc,project:state.project,home:state.home}); localStorage.setItem('nh_save',data); rollBackup(data); }catch(e){} }
 /* ---------- keeping saves safe: a rolling backup every 10 minutes (two kept), a fallback to it if the main save is
@@ -3418,7 +3431,7 @@ function renderInv(){
   var gk=Object.keys(groups), far=function(d){ return SYS && d.sys!==SYS.seed; };
   gk.sort(function(a,b){ var A=groups[a].d, B=groups[b].d; return (far(A)-far(B)) || (far(A)?String(A.sysName).localeCompare(B.sysName):0); });
   gk.forEach(function(k){ var g=groups[k], c=document.createElement('div'), on=state.route && !state.route.project && state.route.loc.key===g.d.key, fr=far(g.d);
-    c.className='jobline'+(fr?' warp':'')+(g.tl==='LATE'?' late':'')+(on?' on':'');
+    c.className='jobline'+(fr?' warp':'')+(g.tl==='LATE'?' late':'')+(on?' on':'')+(tutAt(3)&&!state.dock&&!state.route?' tut-glow':'');
     c.textContent='\u25b8 '+g.n+' \u2192 '+(isProject(g.d)?'\u2605 ':'')+g.d.name+(fr?' \u00b7 WARP '+g.d.sysName:'')+(g.tl?' \u00b7 '+g.tl:'');
     var go=document.createElement('span'); go.className='go'; go.textContent=on?'ROUTE ON':'AUTO'; c.appendChild(go);
     c.addEventListener('click',function(e){ e.stopPropagation(); if(state.route && state.route.loc.key===g.d.key){ apOff(''); cancelRoute('ROUTE CANCELLED'); } else startRoute(g.d); });
@@ -3885,6 +3898,7 @@ function jobBase(dist, ly){ return ly?200+ly*1.6:70+dist*.085; }
 function boardOffers(loc){
   var g=boardGen(loc), r=rng(ihash(ihash(SYS.seed+11,loc.planet+20+(loc.site||0)*100),g*31+7));
   var others=locations().filter(function(l){ return l.key!==loc.key; }), out=projectOffers(loc,g), nbs=neighbourSeeds(SYS.seed,3);
+  if(state.tut && state.tut.step<=3 && loc.kind==='station' && !state.taken['tut:first']){ var ft=firstLoadDest(); if(ft) out.unshift({id:'tut:first', kind:'standard', name:'Tool Crates', crates:1, reward:300, from:loc.name, dest:ft, ly:0, limit:0, first:true}); }
   if(!others.length) return out;
   var nOff=4+(loc.kind==='town'?Math.max(0,townLevel(loc)-1):1);
   for(var k=0;k<nOff;k++){
@@ -4851,7 +4865,7 @@ function renderTerminal(tab){
       here.forEach(function(c){ var p=cargoPay(c);
         h+='<div class="st-row job ready"><span class="nm">'+c.name+tagHTML(c.kind,c.grade)+'<small>'+c.crates+' crate'+(c.crates>1?'s':'')+' from '+c.from+'</small>'+
           '<small class="fx">Pays '+fmt(p.pay)+' units'+(c.kind==='fragile'?' · condition '+Math.round(c.cond*100)+'%':'')+(p.late?' · late, reduced pay':'')+'</small></span></div>'; });
-      h+='<button class="bigact" data-act="deliver">DELIVER ALL · +'+fmt(sum)+' UNITS</button>';
+      h+='<button class="bigact'+(tutAt(5)?' tut-glow':'')+'" data-act="deliver">DELIVER ALL · +'+fmt(sum)+' UNITS</button>';
     }
     var other=state.cargo.filter(function(c){ return c.dest.key!==loc.key; });
     if(other.length){
@@ -4871,7 +4885,7 @@ function renderTerminal(tab){
     offers=offers.map(function(o,i){ return {o:o, i:i}; }).sort(function(a,b){ return rank(a.o)-rank(b.o) || a.i-b.i; }).map(function(x){ return x.o; });
     offers.forEach(function(o){
       var fits=used+o.crates<=cap, need=kindNeeds(o.kind), pj=isProject(o.dest);
-      h+='<div class="st-row job'+(need?' locked':'')+(o.ly?' warp':'')+(pj?' proj':'')+(o.story!=null?' story':'')+'"><span class="nm">'+(pj?'★ ':'')+o.name+tagHTML(o.kind,o.grade)+(o.story!=null?'<span class="tag k-story">'+STORIES[o.story].t+'</span><small class="premise">'+storyText(o.story,'p',o.dest)+' Pays a quarter more.</small>':'')+(o.ly&&runs[o.dest.sys]?'<span class="tag k-run">ON YOUR '+o.dest.sysName+' RUN</span>':'')+'<small>'+o.crates+' crate'+(o.crates>1?'s':'')+' to '+destLabel(o.dest)+'</small>'+
+      h+='<div class="st-row job'+(need?' locked':'')+(o.ly?' warp':'')+(pj?' proj':'')+(o.story!=null?' story':'')+(o.first&&tutAt(2)?' tut-glow':'')+'"><span class="nm">'+(pj?'★ ':'')+o.name+tagHTML(o.kind,o.grade)+(o.story!=null?'<span class="tag k-story">'+STORIES[o.story].t+'</span><small class="premise">'+storyText(o.story,'p',o.dest)+' Pays a quarter more.</small>':'')+(o.ly&&runs[o.dest.sys]?'<span class="tag k-run">ON YOUR '+o.dest.sysName+' RUN</span>':'')+'<small>'+o.crates+' crate'+(o.crates>1?'s':'')+' to '+destLabel(o.dest)+'</small>'+
         '<small class="fx">'+(o.ly?'<span class="xs">WARP '+o.ly+' LY</span> ':'')+'Pays '+fmt(o.reward)+' units'+(o.limit?' · '+Math.round(o.limit/60)+' min limit':'')+(o.kind==='fragile'?' · pay drops if you crash':'')+'</small></span>'+
         '<span class="acts"><button class="pri" data-act="accept" data-id="'+o.id+'"'+(fits&&!need?'':' disabled')+'>'+(need?need:fits?'LOAD':'HOLD FULL')+'</button></span></div>';
     });
@@ -4997,6 +5011,7 @@ function renderTerminal(tab){
       h+='<div class="st-row upg"><span class="nm">'+PR.bedName+'<small>Sleep 8 hours, wake well rested · perishable deadlines keep running</small></span><span class="acts"><button class="pri" data-act="bed"'+(state.credits>=PR.bed?'':' disabled')+'>'+(PR.bed?'SLEEP · '+PR.bed:'SLEEP · FREE')+'</button>'+(loc.kind==='home'?'':'<button data-act="cab">CAB · FREE</button>')+'</span></div>';
     }
     h+='<div class="st-row upg"><span class="nm">PILOT NEEDS · '+(needsOn()?'ON':'OFF')+'<small>'+(needsOn()?'Hunger, fatigue and logbook checks are on. Relaxed mode turns them off.':'Relaxed mode: no hunger, fatigue or logbook checks.')+'</small></span><span class="acts"><button data-act="needs">'+(needsOn()?'RELAXED MODE':'TURN ON')+'</button></span></div>';
+    h+='<div class="st-row upg"><span class="nm">TIPS<small>Short tips pop up the first time something new comes up. Seen them all? Bring them back.</small></span><span class="acts"><button data-act="tipsagain">SHOW TIPS AGAIN</button></span></div>';
     h+='<div class="st-row upg"><span class="nm">BACK UP YOUR GAME<small>Download your save as a file. Load it again from IMPORT SAVE on the title screen, on this device or another.</small></span><span class="acts"><button data-act="exportsave">EXPORT SAVE</button></span></div>';
     var hz=heatOf(SYS.seed);
     if(loc.kind==='station' && hz>.05) h+='<div class="st-row upg"><span class="nm">CRIMINAL RECORD<small>Heat '+hz.toFixed(1)+' / 5 in '+SYS.name+' · more patrols and tougher scans</small></span><span class="acts"><button class="pri" data-act="clearrec"'+(state.credits>=Math.ceil(hz*700)?'':' disabled')+'>PAY OFF · '+fmt(Math.ceil(hz*700))+'</button></span></div>';
@@ -5129,6 +5144,7 @@ $('stationPanel').addEventListener('click',function(e){
     if(!BIZ[bz] || pl>=BIZ_PLOTS[tr2.lvl] || tr2.biz[pl] || tr2.biz.indexOf(bz)>=0 || state.credits<BIZ_COST) return;
     state.credits-=BIZ_COST; tr2.biz[pl]=bz; rebuildTownAt(loc); sfx('confirm',.8);
     toast(BIZ[bz].name+' OPENS IN '+loc.name,'life'); CB.queue=cbPick(['New '+BIZ[bz].name.toLowerCase()+' just opened in '+loc.name+'. Freight’s gonna be flowing.','Somebody built a '+BIZ[bz].name.toLowerCase()+' out at '+loc.name+'. About time.']); }
+  else if(act==='tipsagain'){ state.hints={}; toast('TIPS WILL SHOW AGAIN'); }
   else if(act==='exportsave'){ if(exportSave()) toast('SAVE FILE DOWNLOADED','life'); }
   else if(act==='homebuild'){ var c1=HOME_TIERS[1].cost; if(state.home || !isProject(loc) || state.credits<c1) return;
     state.credits-=c1; state.home={key:loc.key, sys:loc.sys, planet:loc.planet, site:loc.site||0, name:loc.name, pname:loc.pname, sysName:loc.sysName, tier:1, spent:c1, ang:null};
@@ -5332,6 +5348,7 @@ function openNav(){
       (t.drop?'<span class="wp-drop">▸ DROP · '+t.drop+' CRATE'+(t.drop>1?'S':'')+' FOR '+t.dropTo+'</span>':'')+
       '<span class="wp-meta">'+t.meta+'</span>';
     row.addEventListener('click',function(){ startRoute(t.kind==='station'?stationLoc():siteLoc(SYS,t.idx,t.site||0)); });
+    if(t.kind==='station' && (tutAt(0)||tutAt(1))) row.classList.add('tut-glow');
     list.appendChild(row);
   });
   $('nvSys').textContent=SYS.name+' · FUEL '+Math.floor(state.fuel)+'/'+fuelCap();
@@ -7434,6 +7451,75 @@ function resumeGame(){
     },150);
   }
 }
+/* ---------- first shift: a brand-new game walks one haul end to end (nav, dock, load, route, land, deliver), then
+   one-time tips pop up as new things come within reach. The card stays out of the way of panels and terminals. ---------- */
+function firstLoadDest(){
+  if(!SYS || !SYS.station) return null;
+  var T=sysSiteLocs(SYS).filter(function(l){ return !l.outpost; }); if(!T.length) T=sysSiteLocs(SYS);
+  T.sort(function(a,b){ return locPos(a).distanceTo(SYS.station.pos)-locPos(b).distanceTo(SYS.station.pos); });
+  return T[0]||null;
+}
+function tutAt(i){ return !!(state.tut && !state.tut.done && state.tut.step===i); }
+function guideDest(){ var c=state.cargo[0]; return c?c.dest.name:(firstLoadDest()||{}).name||'the town'; }
+var GUIDE=[
+  {text:function(){ return 'Your rig is at the warp-in point. <b>Tap the radar</b> (top right, or press N) to open System Nav.'; },
+   done:function(){ return !$('navPanel').hidden || !!state.ap || !!state.dock || state.cargo.length>0; }},
+  {text:function(){ return 'Pick <b>'+SYS.station.name+'</b>. The autopilot flies you in and docks you at the freight pier.'; },
+   done:function(){ return (state.dock && state.dock.phase==='docked') || state.cargo.length>0; }},
+  {text:function(){ return 'This is the job board. <b>LOAD</b> the Tool Crates for <b>'+guideDest()+'</b>, your first contract.'; },
+   done:function(){ return state.cargo.length>0; }},
+  {text:function(){ return 'Tap <b>UNDOCK</b>, then tap your cargo line under the status panel (▸ 1 → '+guideDest()+'). The autopilot flies the whole route.'; },
+   done:function(){ return (!!state.route && !state.dock) || !!(termLoc && termLoc.kind==='town'); }},
+  {text:function(){ return 'Sit back. The rig pulses across, drops into the atmosphere and sets down on the pad at <b>'+guideDest()+'</b>. Touching the stick takes control.'; },
+   done:function(){ return !!(termLoc && termLoc.kind==='town'); }},
+  {text:function(){ return 'Tap <b>DELIVER ALL</b> to sign for the crates and get paid.'; },
+   done:function(){ return (state.delivered||0)>0; }}
+];
+/* one-time tips: shown once each, in this order of priority, when they apply */
+function boardHas(sel){ return !!(termLoc && stTab==='cargo' && document.querySelector('#stBody '+sel)); }
+var HINTS=[
+  {k:'upgrade', ok:function(){ return lvl('hold')===0 && state.credits>=700; }, t:'You can afford a <b>MULE</b> (6 crates). Dock at any station and open <b>UPGRADES</b>.'},
+  {k:'warp', ok:function(){ return boardHas('.st-row.job.warp'); }, t:'<b>Blue</b> jobs need a warp to another system. Warps burn fuel, so stack crates going the same way.'},
+  {k:'locked', ok:function(){ return boardHas('.st-row.job.locked'); }, t:'Greyed-out loads need a module or licence: a reefer bay, a shielded vault, an oversize permit. Fit them in <b>UPGRADES</b>.'},
+  {k:'story', ok:function(){ return boardHas('.st-row.job.story'); }, t:'<b>Purple</b> jobs have a story behind them. They pay a quarter more, and the town grows a little extra.'},
+  {k:'hungry', ok:function(){ return needsOn() && state.food<35; }, t:'You’re getting <b>hungry</b>. Eat at any terminal (SERVICES), or tap the fork on your HUD for a ration pack.'},
+  {k:'project', ok:function(){ return (state.delivered||0)>=6 && !state.project; }, t:'Pick a town to build up: make it your <b>PROJECT</b> from its Town tab, and every board in its system posts loads for it.'},
+  {k:'mytowns', ok:function(){ return (state.delivered||0)>=12; }, t:'The <b>town button</b> by the radar (or T) shows every town you’ve worked on, and can route you to any of them.'},
+  {k:'company', ok:function(){ return state.credits>=10000 && !state.company; }, t:'You can start your own <b>trucking company</b>: hire pilots to haul for you. The station’s <b>FLEET</b> tab.'},
+  {k:'home', ok:function(){ return !!state.project && !state.home && state.credits>=25000; }, t:'You can build your <b>home</b> in your project town: a private pad, a garage and your own bed. Its Town tab.'}
+];
+var GD={tip:null, tipT:0, last:''};
+function guideShow(eye, html, tut){
+  var el=$('guide'); if(GD.last!==eye+html){ $('gdEye').textContent=eye; $('gdText').innerHTML=html; GD.last=eye+html; }
+  $('gdSkip').hidden=!tut; $('gdOk').hidden=!!tut; el.hidden=false;
+}
+function guideTick(){
+  var el=$('guide');
+  if(state.mode==='title' || state.sleeping || state.law){ el.hidden=true; return; }
+  if(!$('navPanel').hidden || !$('townsPanel').hidden || mapOpen){ el.hidden=true; return; }
+  el.classList.toggle('side', !!termLoc);
+  var T=state.tut;
+  if(T && !T.done){
+    var was=T.step; while(T.step<GUIDE.length && GUIDE[T.step].done()) T.step++;
+    if(was!==T.step || (T.step===3 && !state.dock && !state.route && !document.querySelector('#invrow .jobline.tut-glow'))){ renderInv(); if(termLoc) renderTerminal(); }
+    if(T.step>=GUIDE.length){ guideFinish(); return; }
+    guideShow('FIRST SHIFT · '+(T.step+1)+' OF '+GUIDE.length, GUIDE[T.step].text(), true); return;
+  }
+  if(GD.tip){ if(Date.now()>GD.tipT){ GD.tip=null; el.hidden=true; } return; }
+  for(var i=0;i<HINTS.length;i++){ var H=HINTS[i]; if(state.hints[H.k] || !H.ok()) continue;
+    state.hints[H.k]=1; GD.tip=H.k; GD.tipT=Date.now()+15000; guideShow('TIP', H.t, false); return; }
+  el.hidden=true;
+}
+function guideFinish(){
+  state.tut={done:true}; $('guide').hidden=true; save();
+  showLaw({type:'project', tone:'good', eye:'FIRST SHIFT · DONE', title:'You’re a freight hauler now.',
+    body:'<p>Take more contracts from any board and tap a cargo line to fly the route. Bigger hulls carry more: trade up in <b>UPGRADES</b> at any station.</p><p>Warp to other systems for bigger pay, grow the towns you supply, and one day start your own company. Tips will pop up as new things open up.</p>',
+    buttons:[{label:'LET’S HAUL', cls:'pri', fn:function(){}}]});
+  sfx('confirm',.8);
+}
+$('gdOk').addEventListener('click',function(){ GD.tip=null; $('guide').hidden=true; });
+$('gdSkip').addEventListener('click',function(){ state.tut={done:true}; $('guide').hidden=true; save(); toast('GUIDE SKIPPED · TIPS WILL STILL POP UP'); });
+setInterval(guideTick,300);
 /* ---------- save files: export to a .json you keep anywhere, import one back (title screen) ---------- */
 function exportSave(){
   if(state.mode!=='title') save();

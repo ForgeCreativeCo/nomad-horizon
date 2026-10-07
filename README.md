@@ -8,6 +8,8 @@ Planets, terrain, skies, wildlife, star systems and towns are generated in code 
 
 Open `index.html` in a modern browser, or host the repo with any static host (GitHub Pages, Netlify, Vercel). It works best on a phone in landscape.
 
+**Your first shift:** a new game walks you through one haul end to end: open System Nav, autopilot in to dock, load a guaranteed first contract, tap your cargo line to fly the route, land and deliver. The next thing to tap glows, and a small card says what to do (it slides to the corner while a terminal is open). Skip it any time. After that, short one-time tips pop up as new things come within reach: your first hull upgrade, warp and locked jobs, story jobs, getting hungry, projects, My Towns, your own company and your home. SERVICES at any terminal can bring the tips back.
+
 ### Install on your phone
 
 Nomad Horizon is a Progressive Web App. Once it's hosted over HTTPS:
@@ -169,6 +171,7 @@ The game ships its own engine flames, glows, nav lights and lights, so models do
 - **Safer saves:** resume where you left off, rolling backups with automatic recovery, and save files you can export and import.
 - **Economy rebalance:** contract pay cut to about a fifth (it had drifted 10–20× high once the systems were widened), bulk loads for big hulls, fleet pay to a fifth, share yields to a quarter with per-town caps, and buying growth costs 400 units a point. Older saves are scaled to match on load.
 - **Stories on the road:** story contracts with a premise and an epilogue, and road events on autopilot runs (distress calls, brokers, storms, riders, customs tip-offs).
+- **First shift guide and tips:** a guided first haul for new games, with glowing targets, and one-time tips for everyone as features come within reach.
 
 ### Next up (in this order)
 1. **Town kit models.** Generate the town pieces from [docs/town-kit-prompts.md](docs/town-kit-prompts.md) and swap them in: start with the town core and one ring-2 block to check the look in-game, then the rest of the blocks and the five business buildings.
