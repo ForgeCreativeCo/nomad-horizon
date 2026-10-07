@@ -3349,7 +3349,7 @@ var state={towns:{}, throttle:0, yawRate:0, pitchRate:0, mode:'title', yaw:Math.
   pos:new THREE.Vector3(), vy:0, grounded:true, bob:0, fovKick:0, exposure:1, exposureTarget:1, t:0, warp:null};
 var OLD_KEYS={'CINDER REACH':'PYRITE','GLASSWATER':'CYANITE','VERDANT HOLLOW':'AMETHINE','PALE SILICATE':'AURUM'};
 try{
-  var sv=readSaveSlot();
+  var sv=readSaveSlot(); if(sv && (sv.v||0)<3) econMigrate(sv);
   if(sv){
     state.credits=sv.credits||0; state.found=sv.found||{}; state.sysSeed=sv.sys||0; state.up=sv.up||{}; state.cargo=sv.cargo||[]; state.taken=sv.taken||{}; state.boardGen=sv.boardGen||{}; state.boardT=sv.boardT||{}; state.delivered=sv.delivered||0; state.towns=sv.towns||{};
     state.mods=sv.mods||[]; state.modsOwned=sv.modsOwned||{}; state.lic=sv.lic||{}; state.fuel=sv.fuel; state.hull=sv.hull==null?100:sv.hull; state.company=sv.company||null; state.hullSel=sv.hullSel==null?null:sv.hullSel; state.rooks=sv.rooks||{}; retireWedge(sv); state.fits=sv.fits||{}; state.fuelReserve=sv.fuelReserve||0; state.cleared=sv.cleared===undefined?(sv.sys||0):sv.cleared; state.heat=sv.heat||{}; state.flares=sv.flares==null?3:sv.flares;
@@ -3363,7 +3363,20 @@ function save(){ if(saveLock) return; try{ snapResume(); }catch(e){} var data; t
   food:state.food,rest:state.rest,rations:state.rations,fedT:state.fedT,restedT:state.restedT,needsOff:state.needsOff,shareLast:state.shareLast,shareAcc:state.shareAcc,project:state.project,home:state.home}); localStorage.setItem('nh_save',data); rollBackup(data); }catch(e){} }
 /* ---------- keeping saves safe: a rolling backup every 10 minutes (two kept), a fallback to it if the main save is
    missing or unreadable, and a save the moment the game is hidden or closed ---------- */
-var SAVE_V=2, saveLock=false, saveRestored, BAK_EVERY=10*60000;   // saveRestored is set by the loader above, so no initializer here
+var SAVE_V=3, saveLock=false, saveRestored, BAK_EVERY=10*60000;   // saveRestored is set by the loader above, so no initializer here
+/* the October 2026 rebalance cut contract and fleet pay to about a fifth: older saves have their
+   money scaled to match, once, so a long-running game lands where it would have under the new rates */
+var econAdjusted;   // set by the loader, which runs before this line: no initializer
+function econMigrate(sv){
+  var k=.2, before=sv.credits||0;   // the loader calls this before any var below has run, so the scale is a literal
+  sv.credits=Math.round(before*k);
+  if(sv.company){ sv.company.bank=Math.round((sv.company.bank||0)*k); (sv.company.ships||[]).forEach(function(sh){ sh.earned=Math.round((sh.earned||0)*k); }); }
+  (sv.cargo||[]).forEach(function(c){ c.reward=Math.max(10,Math.round(c.reward*k/10)*10); });
+  Object.keys(sv.towns||{}).forEach(function(key){ var t=sv.towns[key]; if(t.inv){ t.inv=Math.round(t.inv*k); t.earned=Math.round((t.earned||0)*k); } });
+  if(sv.home) sv.home.spent=Math.round(sv.home.spent*k);
+  if(sv.project){ sv.project.inv=Math.round((sv.project.inv||0)*k); }
+  sv.v=3; econAdjusted={from:before, to:sv.credits};
+}
 function readSaveSlot(){
   var keys=['nh_save','nh_save_bak','nh_save_bak2'];
   for(var i=0;i<keys.length;i++){ try{ var raw=localStorage.getItem(keys[i]); if(!raw) continue; var o=JSON.parse(raw); if(o && typeof o.credits==='number'){ if(i>0) saveRestored=keys[i]; return o; } }catch(e){} }
@@ -3761,7 +3774,7 @@ function hullFactor(){ return state.hull>=50?1:lerp(.7,1,state.hull/50); }
 
 /* trucking company: fleet ships run contracts on their own and pay into the company account,
    in real time and (at half rate, up to 8 hours) while the game is closed */
-var FLEET_PRICE=[4000,9000,18000,32000], FLEET_RATE=[40,70,110,160], OFFICE_CAP=[2,4,6], OFFICE_COST=[6000,15000], FOUND_COST=5000;
+var FLEET_PRICE=[4000,9000,18000,32000], FLEET_RATE=[8,14,22,32], OFFICE_CAP=[2,4,6], OFFICE_COST=[6000,15000], FOUND_COST=5000;
 var PILOT_GRADES={rookie:{name:'ROOKIE', skill:.85, cut:.18, fee:300}, veteran:{name:'VETERAN', skill:1, cut:.22, fee:1200}, ace:{name:'ACE', skill:1.2, cut:.26, fee:3000}};
 var ROUTES={local:{name:'LOCAL RUNS', mult:1, wear:.25, len:4, risk:.05}, long:{name:'LONG HAUL', mult:1.55, wear:.5, len:10, risk:.1}};
 var PILOT_FIRST=['ARI','BEX','CORA','DMITRI','EZRA','FEN','GALE','HOLLIS','IVO','JUNO','KAI','LIOR','MARA','NIKO','ODA','PELL','QUINN','RHEA','SOLLY','TAM','UMA','VEX','WREN','YARA','ZED'];
@@ -3864,6 +3877,9 @@ function boardGen(loc){
   return Date.now()-t>=BOARD_REFRESH ? bumpBoard(k) : (state.boardGen[k]||0);
 }
 function boardRefreshIn(loc){ var t=state.boardT[loc.key]; return t?Math.max(0,BOARD_REFRESH-(Date.now()-t)):BOARD_REFRESH; }
+/* Base pay per crate before cargo-type and size multipliers. In-system: a ~1 min same-planet hop pays ~155, a ~3 min
+   cross-system leg ~240. Warp legs pay ~500 at a typical 190 ly, enough to cover the fuel when you stack a few crates. */
+function jobBase(dist, ly){ return ly?200+ly*1.6:70+dist*.085; }
 function boardOffers(loc){
   var g=boardGen(loc), r=rng(ihash(ihash(SYS.seed+11,loc.planet+20+(loc.site||0)*100),g*31+7));
   var others=locations().filter(function(l){ return l.key!==loc.key; }), out=projectOffers(loc,g), nbs=neighbourSeeds(SYS.seed,3);
@@ -3882,18 +3898,23 @@ function boardOffers(loc){
     var dBiz=dest.kind==='town'?(townRec(dest).biz||[]).filter(Boolean):[];
     if(kind!=='construction' && dBiz.length && r()<.4){ bizTag=dBiz[Math.floor(r()*dBiz.length)]; kind=BIZ[bizTag].wantKind; names=BIZ[bizTag].want; dest=Object.assign({},dest,{biz:bizTag}); }
     if(kind==='oversize') crates=r()<.5?3:4;
-    var base=remote?(600+ly*5.5):(210+dist*.55);
+    var base=jobBase(dist,remote?ly:0);
     var reward=Math.round(base*KIND_MULT[kind]*(crates===4?3.3:crates===3?2.6:crates===2?1.75:1)*(dest.kind==='town'?1+.08*townLevel(dest):1)*(bizTag?1.35:1)/10)*10;
     var id=loc.key+':'+g+':'+k;
     if(state.taken[id]) continue;
     out.push({id:id, kind:kind, biz:bizTag, name:names[Math.floor(r()*names.length)], crates:crates, reward:reward, from:loc.name, dest:dest, ly:ly,
       limit:kind==='perishable'?(remote?Math.round((ly*1.3+420)):Math.round((dist/90+4)*60)):0});
   }
+  // bulk freight for big holds: 3-4 crate loads, no permit needed, a little under the single-crate rate
+  var cap0=holdCap(), nBulk=cap0>=12?2:cap0>=9?1:0, rb=rng(ihash(ihash(SYS.seed+67,loc.planet+20+(loc.site||0)*100),g*31+23));
+  for(var kb=0;kb<nBulk;kb++){ var db=others[Math.floor(rb()*others.length)], ddb=locDist(loc,db), kbk=db.kind==='town'&&townLevel(db)<3&&rb()<.4?'construction':'standard', cb=rb()<.5?3:4;
+    var idb=loc.key+':'+g+':u'+kb, nmb=CARGO_NAMES[kbk][Math.floor(rb()*CARGO_NAMES[kbk].length)]; if(state.taken[idb]) continue;
+    out.push({id:idb, kind:kbk, name:'Bulk '+nmb, crates:cb, reward:Math.round(jobBase(ddb,0)*KIND_MULT[kbk]*cb*.9*(db.kind==='town'?1+.08*townLevel(db):1)/10)*10, from:loc.name, dest:db, ly:0, limit:0}); }
   // each business ships its own goods out of town
   if(loc.kind==='town') (townRec(loc).biz||[]).forEach(function(bz,bi){ if(!bz) return;
     var B=BIZ[bz], dest2=others[Math.floor(r()*others.length)], dist2=locDist(loc,dest2), kind2=B.exportKind, cr2=r()<.5?2:1;
     var id2=loc.key+':'+g+':b'+bi; if(state.taken[id2]) return;
-    out.push({id:id2, kind:kind2, name:B.export[Math.floor(r()*B.export.length)], crates:cr2, reward:Math.round((210+dist2*.55)*KIND_MULT[kind2]*(cr2===2?1.75:1)*1.2/10)*10,
+    out.push({id:id2, kind:kind2, name:B.export[Math.floor(r()*B.export.length)], crates:cr2, reward:Math.round(jobBase(dist2,0)*KIND_MULT[kind2]*(cr2===2?1.75:1)*1.2/10)*10,
       from:loc.name+' · '+B.name, dest:dest2, ly:0, limit:kind2==='perishable'?Math.round((dist2/90+4)*60):0}); });
   if(loc.kind==='town') out=out.concat(contrabandOffers(loc,g));
   return out;
@@ -4209,15 +4230,16 @@ function homeBuildCost(){ var H=state.home; return H?(H.tier<3?HOME_TIERS[H.tier
 /* Investing: units turn into growth (one point per INVEST_PER_G) and a stake that pays an hourly share of the
    town's income. Yield rises with the town's stage and its businesses. Paid into the company account if you
    run one, otherwise straight to you; while the game is closed it pays at half rate for up to 8 hours. */
-var INVEST_PER_G=150, INVEST_AMTS=[1000,5000,20000], INVEST_YIELD=[.02,.04,.06,.08];
+var INVEST_PER_G=400, INVEST_AMTS=[1000,5000,20000], INVEST_YIELD=[.006,.012,.018,.024], STAKE_CAP=[5000,15000,40000,100000];   // most a town will sell you, by stage
 var sharesAway=null;
 function townRecByKey(k){ var t=state.towns[k]; if(t && !t.biz) t.biz=[]; return t; }
 function shareRate(t){ return t && t.inv ? t.inv*INVEST_YIELD[t.lvl]*(1+.15*(t.biz||[]).filter(Boolean).length) : 0; }   // units per hour
 function holdings(){ return Object.keys(state.towns).filter(function(k){ return state.towns[k].inv>0; }).map(function(k){ return {key:k, t:townRecByKey(k)}; }); }
 function sharesPerHour(){ return holdings().reduce(function(a,h){ return a+shareRate(h.t); },0); }
 function investIn(loc, amt){
-  if(!loc || loc.kind!=='town' || amt<=0 || state.credits<amt) return null;
-  var t=state.towns[loc.key]=townRec(loc);
+  if(!loc || loc.kind!=='town' || amt<=0) return null;
+  var t0=townRec(loc), room=STAKE_CAP[t0.lvl]-(t0.inv||0); amt=Math.min(amt,room); if(amt<=0 || state.credits<amt) return null;
+  var t=state.towns[loc.key]=t0;
   state.credits-=amt; t.inv=(t.inv||0)+amt; t.earned=t.earned||0;
   if(isProject(loc)) state.project.inv=(state.project.inv||0)+amt;
   t.name=loc.name; t.pname=loc.pname; t.sysName=loc.sysName;
@@ -4293,7 +4315,7 @@ function projectOffers(loc, g){
     if(tr.lvl>=3 || (wants.length && r()<.35)){ if(!wants.length) break; bizTag=wants[Math.floor(r()*wants.length)]; kind=BIZ[bizTag].wantKind; names=BIZ[bizTag].want; }
     var crates=r()<.5?2:1, dist=locDist(loc,P), nm=names[Math.floor(r()*names.length)];
     if(state.taken[id]) continue;
-    var reward=Math.round((210+dist*.55)*KIND_MULT[kind]*(crates===2?1.75:1)*(1+.08*tr.lvl)*(bizTag?1.35:1)/10)*10;
+    var reward=Math.round(jobBase(dist,0)*KIND_MULT[kind]*(crates===2?1.75:1)*(1+.08*tr.lvl)*(bizTag?1.35:1)/10)*10;
     out.push({id:id, kind:kind, biz:bizTag, name:nm, crates:crates, reward:reward, from:loc.name, dest:bizTag?Object.assign({},P,{biz:bizTag}):P, ly:0, limit:0});
   }
   return out;
@@ -4863,15 +4885,15 @@ function renderTerminal(tab){
       else h+='<div class="st-row upg"><span class="nm">BUILD YOUR HOME HERE<small>'+HOME_TIERS[1].note+' Upgrade it later to a FRONTIER HOUSE and a HILLTOP ESTATE.</small></span>'+
         '<span class="acts"><button class="pri" data-act="homebuild"'+(state.credits>=HOME_TIERS[1].cost?'':' disabled')+'>'+fmt(HOME_TIERS[1].cost)+' UNITS</button></span></div>';
     } else if(!state.home) h+='<p class="st-note">Make '+loc.name+' your project to build your home here.</p>';
-    var inv=tr.inv||0, bizN=(tr.biz||[]).filter(Boolean).length, yl=INVEST_YIELD[lv]*(1+.15*bizN);
+    var inv=tr.inv||0, bizN=(tr.biz||[]).filter(Boolean).length, yl=INVEST_YIELD[lv]*(1+.15*bizN), room=Math.max(0,STAKE_CAP[lv]-inv);
     h+='<div class="st-sub">INVEST IN '+loc.name+'</div>';
     h+='<div class="st-row upg'+(inv?' hangar-on':'')+'"><span class="nm">YOUR STAKE'+(inv?'<span class="tag hi">SHAREHOLDER</span>':'')+
       '<small>'+(inv?fmt(inv)+' units invested · paid '+fmt(Math.round(tr.earned||0))+' so far':'You hold no shares here yet.')+'</small>'+
       '<small class="fx">'+(inv?'~'+fmt(shareRate(tr))+' units/hr · ':'')+'pays '+(yl*100).toFixed(1)+'% of your stake per hour at this stage'+(bizN?' (with '+bizN+' business'+(bizN>1?'es':'')+')':'')+'</small></span></div>';
-    h+='<div class="st-row upg"><span class="nm">BUY SHARES<small>'+(lv<3?'Every '+INVEST_PER_G+' units also adds 1 growth toward '+TOWN_LVLS[lv+1]+'.':'A city is fully grown: shares here pay the best rate.')+
+    h+='<div class="st-row upg"><span class="nm">BUY SHARES<small>'+(room>0?fmt(room)+' units of shares left at this stage'+(lv<3?' (more when it grows)':'')+'. ':'No shares left at this stage'+(lv<3?': more go on sale when '+loc.name+' grows. ':'. '))+(lv<3?'Every '+INVEST_PER_G+' units also adds 1 growth toward '+TOWN_LVLS[lv+1]+'.':'A city is fully grown: shares here pay the best rate.')+
       ' Income goes '+(state.company?'into '+state.company.name+'’s account':'straight to you')+', and keeps coming at half rate for up to 8 hours while you’re away.</small>'+
-      '<span class="bizopts">'+INVEST_AMTS.map(function(a){ return '<button data-act="invest" data-amt="'+a+'"'+(state.credits>=a?'':' disabled')+'>'+fmt(a)+(lv<3?' · +'+Math.floor(a/INVEST_PER_G)+' GROWTH':'')+'</button>'; }).join('')+'</span></span></div>';
-    h+='<p class="st-note">Shares pay more as '+loc.name+' grows and opens businesses: '+INVEST_YIELD.map(function(y,i){ return TOWN_LVLS[i].toLowerCase()+' '+(y*100)+'%'; }).join(', ')+' an hour, +15% for each business.</p>';
+      '<span class="bizopts">'+INVEST_AMTS.map(function(a){ var a2=Math.min(a,room); return '<button data-act="invest" data-amt="'+a+'"'+(a2>0&&state.credits>=a2?'':' disabled')+'>'+fmt(a2>0?a2:a)+(lv<3&&a2>0?' · +'+Math.floor(a2/INVEST_PER_G)+' GROWTH':'')+'</button>'; }).join('')+'</span></span></div>';
+    h+='<p class="st-note">Shares pay more as '+loc.name+' grows and opens businesses: '+INVEST_YIELD.map(function(y,i){ return TOWN_LVLS[i].toLowerCase()+' '+(y*100).toFixed(1)+'%'; }).join(', ')+' an hour, +15% for each business.</p>';
     h+=holdingsHTML(loc.key);
   } else if(stTab==='home'){
     var HM=state.home, HT0=homeTier(), nx=HM.tier<3?HOME_TIERS[HM.tier+1]:null;
@@ -6024,7 +6046,7 @@ function contrabandOffers(loc, g){
     var gr=r()<.5?1:(r()<.62?2:3), G=CB_GRADES[gr], remote=r()<.6 || !local.length, dest, ly=0, dist=0;
     if(remote){ var ns=nbs[Math.floor(r()*nbs.length)], tl=sysSiteLocs(sysInfo(ns)); dest=tl[Math.floor(r()*tl.length)]; ly=lightYears(SYS.seed,ns); }
     else { dest=local[Math.floor(r()*local.length)]; dist=locDist(loc,dest); }
-    var crates=r()<.3?2:1, base=remote?(600+ly*5.5):(210+dist*.55);
+    var crates=r()<.3?2:1, base=jobBase(dist,remote?ly:0);
     var reward=Math.round(base*G.mult*secOf(dest.sys).bm*(crates===2?1.75:1)/10)*10, id=loc.key+':'+g+':c'+k;
     var name=G.items[Math.floor(r()*G.items.length)];
     if(state.taken[id]) continue;
@@ -7269,6 +7291,7 @@ $('enterBtn').addEventListener('click',function(){
   state.yaw=Math.atan2(d.x,d.z)+.25; state.pitch=Math.asin(clamp(d.y,-1,1))*.4;
   try{ if(screen.orientation && screen.orientation.lock) screen.orientation.lock('landscape').catch(function(){}); }catch(e){}
   resumeGame();
+  if(econAdjusted) setTimeout(function(){ toast('ECONOMY REBALANCED · YOUR UNITS: '+fmt(econAdjusted.from)+' → '+fmt(econAdjusted.to),'life'); },2200);
   if(saveRestored) setTimeout(function(){ toast('LOADED FROM A BACKUP SAVE','life'); },3000);
 });
 
@@ -7345,6 +7368,7 @@ $('saveFile').addEventListener('change',function(){
   rd.readAsText(f);
 });
 if(saveRestored) $('saveNote').textContent='Your last save couldn’t be read, so the game loaded a backup.';
+else if(econAdjusted) $('saveNote').textContent='Contract pay was rebalanced: your units were adjusted from '+fmt(econAdjusted.from)+' to '+fmt(econAdjusted.to)+'.';
 async function boot(){
   var lf=$('loadFill'), ld=$('loader');
   function prog(p,msg){ lf.style.width=(p*100)+'%'; ld.firstChild.nodeValue=msg; }
