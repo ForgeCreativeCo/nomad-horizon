@@ -91,6 +91,7 @@ Each freighter hull has its own turn rate and weight: the Skiff snaps into turns
 ### Your company
 - **Trucking company:** register your own company at any station, buy freighters, hire rookie, veteran or ace pilots and send ships on local runs or long hauls. They earn into the company account in real time, and at half rate for up to 8 hours while the game is closed. Collect earnings, repair worn ships and expand your head office from the station's Fleet tab. Fleet ships berth at the station pier and show on the departures board.
 - **Fleet runs grow towns:** every finished run drops at a town in the system you're in (long hauls sometimes cross to a neighbouring system), and about half of them add growth there (a quarter while you're away): 1 point, doubled for Longhaul and Atlas hulls and doubled again on long hauls. Each ship shows its last drop, the Town tab shows how much growth your company has brought, and a town your fleet levels up goes in the company log.
+- **See your fleet at work:** when you're on a planet, your crews favour its towns, and a drop there flies in for real: the rig comes in over the town, sets down on the pad, unloads for a while and leaves. If your own rig is on that pad it makes a low pass instead, and it lifts off early if you're coming in to land. Your pilots check in on channel 19 under their own call signs: drops, rest breaks, worn hulls, a wave from the pad.
 
 ### Worlds
 - **Open planet surfaces:** each planet is about 3 × 3 km, streamed in tiles as you fly (full detail nearby, simpler tiles further out). Where you dive in from orbit decides where you arrive.
@@ -149,7 +150,8 @@ The game ships its own engine flames, glows, nav lights and lights, so models do
 - **Project town and warp colours:** focus on building one town at a time with guaranteed ★ loads on every board in its system, and see at a glance which jobs need a warp.
 - **Fresh boards, project milestones, foldable cargo list:** boards turn over every 15 minutes, a project stage-up gets its own moment, and the HUD cargo list folds away.
 - **My towns overview:** every town you've touched in one list, with progress, needs, businesses, stake and fleet help, plus set-project and route buttons.
-- **Your home:** build a cabin in your project town and grow it into a house and an estate, with a private pad, a garage for your spare rigs, a workshop and free food and rest.
+- **Your home:** build a cabin in your project town and grow it into a house and an estate, with a private pad, a garage for your spare rigs, a workshop and free food and rest. Walk inside: from a one-room cabin to an estate with a trophy room and a glass lounge.
+- **Your fleet in the world:** company rigs fly in and land at town pads on the planet you're on, and your pilots chat on the CB.
 
 ### Next up (in this order)
 1. **Town kit models.** Generate the town pieces from [docs/town-kit-prompts.md](docs/town-kit-prompts.md) and swap them in: start with the town core and one ring-2 block to check the look in-game, then the rest of the blocks and the five business buildings.

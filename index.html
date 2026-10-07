@@ -4031,7 +4031,7 @@ function buildHome(scene, b, site, key, M){
     [-2.1,2.1].forEach(function(ox){ var rr=mesh(new THREE.BoxGeometry(.08,.08,rl),M.dark,door.x+ox,-rise/2+.85,fz+run/2,false); rr.rotation.x=rm.rotation.x; });
     ramp={x:door.x, z0:fz, run:run, rise:rise}; }
   var pw=world(px,pz), dw=world(door.x,door.z), kw=world(kx,kz);
-  var pt={key:'home', home:true, name:'HOME', j:-1, x:pw.x, z:pw.z, hs:fy, cityR:30, skyH:12, pad:new THREE.Vector3(pw.x,fy+.7,pw.z),
+  var pt={key:'home', name:'HOME', j:-1, x:pw.x, z:pw.z, hs:fy, cityR:30, skyH:12, pad:new THREE.Vector3(pw.x,fy+.7,pw.z),
     lot:{x:sp.x, z:sp.z, rot:rot, w:w, d:d, y:fy, ramp:ramp}, door:dw, kiosk:new THREE.Vector3(kw.x,fy,kw.z)};
   return {group:g, pt:pt, rigs:spare};
 }
@@ -4301,12 +4301,62 @@ function fleetDrop(s, eff, quiet){
   var home=SYS||sysInfo(state.sysSeed), sy=home, r=Math.random;
   if(s.route==='long' && r()<.4){ var nb=neighbourSeeds(home.seed,3); sy=sysInfo(nb[Math.floor(r()*nb.length)]); }
   var L=sysSiteLocs(sy); if(!L.length) return;
-  var loc=L[Math.floor(r()*L.length)]; s.lastDrop=loc.name+(sy===home?'':' ('+sy.name+')');
+  var onPlanet=!quiet && S && SYS && sy===SYS && (state.mode==='surface'||state.mode==='atmo') && !state.inHome;
+  if(onPlanet && r()<.45){ var LP=L.filter(function(l){ return l.planet===S.idx; }); if(LP.length) L=LP; }
+  var loc=L[Math.floor(r()*L.length)];
+  if(onPlanet && loc.planet===S.idx){ var TV=townByKey(loc.key); if(TV) fleetVisit(s,TV); }
+  else if(!quiet && s.pilot && r()<.3) CB.queue={who:s.name+' · '+s.pilot.name, line:cbPick(['Set down at '+loc.name+', boss. Unloading now.','Dropped at '+loc.name+'. Paperwork’s clean, heading back out.',(sy===home?'':'Long one to '+sy.name+'. ')+loc.name+' got their freight. On my way.'])}; s.lastDrop=loc.name+(sy===home?'':' ('+sy.name+')');
   if(r()>=.5*eff) return;
   var t=state.towns[loc.key]=townRec(loc), pts=(s.tier>=2?2:1)*(s.route==='long'?2:1);
   t.fleet=(t.fleet||0)+pts; if(isProject(loc)) state.project.fleet=(state.project.fleet||0)+pts; t.name=loc.name; t.pname=loc.pname; t.sysName=loc.sysName;
   var up=growTown(loc,pts,true);
   if(up!=null){ var m=loc.name+' IS NOW A '+TOWN_LVLS[up]+' · YOUR FLEET HELPED'; fleetLog(m); if(!quiet) toast('FLEET · '+m,'life'); }
+}
+/* Your fleet in the world: a crew dropping at a town on the planet you're on flies in, sets down on the pad, unloads and
+   leaves. If your rig is on that pad (or you're coming in to land) it makes a low pass instead, or lifts off early. */
+var fleetVis=[], FV_PREV=new THREE.Vector3();
+function fleetVisit(s, T){
+  if(!S || !T || T.key==='home' || fleetVis.length>=2 || fleetVis.some(function(v){ return v.T===T; })) return false;
+  var h=buildHull(s.tier,true,{value:.35}); h.userData.dyn=true; setShipFlying(h,true); S.scene.add(h);
+  var a=Math.random()*TAU, R=900, from=new THREE.Vector3(T.x+Math.sin(a)*R, T.hs+240, T.z+Math.cos(a)*R), out=new THREE.Vector3(T.x-Math.sin(a+.6)*R, T.hs+260, T.z-Math.cos(a+.6)*R);
+  var busy=!!(S.ship && Math.hypot(S.ship.position.x-T.x,S.ship.position.z-T.z)<16);
+  h.position.copy(from);
+  fleetVis.push({s:s, T:T, h:h, S:S, ph:busy?'pass':'in', t:0, from:from, out:out, hover:new THREE.Vector3(T.x,T.pad.y+34,T.z), land:new THREE.Vector3(T.x,T.pad.y+hullGear(h),T.z),
+    passPt:new THREE.Vector3(T.x,T.hs+Math.max(40,T.skyH+20),T.z), yaw:a+Math.PI});
+  return true;
+}
+function fleetSay(v, lines){ if(v.s.pilot) CB.queue={who:v.s.name+' · '+v.s.pilot.name, line:cbPick(lines)}; }
+function updateFleetVis(dt){
+  for(var i=fleetVis.length-1;i>=0;i--){
+    var v=fleetVis[i], h=v.h; if(v.S!==S){ if(v.S && v.S.scene) v.S.scene.remove(h); disposeObject(h); fleetVis.splice(i,1); continue; }
+    v.t+=dt; var prev=FV_PREV.copy(h.position), k, e, flying=true, gone=false;
+    var near=Math.hypot(camera.position.x-h.position.x,camera.position.z-h.position.z), vol=clamp(1-near/500,0,1);
+    if(v.ph==='in'){ k=Math.min(1,v.t/18); e=k*k*(3-2*k); h.position.lerpVectors(v.from,v.hover,e); h.position.y=lerp(v.from.y,v.hover.y,Math.sqrt(e));
+      if(k>=1){ v.ph='down'; v.t=0; if(vol>.05) sfx('landing',.5*vol); } }
+    else if(v.ph==='down'){ k=Math.min(1,v.t/6); e=k*k*(3-2*k); h.position.lerpVectors(v.hover,v.land,e); if(k>.7 && !v.gear){ v.gear=true; setShipFlying(h,false); if(vol>.05) sfx('gear',.5*vol); }
+      if(k>=1){ v.ph='sit'; v.t=0; fleetSay(v,['That’s me on the pad at '+v.T.name+', boss. Unloading.','Down at '+v.T.name+'. Wave if you’re out there.','On the ground in '+v.T.name+'. Give us twenty.']); } }
+    else if(v.ph==='sit'){ flying=false; var pl=S.ship && state.mode==='atmo' && Math.hypot(S.ship.position.x-v.T.x,S.ship.position.z-v.T.z)<140;
+      if(v.t>24 || pl){ v.ph='up'; v.t=0; v.gear=false; setShipFlying(h,true); if(vol>.05) sfx('landing',.45*vol,1.1); if(pl) fleetSay(v,['Pad’s yours, boss. Clearing out.']); } }
+    else if(v.ph==='up'){ k=Math.min(1,v.t/5); e=k*k; h.position.lerpVectors(v.land,v.hover,e); if(k>=1){ v.ph='out'; v.t=0; } }
+    else if(v.ph==='out'){ k=Math.min(1,v.t/18); e=k*k; h.position.lerpVectors(v.hover,v.out,e); if(k>=1) gone=true; }
+    else if(v.ph==='pass'){ k=Math.min(1,v.t/26); var mid=v.passPt;
+      if(k<.5){ e=k*2; h.position.lerpVectors(v.from,mid,e); h.position.y=lerp(v.from.y,mid.y,Math.sqrt(e)); } else { e=(k-.5)*2; h.position.lerpVectors(mid,v.out,e); h.position.y=lerp(mid.y,v.out.y,e*e); }
+      if(!v.said && k>.4){ v.said=true; fleetSay(v,['Your pad’s taken, boss, so I’m just passing through '+v.T.name+'.','Low pass over '+v.T.name+'. That’s your company colours up there.']); }
+      if(k>=1) gone=true; }
+    var dx=h.position.x-prev.x, dz=h.position.z-prev.z; if(dx*dx+dz*dz>1e-4) v.yaw=Math.atan2(dx,dz);
+    h.rotation.set(0,v.yaw+Math.PI,0);
+    h.userData.flames.forEach(function(f){ var u=f.material.uniforms; u.intensity.value=flying?(v.ph==='down'||v.ph==='up'?.7:1):0; u.time.value=state.t; });
+    if(gone){ S.scene.remove(h); disposeObject(h); fleetVis.splice(i,1); }
+  }
+}
+/* your pilots check in on channel 19 now and then */
+function fleetCbLine(){
+  var C=state.company; if(!C) return null; var crew=C.ships.filter(function(x){ return x.pilot; }); if(!crew.length) return null;
+  var sh=crew[Math.floor(Math.random()*crew.length)], R=ROUTES[sh.route], st=fleetStatus(sh), who=sh.name+' · '+sh.pilot.name, L=[];
+  if(st==='RESTING') L.push('Taking my break, boss. Back on the road soon.','Parked up for a rest. Coffee’s terrible.');
+  else if(sh.cond<40) L.push(sh.name+' is rattling bad, boss. Needs the shop soon.','Hull’s at '+Math.round(sh.cond)+'%. I’d like to make it home in one piece.');
+  else L.push(sh.name+' rolling on the '+R.name.toLowerCase()+'. All quiet back here.', 'Checking in, boss. '+(sh.lastDrop?'Last drop was '+sh.lastDrop+'.':'Loaded and moving.'), C.name+' rig '+sh.name+', on schedule.');
+  return {who:who, line:cbPick(L)};
 }
 try{ if(state.company) fleetCatchUp(); }catch(e){ console.error(e); }
 try{ sharesCatchUp(); }catch(e){ console.error(e); }
@@ -5384,7 +5434,7 @@ function routeTick(dt){
   if(state.dock || state.warp || state.spool) return;
   if(state.mode==='surface'){
     var nt=S && (L.kind==='home'?nearestPad(state.pos.x,state.pos.z):nearestTown(state.pos.x,state.pos.z));
-    if(nt && L.kind==='home' && nt.T.home && nt.d<60){ routeDone('HOME · '+state.home.name); }
+    if(nt && L.kind==='home' && nt.T.key==='home' && nt.d<60){ routeDone('HOME · '+state.home.name); }
     else if(nt && nt.T.key===L.key && nt.d<40){ routeDone('ARRIVED · '+L.name+(R.project&&!isProject(L)?' · PROJECT LOADS AT THE TERMINAL':' · DELIVER AT THE TERMINAL')); }
     return;
   }
@@ -5494,9 +5544,9 @@ function cbEvent(kind, loc){
 function cbTick(dt){
   if(CB.hideT>0){ CB.hideT-=dt; if(CB.hideT<=0) $('cbMsg').classList.remove('show'); }
   if(!CB.on || state.mode==='title' || state.sleeping || state.law || termLoc || state.dock) return;
-  if(CB.queue){ var q=CB.queue; CB.queue=null; CB.t=Math.max(CB.t,25); setTimeout(function(){ cbSay(q); },1500); return; }
+  if(CB.queue){ var q=CB.queue; CB.queue=null; CB.t=Math.max(CB.t,25); setTimeout(function(){ if(q.line) cbSay(q.line,q.who); else cbSay(q); },1500); return; }
   CB.t-=dt*(state.ap?1.6:1);
-  if(CB.t<=0){ CB.t=40+Math.random()*50; cbSay(cbLine()); }
+  if(CB.t<=0){ CB.t=40+Math.random()*50; var fl=Math.random()<.3?fleetCbLine():null; if(fl) cbSay(fl.line,fl.who); else cbSay(cbLine()); }
 }
 function setCB(on){ CB.on=on; try{ localStorage.setItem('nh_cb',on?'1':'0'); }catch(e){} $('cbBtn').classList.toggle('off',!on); $('cbBtn').setAttribute('aria-pressed',on?'true':'false'); if(!on) $('cbMsg').classList.remove('show'); }
 /* =========================================================================
@@ -6446,6 +6496,7 @@ function updateWorld(dt, focus){
     r.marker.position.y=4+Math.sin(state.t*2+r.phase)*.3;
   });
   updateTown(dt);
+  updateFleetVis(dt);
   setSun(V3.copy(camera.position).addScaledVector(S.sunDir,1000), sstep(-.04,.06,S.sunDir.y));
 }
 function surfaceRadarItems(includeShip, focus){
@@ -6597,7 +6648,7 @@ function disembark(){
   state.mode='surface'; setModeUI('surface');
   camera.fov=68; camera.updateProjectionMatrix(); finalPass.uniforms.boost.value=0; state.fovKick=0;
   updateGrass(true);
-  if(onPad && padT.home){ setTimeout(function(){ showBanner('HOME', state.home?homeTier().name:'', state.home?state.home.name:''); },500); }
+  if(onPad && padT.key==='home'){ setTimeout(function(){ showBanner('HOME', state.home?homeTier().name:'', state.home?state.home.name:''); },500); }
   else if(onPad){ setTimeout(function(){ if(state.mode==='surface' && S) openTerminal(townLoc(S.idx,padT.j)); },900); }
   else if(!state.landedHere){ state.landedHere=true; toast('SHIP PARKED · FOLLOW THE BEACON OR RADAR TO RETURN'); }
 }
@@ -7214,7 +7265,7 @@ async function boot(){
   frame();
   setTimeout(streamShipModels,1500);
 }
-window.__nh={town:{grow:function(loc,p){ return growTown(loc,p); }, rec:townRec, kit:function(){ return TOWN_KIT; }, prompt:kitPrompt, invest:investIn, home:{pt:function(){ return homeT(); }, loc:function(){ return homeLoc(); }, land:function(){ var H=homeT(); if(!H) return false; S.ship.position.set(H.x,H.pad.y+hullGear(S.ship),H.z); state.landing={t:1, pad:true, town:H, y0:H.pad.y+10, y1:H.pad.y}; disembark(); state.camFrom=null; return true; }}, shares:function(mins,eff){ return simShares(mins,eff==null?1:eff); }, terminal:openTerminal}, stationLoc:function(){ return stationLoc(); }, lineup:function(){ var sc=new THREE.Scene(); sc.background=new THREE.Color(.16,.165,.17); sc.environment=spaceScene.environment;
+window.__nh={town:{grow:function(loc,p){ return growTown(loc,p); }, rec:townRec, kit:function(){ return TOWN_KIT; }, prompt:kitPrompt, invest:investIn, fleetVisit:function(tier,j){ var T=S&&S.towns[j||0]; return fleetVisit({tier:tier||2, name:'TF-09', pilot:{name:'WREN TEST', grade:'veteran'}},T); }, fleetVis:function(){ return fleetVis; }, home:{pt:function(){ return homeT(); }, loc:function(){ return homeLoc(); }, land:function(){ var H=homeT(); if(!H) return false; S.ship.position.set(H.x,H.pad.y+hullGear(S.ship),H.z); state.landing={t:1, pad:true, town:H, y0:H.pad.y+10, y1:H.pad.y}; disembark(); state.camFrom=null; return true; }}, shares:function(mins,eff){ return simShares(mins,eff==null?1:eff); }, terminal:openTerminal}, stationLoc:function(){ return stationLoc(); }, lineup:function(){ var sc=new THREE.Scene(); sc.background=new THREE.Color(.16,.165,.17); sc.environment=spaceScene.environment;
     sc.add(new THREE.HemisphereLight(0xdfe6ee,0x30302c,.8)); var dl=new THREE.DirectionalLight(0xffffff,2.2); dl.position.set(-30,50,40); sc.add(dl);
     var x=0; [0,1,4,2,3].forEach(function(t){ var h=buildHull(t,true,{value:.4}); var bb=new THREE.Box3().setFromObject(h); h.position.set(x-bb.min.x,-h.userData.gear,0); x+=bb.max.x-bb.min.x+3; sc.add(h); });
     var cam=new THREE.PerspectiveCamera(30,innerWidth/innerHeight,.1,1000); cam.position.set(x/2,22,x*.95); cam.lookAt(x/2,0,0); SHOWCASE={scene:sc, cam:cam, ground:new THREE.Object3D()}; },
