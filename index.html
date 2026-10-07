@@ -2308,7 +2308,7 @@ function* chunkBuilder(s, ci, cj, N){
   var sph=new THREE.Sphere(new THREE.Vector3(x0+CS/2,hsum/V,z0+CS/2),CS*.72+60);
   var R=rng(ihash(ihash(b.seed,ci*7919+cj*104729+5),31)), dm=A.dummy, wl=wet?.6:-1e9;
   function hAt(x,z){ return chunkHeight(c,x,z); }
-  function okAt(x,z,ms){ if(nearSite(T,x,z,FLAT_IN+4)) return false; if(hAt(x,z)<wl) return false;
+  function okAt(x,z,ms){ if(nearSite(T,x,z,FLAT_IN+4) || nearHome(T,x,z,6)) return false; if(hAt(x,z)<wl) return false;
     var dx=hAt(x+1.2,z)-hAt(x-1.2,z), dz=hAt(x,z+1.2)-hAt(x,z-1.2); return Math.sqrt(dx*dx+dz*dz)/2.4<ms; }
   function rp(){ return 2+R()*(CS-4); }
   function addIM(im){ im.castShadow=Q.shadows>0; im.receiveShadow=true; grp.add(im); c.ims.push(im); return im; }
@@ -2992,13 +2992,14 @@ function buildTown(scene, b, site, key){
     fragmentShader:'uniform vec3 color; uniform float time, fade; varying vec2 vUv; void main(){ float y=vUv.y; float a=pow(1.0-y,1.6)*(0.75+0.25*sin(time*2.0-y*40.0)); gl_FragColor=vec4(color*a*fade,1.0); }',
     transparent:true, blending:THREE.AdditiveBlending, depthWrite:false, side:THREE.DoubleSide}));
   beacon.geometry.translate(0,.5,0); beacon.frustumCulled=false; beacon.position.set(site.x,hs,site.z); scene.add(beacon);
+  var home=buildHome(scene,b,site,key,{tex:T, TW:TW, hull:hull, winMat:winMat, dark:dark, accent:accent, lampMat:lampMat, padLampMat:padLampMat, screenMat:screenMat, pools:pools});
   mergeStatic(g);
   vents=vents.map(function(v){ return v.clone().add(new THREE.Vector3(site.x,0,site.z)); });
   return {key:key, lvl:lvl, site:site, traffic:rings.traffic, reds:rings.reds, skyH:Math.max(16,rings.skyH), cityR:townCityR(lvl),
     name:site.name, label:site.label, outpost:site.outpost, j:site.j, x:site.x, z:site.z, group:g,
     pad:new THREE.Vector3(site.x,hs+.7,site.z), kiosk:new THREE.Vector3(site.x+kx,hs,site.z), hs:hs,
     lampMat:lampMat, lampBase:lampBase, padLampMat:padLampMat, winMat:winMat, red:red, red2:red2, npcs:npcs, doors:doors, beacon:beacon,
-    pools:pools, vents:vents, crawler:{obj:crawler, lamp:crawlLamp, x0:-14, z0:7, ph:R()*TAU}};
+    home:home, pools:pools, vents:vents, crawler:{obj:crawler, lamp:crawlLamp, x0:-14, z0:7, ph:R()*TAU}};
 }
 function updateTown(dt){
   var night=1-S.dayF, t=state.t, cx=camera.position.x, cz=camera.position.z;
@@ -3048,6 +3049,7 @@ function updateGrass(force, focus){
   var cell=.55, per=Math.max(1,Math.round(2.6*S.biome.grassDensity));
   var cx0=Math.floor((p.x-radius)/cell), cx1=Math.floor((p.x+radius)/cell), cz0=Math.floor((p.z-radius)/cell), cz1=Math.floor((p.z+radius)/cell);
   var m=new THREE.Matrix4(), qt=new THREE.Quaternion(), sc=new THREE.Vector3(), ps=new THREE.Vector3(), eu=new THREE.Euler(), n=0, r2=radius*radius;
+  var hmSpot=homeOnTer(S.ter);
   var nearTowns=S.ter.sites.filter(function(st){ return Math.hypot(st.x-p.x,st.z-p.z)<radius+(st.cr||46)+4; }), nearTownsT={sites:nearTowns};
   for(var ci=cx0;ci<=cx1 && n<cnt;ci++) for(var cj=cz0;cj<=cz1 && n<cnt;cj++){
     for(var k=0;k<per && n<cnt;k++){
@@ -3055,6 +3057,7 @@ function updateGrass(force, focus){
       var dx=x-p.x, dz=z-p.z, d2=dx*dx+dz*dz; if(d2>r2) continue;
       var patch=vnoise(x*.08+3,z*.08); if(patch<.32) continue;
       if(nearTowns.length && nearSiteR(nearTownsT,x,z,0)) continue;
+      if(hmSpot && Math.hypot(x-hmSpot.x,z-hmSpot.z)<46) continue;
       var y=S.heightAt(x,z); if(y<S.waterLevel+(S.waterLevel>-1e8?2.1+vnoise(x*.2,z*.2)*.8:.5)) continue;
       if(S.slopeAt(x,z)>.55) continue;
       var edge=1-sstep(r2*.55,r2,d2);
@@ -3345,14 +3348,14 @@ try{
   if(sv){
     state.credits=sv.credits||0; state.found=sv.found||{}; state.sysSeed=sv.sys||0; state.up=sv.up||{}; state.cargo=sv.cargo||[]; state.taken=sv.taken||{}; state.boardGen=sv.boardGen||{}; state.boardT=sv.boardT||{}; state.delivered=sv.delivered||0; state.towns=sv.towns||{};
     state.mods=sv.mods||[]; state.modsOwned=sv.modsOwned||{}; state.lic=sv.lic||{}; state.fuel=sv.fuel; state.hull=sv.hull==null?100:sv.hull; state.company=sv.company||null; state.hullSel=sv.hullSel==null?null:sv.hullSel; state.rooks=sv.rooks||{}; retireWedge(sv); state.fits=sv.fits||{}; state.fuelReserve=sv.fuelReserve||0; state.cleared=sv.cleared===undefined?(sv.sys||0):sv.cleared; state.heat=sv.heat||{}; state.flares=sv.flares==null?3:sv.flares;
-    state.food=sv.food==null?100:sv.food; state.rest=sv.rest==null?100:sv.rest; state.rations=sv.rations==null?2:sv.rations; state.fedT=sv.fedT||0; state.restedT=sv.restedT||0; state.needsOff=!!sv.needsOff; state.shareLast=sv.shareLast==null?null:sv.shareLast; state.shareAcc=sv.shareAcc||0; state.project=sv.project||null;
+    state.food=sv.food==null?100:sv.food; state.rest=sv.rest==null?100:sv.rest; state.rations=sv.rations==null?2:sv.rations; state.fedT=sv.fedT||0; state.restedT=sv.restedT||0; state.needsOff=!!sv.needsOff; state.shareLast=sv.shareLast==null?null:sv.shareLast; state.shareAcc=sv.shareAcc||0; state.project=sv.project||null; state.home=sv.home||null;
     Object.keys(sv.inv||{}).forEach(function(k){ var nk=OLD_KEYS[k]||k; if(ELEMENTS[nk]) state.inv[nk]=(state.inv[nk]||0)+sv.inv[k]; });
   }
 }catch(e){}
 drawThrottle();
 function save(){ try{ localStorage.setItem('nh_save',JSON.stringify({credits:state.credits,inv:state.inv,found:state.found,sys:state.sysSeed,up:state.up,cargo:state.cargo,taken:state.taken,boardGen:state.boardGen,boardT:state.boardT,delivered:state.delivered,towns:state.towns,
   mods:state.mods,modsOwned:state.modsOwned,lic:state.lic,fuel:state.fuel,hull:state.hull,company:state.company,hullSel:state.hullSel,rooks:state.rooks,fits:state.fits,fuelReserve:state.fuelReserve,cleared:state.cleared,heat:state.heat,flares:state.flares,
-  food:state.food,rest:state.rest,rations:state.rations,fedT:state.fedT,restedT:state.restedT,needsOff:state.needsOff,shareLast:state.shareLast,shareAcc:state.shareAcc,project:state.project})); }catch(e){} }
+  food:state.food,rest:state.rest,rations:state.rations,fedT:state.fedT,restedT:state.restedT,needsOff:state.needsOff,shareLast:state.shareLast,shareAcc:state.shareAcc,project:state.project,home:state.home})); }catch(e){} }
 
 function toast(msg, cls){ if(typeof SND!=='undefined' && state.mode!=='title' && !(typeof AU!=='undefined' && AU.hush)){ if(cls==='life') SND.good(); else SND.blip(); } var el=document.createElement('div'); el.className='toast'+(cls?' '+cls:''); el.textContent=msg; $('toastWrap').appendChild(el); setTimeout(function(){ el.remove(); },2400); }
 var invFold=false;
@@ -3721,6 +3724,7 @@ function kindNeeds(kind){
 }
 /* local price multipliers: fuel depots sell cheap fuel, remote outposts charge a premium */
 function serviceRates(loc){
+  if(loc.kind==='home'){ var sh=homeTier().shop; return {fuel:1-sh, repair:1-sh, note:sh>=1?'Your workshop: fuel and repairs are free.':sh>0?'Your workshop: half the station price for fuel and repairs.':'No workshop yet (a FRONTIER HOUSE adds one): station prices.'}; }
   if(loc.kind==='station') return {fuel:1, repair:1, note:'Station rates.'};
   if(loc.outpost && /FUEL DEPOT/.test(loc.name)) return {fuel:.6, repair:1.6, note:'Fuel depot: cheapest fuel in the system.'};
   if(loc.outpost) return {fuel:1.4, repair:1.6, note:'Remote outpost: everything costs extra.'};
@@ -3918,8 +3922,120 @@ function rebuildTownAt(loc){
   var surf=surfaces[loc.planet]; if(!surf || !surf.towns) return;
   var i=-1; surf.towns.forEach(function(T,k){ if(T.key===loc.key) i=k; }); if(i<0) return;
   var old=surf.towns[i]; surf.scene.remove(old.group); surf.scene.remove(old.beacon); disposeObject(old.group); disposeObject(old.beacon);
+  // parked on your own pad when the home is rebuilt (an upgrade grows the lot and moves the pad): keep the rig on it
+  var onHomePad=!!(old.home && surf===S && state.mode==='surface' && Math.hypot(S.ship.position.x-old.home.pt.x,S.ship.position.z-old.home.pt.z)<12);
+  if(old.home) disposeObject(old.home.group), surf.scene.remove(old.home.group);
   surf.towns[i]=buildTown(surf.scene, surf.biome, old.site, old.key);
+  var nh=surf.towns[i].home; if(onHomePad && nh) S.ship.position.set(nh.pt.x,nh.pt.pad.y+hullGear(S.ship),nh.pt.z);
 }
+
+/* =========================================================================
+   Your home: one house, built in your project town and upgraded in tiers. It stands on its own lot just
+   outside the town (clear of the city rings), with a private pad, a garage for spare rigs and a home terminal.
+   ========================================================================= */
+var HOME_TIERS=[null,
+  {name:'PREFAB CABIN', cost:25000, garage:1, shop:0, w:36, d:28, note:'A one-room prefab: your own bunk and kitchenette (free sleep and meals), a private pad and space to park one spare rig.'},
+  {name:'FRONTIER HOUSE', cost:75000, garage:2, shop:.5, w:48, d:34, note:'Two storeys and a workshop that halves repair and fuel costs, with a garage for two spare rigs.'},
+  {name:'HILLTOP ESTATE', cost:200000, garage:4, shop:1, w:62, d:40, note:'A big house with a glass lounge and a trophy room, free repairs and fuel, and a hangar for four spare rigs.'}];
+var HOME_R=158;
+function homeHere(){ var H=state.home; return H && SYS && H.sys===SYS.seed ? H : null; }
+function homeTier(){ return state.home?HOME_TIERS[state.home.tier]:null; }
+function homeSpot(T,H){ var st=T.sites[H.site||0]; if(!st || H.ang==null) return null; return {x:st.x+Math.sin(H.ang)*HOME_R, z:st.z+Math.cos(H.ang)*HOME_R}; }
+/* the home's lot on this terrain, if it's here (used to keep rocks and grass off it) */
+function homeOnTer(T){ var H=homeHere(); if(!H || !SYS.biomes[H.planet] || planetTerrain(SYS.biomes[H.planet])!==T) return null; return homeSpot(T,H); }
+function nearHome(T,x,z,pad){ var h=homeOnTer(T); return !!h && Math.hypot(x-h.x,z-h.z)<44+pad; }
+/* pick the flattest dry spot on a ring round the town, once, when the home is first built */
+function pickHomeAngle(b, site){
+  var T=planetTerrain(b), best=0, bs=1e9;
+  for(var k=0;k<24;k++){ var a=k/24*TAU, cx=site.x+Math.sin(a)*HOME_R, cz=site.z+Math.cos(a)*HOME_R, lo=1e9, hi=-1e9;
+    if(Math.abs(cx)>SITE_E+120 || Math.abs(cz)>SITE_E+120) continue;
+    for(var i=-2;i<=2;i++) for(var j=-2;j<=2;j++){ var h=siteHeight(T,cx+i*16,cz+j*12); lo=Math.min(lo,h); hi=Math.max(hi,h); }
+    var sc=hi-lo+(b.water && lo<2.5?100:0)+(T.sites.some(function(o){ return o!==site && Math.hypot(o.x-cx,o.z-cz)<HOME_R+60; })?50:0);
+    if(sc<bs){ bs=sc; best=a; } }
+  return best;
+}
+function homeLoc(){ var H=state.home; if(!H) return null;
+  return {kind:'home', key:'home', name:'HOME · '+H.name, town:H.name, planet:H.planet, site:H.site||0, pname:H.pname, sys:H.sys, sysName:H.sysName}; }
+function homeT(){ if(!S || !S.towns) return null; for(var i=0;i<S.towns.length;i++) if(S.towns[i].home) return S.towns[i].home.pt; return null; }
+/* the town pad or your own pad, whichever is closer */
+function nearestPad(x,z){
+  var nt=nearestTown(x,z), H=homeT(); if(!H) return nt;
+  var d=Math.hypot(x-H.x,z-H.z); return (!nt || d<nt.d)?{T:H, d:d}:nt;
+}
+function homeGround(x,z){ var H=homeT(); if(!H) return -1e9; var L=H.lot, dx=x-L.x, dz=z-L.z, c=Math.cos(L.rot), s=Math.sin(L.rot);
+  var lx=dx*c-dz*s, lz=dx*s+dz*c; if(Math.abs(lx)<L.w/2 && Math.abs(lz)<L.d/2) return L.y;
+  var R=L.ramp; if(R && Math.abs(lx-R.x)<2.2 && lz>=R.z0 && lz<=R.z0+R.run) return L.y-(lz-R.z0)/R.run*R.rise;
+  return -1e9; }
+function buildHome(scene, b, site, key, M){
+  var H=state.home; if(!H || H.sys!==SYS.seed || H.key!==key) return null;
+  if(H.ang==null){ H.ang=pickHomeAngle(b,site); save(); }
+  var T=planetTerrain(b), sp=homeSpot(T,H), tier=HOME_TIERS[H.tier], rot=H.ang+Math.PI;
+  // spare rigs parked out back: work out the garage strip first so the lot fits them
+  var spare=[]; [3,2,1,0,4].forEach(function(t){ if(spare.length<tier.garage && ownsHull(t) && t!==hullTier()) spare.push(t); });
+  var rigs=spare.map(function(t){ var h=buildHull(t,true,{value:.3}); return {t:t, h:h, len:h.userData.len, beam:h.userData.beam}; });
+  var gW=rigs.reduce(function(a,r){ return a+r.beam+5; },0), gD=rigs.length?Math.max.apply(null,rigs.map(function(r){ return r.len; }))+6:0;
+  var w=Math.max(tier.w,gW+6), d=tier.d+gD;
+  var lo=1e9, hi=-1e9, cs=Math.cos(rot), sn=Math.sin(rot);
+  for(var i=-3;i<=3;i++) for(var j=-3;j<=3;j++){ var lx=i/3*w/2, lz=j/3*d/2, h=siteHeight(T,sp.x+lx*cs+lz*sn,sp.z-lx*sn+lz*cs); lo=Math.min(lo,h); hi=Math.max(hi,h); }
+  if(b.water) hi=Math.max(hi,2.6);
+  var fy=hi+.5, g=new THREE.Group(); g.position.set(sp.x,fy,sp.z); g.rotation.y=rot; scene.add(g);
+  function mesh(geo,mat,x,y,z,shadow){ var m=new THREE.Mesh(geo,mat); m.position.set(x,y,z); if(shadow!==false){ m.castShadow=true; m.receiveShadow=true; } g.add(m); return m; }
+  var conc=weather(new THREE.MeshStandardMaterial({color:lin('#6d6b66'), map:texRep(M.tex.plate,4,3), roughness:.9, metalness:.05}),.9,{u:M.TW,paint:.2});
+  // the lot: a poured slab with a skirt down to the ground, so it sits level on any slope
+  mesh(new THREE.BoxGeometry(w,.6,d),conc,0,-.3,0); var sk=fy-lo+2; mesh(new THREE.BoxGeometry(w-.4,sk,d-.4),M.dark,0,-.6-sk/2,0,false);
+  var fz=d/2, padR=tier.w>40?10:9;
+  // private pad, front left
+  var px=-w/2+padR+3, pz=fz-padR-3;
+  var pad=mesh(new THREE.CylinderGeometry(padR,padR+.5,.7,40),M.dark,px,.35,pz); pad.castShadow=false;
+  var top=new THREE.Mesh(new THREE.CircleGeometry(padR-.2,40),new THREE.MeshStandardMaterial({map:padTexture(), roughness:.75, metalness:.15})); top.rotation.x=-Math.PI/2; top.position.set(px,.71,pz); top.receiveShadow=true; g.add(top);
+  for(var k=0;k<10;k++){ var a=k/10*TAU; mesh(new THREE.SphereGeometry(.2,8,6),M.padLampMat,px+Math.cos(a)*(padR+.3),.75,pz+Math.sin(a)*(padR+.3),false); }
+  // the house, front right, door facing the town
+  var hx, hz, hw, hd, door;
+  function box(wx,hy,dz,mat,x,y,z){ return mesh(new THREE.BoxGeometry(wx,hy,dz),mat,x,y,z); }
+  if(H.tier===1){ hw=11; hd=8; hx=w/2-hw/2-3; hz=fz-hd/2-4;
+    box(hw,3.6,hd,M.winMat,hx,1.8,hz); box(hw+.6,.4,hd+.6,M.dark,hx,3.8,hz); box(2.2,1,1.6,M.dark,hx-2.5,4.5,hz-1.5);
+    mesh(new THREE.CylinderGeometry(.06,.06,4,6),M.dark,hx+3.8,6,hz-2.4);
+  } else if(H.tier===2){ hw=15; hd=10; hx=w/2-hw/2-3; hz=fz-hd/2-4;
+    box(hw,3.4,hd,M.winMat,hx,1.7,hz); box(hw+.6,.35,hd+.6,M.dark,hx,3.55,hz);
+    box(10,3.2,8,M.winMat,hx-1.6,5.3,hz-.6); box(10.6,.35,8.6,M.dark,hx-1.6,7.05,hz-.6);
+    for(var r=0;r<6;r++) box(.1,1,.1,M.dark,hx-6.4+r*2.1,4.2,hz+hd/2-.3); box(12.6,.1,.1,M.dark,hx-1.4,4.7,hz+hd/2-.3);
+    // workshop shed beside the house
+    var sw=hx+2, sz=hz-hd/2-4.5; box(8,3.6,7,M.hull,sw,1.8,sz); box(.2,3,5,M.accent,sw+4.05,1.5,sz); box(8.4,.3,7.4,M.dark,sw,3.75,sz);
+  } else { hw=19; hd=13; hx=w/2-hw/2-3; hz=fz-hd/2-4;
+    box(hw,3.6,hd,M.winMat,hx,1.8,hz); box(hw+.8,.4,hd+.8,M.dark,hx,3.8,hz);
+    box(14,3.4,10,M.winMat,hx+1.5,5.7,hz-1); box(14.6,.4,10.6,M.dark,hx+1.5,7.6,hz-1);
+    var glass=new THREE.MeshStandardMaterial({color:lin('#9fb1bd'), metalness:.6, roughness:.08, transparent:true, opacity:.35, emissive:new THREE.Color(1,.75,.45), emissiveIntensity:.35});
+    var gl=box(8,3.2,7,glass,hx-hw/2-4.5,1.6,hz+1.5); gl.castShadow=false; box(8.4,.3,7.4,M.dark,hx-hw/2-4.5,3.35,hz+1.5);
+    // hangar out back and a mast with the house colours
+    var qr=6.5, ql=16, qx=hx-1, qz=-d/2+gD+ql/2+2; if(qz+ql/2>hz-hd/2-2) qz=hz-hd/2-2-ql/2;
+    var q=mesh(new THREE.CylinderGeometry(qr,qr,ql,20,1,true,-Math.PI/2,Math.PI),M.hull,qx,0,qz); q.rotation.x=-Math.PI/2; q.material.side=THREE.DoubleSide;
+    mesh(new THREE.CircleGeometry(qr,20,0,Math.PI),M.dark,qx,0,qz-ql/2+.05).rotation.y=Math.PI; box(6,5,.25,M.accent,qx,2.5,qz+ql/2+.05);
+    mesh(new THREE.CylinderGeometry(.12,.18,14,8),M.dark,-w/2+2,7,-d/2+2); mesh(new THREE.SphereGeometry(.35,8,6),new THREE.MeshBasicMaterial({color:new THREE.Color(4,.3,.2)}),-w/2+2,14.2,-d/2+2,false);
+    for(var f=0;f<8;f++){ var fx2=-w/2+.5+f*(w-1)/7; mesh(new THREE.CylinderGeometry(.08,.08,1.4,6),M.dark,fx2,.7,fz-.4); }
+  }
+  door={x:hx, z:hz+hd/2+.6};
+  box(1.5,2.4,.2,M.accent,hx,1.2,hz+hd/2+.05);
+  mesh(new THREE.BoxGeometry(.5,.25,.3),M.lampMat,hx,2.7,hz+hd/2+.25,false);
+  lightPool(g,hx,0,hz+hd/2+2.5,5,new THREE.Color(.62,.3,.09),M.pools);
+  // home terminal on a post by the door
+  var kx=hx+hw/2-1.5, kz=hz+hd/2+1.6;
+  box(.9,1.8,.6,M.dark,kx,.9,kz); var scr=mesh(new THREE.PlaneGeometry(.7,.5),M.screenMat,kx,1.45,kz+.31,false);
+  // garage strip
+  var gx=-w/2+3;
+  rigs.forEach(function(rg){ var h=rg.h; h.position.set(gx+rg.beam/2+2,h.userData.gear,-d/2+3+rg.len/2); gx+=rg.beam+5; h.userData.dyn=true; g.add(h);
+    box(rg.beam+3,.05,rg.len+3,M.accent,h.position.x,.03,h.position.z).receiveShadow=true; });
+  function world(lx,lz){ return {x:sp.x+lx*cs+lz*sn, z:sp.z-lx*sn+lz*cs}; }
+  // a ramp from the ground up to the front door when the lot stands proud of the slope
+  var rw=world(door.x,fz+3), rise=fy-siteHeight(T,rw.x,rw.z), ramp=null;
+  if(rise>.5){ var run=Math.max(3,rise*2.6), rl=Math.hypot(run,rise), rm=mesh(new THREE.BoxGeometry(4,.4,rl),conc,door.x,-rise/2-.2,fz+run/2); rm.rotation.x=Math.atan2(rise,run);
+    [-2.1,2.1].forEach(function(ox){ var rr=mesh(new THREE.BoxGeometry(.08,.08,rl),M.dark,door.x+ox,-rise/2+.85,fz+run/2,false); rr.rotation.x=rm.rotation.x; });
+    ramp={x:door.x, z0:fz, run:run, rise:rise}; }
+  var pw=world(px,pz), dw=world(door.x,door.z), kw=world(kx,kz);
+  var pt={key:'home', home:true, name:'HOME', j:-1, x:pw.x, z:pw.z, hs:fy, cityR:30, skyH:12, pad:new THREE.Vector3(pw.x,fy+.7,pw.z),
+    lot:{x:sp.x, z:sp.z, rot:rot, w:w, d:d, y:fy, ramp:ramp}, door:dw, kiosk:new THREE.Vector3(kw.x,fy,kw.z)};
+  return {group:g, pt:pt, rigs:spare};
+}
+function homeBuildCost(){ var H=state.home; return H?(H.tier<3?HOME_TIERS[H.tier+1].cost:0):HOME_TIERS[1].cost; }
 /* Investing: units turn into growth (one point per INVEST_PER_G) and a stake that pays an hourly share of the
    town's income. Yield rises with the town's stage and its businesses. Paid into the company account if you
    run one, otherwise straight to you; while the game is closed it pays at half rate for up to 8 hours. */
@@ -4431,15 +4547,16 @@ function updateDock(dt){
 var stTab='cargo', termLoc=null;
 function openTerminal(loc){
   closeMap(); termLoc=loc;
-  $('stEye').textContent=(loc.kind==='station'?'DOCKED':'LANDED')+' · '+(loc.kind==='station'?SYS.name:loc.pname+' · '+SYS.name);
-  $('stName').textContent=loc.name;
-  var tabs=loc.kind==='station'?['cargo','trade','services','upgrades','fleet']:['cargo','trade','services','town'];
+  $('stEye').textContent=loc.kind==='home'?'HOME · '+loc.town+' · '+loc.pname:(loc.kind==='station'?'DOCKED':'LANDED')+' · '+(loc.kind==='station'?SYS.name:loc.pname+' · '+SYS.name);
+  $('stName').textContent=loc.kind==='home'?'YOUR '+homeTier().name:loc.name;
+  var tabs=loc.kind==='home'?['home','garage','services']:loc.kind==='station'?['cargo','trade','services','upgrades','fleet']:['cargo','trade','services','town'];
+  if(loc.kind==='home' && tabs.indexOf(stTab)<0) stTab='home';
   $('stTabs').classList.toggle('many',tabs.length>4); coConfirm=null;
   $('stTabs').innerHTML=tabs.map(function(t){ return '<button type="button" role="tab" data-tab="'+t+'">'+t.toUpperCase()+'</button>'; }).join('');
   $('undockBtn').textContent=loc.kind==='station'?'UNDOCK':'LEAVE TERMINAL';
   $('stationPanel').hidden=false; showFlightControls(false); setPrompt(null);
   if(tabs.indexOf(stTab)<0) stTab='cargo';
-  var here=state.cargo.filter(function(c){ return c.dest.key===loc.key; });
+  var here=loc.kind==='home'?[]:state.cargo.filter(function(c){ return c.dest.key===loc.key; });
   renderTerminal(here.length?'cargo':stTab);
 }
 function closeTerminal(){
@@ -4516,6 +4633,16 @@ function renderTerminal(tab){
       h+='<div class="st-row upg"><span class="nm">PLOT '+(pi+1)+' · FOR LEASE<small>Choose a business to build here · '+fmt(BIZ_COST)+' units</small>'+
         '<span class="bizopts">'+opts.map(function(k){ return '<button data-act="bizbuild" data-plot="'+pi+'" data-biz="'+k+'"'+(state.credits>=BIZ_COST?'':' disabled')+' title="'+BIZ[k].note+'">'+BIZ[k].name+'</button>'; }).join('')+'</span></span></div>';
     }
+    var HMt=state.home, homeHereT=HMt && HMt.key===loc.key;
+    if(homeHereT || pjHere){
+      h+='<div class="st-sub">YOUR HOME</div>';
+      if(homeHereT){ var nxt=HMt.tier<3?HOME_TIERS[HMt.tier+1]:null;
+        h+='<div class="st-row upg hangar-on"><span class="nm">⌂ '+HOME_TIERS[HMt.tier].name+'<span class="tag hi">YOURS</span><small>On its own lot just outside '+loc.name+', with a private pad. Find it as ⌂ HOME on the planet map.</small></span>'+
+          (nxt?'<span class="acts"><button class="pri" data-act="homeup"'+(state.credits>=nxt.cost?'':' disabled')+'>'+nxt.name+' · '+fmt(nxt.cost)+'</button></span>':'')+'</div>'; }
+      else if(HMt) h+='<p class="st-note">Your home is in '+HMt.name+' ('+HMt.sysName+'). Sell it from its home terminal to build here instead.</p>';
+      else h+='<div class="st-row upg"><span class="nm">BUILD YOUR HOME HERE<small>'+HOME_TIERS[1].note+' Upgrade it later to a FRONTIER HOUSE and a HILLTOP ESTATE.</small></span>'+
+        '<span class="acts"><button class="pri" data-act="homebuild"'+(state.credits>=HOME_TIERS[1].cost?'':' disabled')+'>'+fmt(HOME_TIERS[1].cost)+' UNITS</button></span></div>';
+    } else if(!state.home) h+='<p class="st-note">Make '+loc.name+' your project to build your home here.</p>';
     var inv=tr.inv||0, bizN=(tr.biz||[]).filter(Boolean).length, yl=INVEST_YIELD[lv]*(1+.15*bizN);
     h+='<div class="st-sub">INVEST IN '+loc.name+'</div>';
     h+='<div class="st-row upg'+(inv?' hangar-on':'')+'"><span class="nm">YOUR STAKE'+(inv?'<span class="tag hi">SHAREHOLDER</span>':'')+
@@ -4526,6 +4653,30 @@ function renderTerminal(tab){
       '<span class="bizopts">'+INVEST_AMTS.map(function(a){ return '<button data-act="invest" data-amt="'+a+'"'+(state.credits>=a?'':' disabled')+'>'+fmt(a)+(lv<3?' · +'+Math.floor(a/INVEST_PER_G)+' GROWTH':'')+'</button>'; }).join('')+'</span></span></div>';
     h+='<p class="st-note">Shares pay more as '+loc.name+' grows and opens businesses: '+INVEST_YIELD.map(function(y,i){ return TOWN_LVLS[i].toLowerCase()+' '+(y*100)+'%'; }).join(', ')+' an hour, +15% for each business.</p>';
     h+=holdingsHTML(loc.key);
+  } else if(stTab==='home'){
+    var HM=state.home, HT0=homeTier(), nx=HM.tier<3?HOME_TIERS[HM.tier+1]:null;
+    h+='<div class="co-head"><span><b>'+HT0.name+'</b><small>'+HM.name+' · '+HM.pname+' · '+HM.sysName+' system</small></span></div>';
+    h+='<p class="st-note">'+HT0.note+'</p>';
+    [['YOUR BED AND KITCHEN','Sleep and eat for free in Services. Sleeping at home leaves you well rested for longer.'],
+     ['PRIVATE PAD','Land here instead of the town pad. Tap ⌂ HOME on the planet map, or ROUTE HOME in My Towns, and the autopilot brings you in.'],
+     ['GARAGE · '+HT0.garage+' BAY'+(HT0.garage>1?'S':''),'Rigs you own and aren’t flying park out back. Swap rigs in the Garage tab while your ship is on your pad.'],
+     ['WORKSHOP',HT0.shop>=1?'Fuel and repairs are free.':HT0.shop>0?'Fuel and repairs at half the station price.':'Comes with a FRONTIER HOUSE.']].forEach(function(p,i){
+      var on=i<3||HT0.shop>0; h+='<div class="st-row upg'+(on?' hangar-on':'')+'"><span class="nm">'+p[0]+(on?'<span class="tag hi">YOURS</span>':'')+'<small>'+p[1]+'</small></span></div>'; });
+    if(nx) h+='<div class="st-row upg"><span class="nm">UPGRADE TO '+nx.name+'<small>'+nx.note+'</small></span><span class="acts"><button class="pri" data-act="homeup"'+(state.credits>=nx.cost?'':' disabled')+'>'+fmt(nx.cost)+' UNITS</button></span></div>';
+    else h+='<p class="st-note">This is as big as it gets. Nice place.</p>';
+    var cities=Object.keys(state.towns).filter(function(k){ return state.towns[k].lvl>=3; }).length, grown=Object.keys(state.towns).filter(function(k){ return state.towns[k].lvl>=2; }).length;
+    h+='<div class="st-sub">ON THE WALL</div><div class="co-log">'+fmt(state.delivered||0)+' crates delivered<br>'+grown+' town'+(grown===1?'':'s')+' grown, '+cities+' cit'+(cities===1?'y':'ies')+
+      (state.company?'<br>'+state.company.name+' · '+state.company.ships.length+' ship'+(state.company.ships.length===1?'':'s'):'')+(holdings().length?'<br>shares in '+holdings().length+' town'+(holdings().length===1?'':'s'):'')+'</div>';
+    h+='<div class="st-sub">MOVING ON</div><div class="st-row upg"><span class="nm">SELL YOUR HOME<small>Get back half of what you’ve put in ('+fmt(Math.floor(HM.spent/2))+' units). You can then build a new one in your project town.</small></span>'+
+      '<span class="acts"><button data-act="homesell">'+(coConfirm==='home'?'CONFIRM · +'+fmt(Math.floor(HM.spent/2)):'SELL')+'</button></span></div>';
+  } else if(stTab==='garage'){
+    var HTg=homeTier(), HP=homeT(), onPad=!!(HP && S && state.mode==='surface' && Math.hypot(S.ship.position.x-HP.x,S.ship.position.z-HP.z)<12), parked=0;
+    h+='<p class="st-note">'+HTg.garage+' bay'+(HTg.garage>1?'s':'')+'. '+(onPad?'Your rig is on your pad: pick which one to fly.':'Land on your private pad to swap rigs here.')+'</p>';
+    [3,2,1,0,4].forEach(function(t2){ if(!ownsHull(t2)) return; var cur=t2===hullTier(), here=!cur && parked<HTg.garage; if(here) parked++;
+      var fits=holdUsed()<=HOLD_CAPS[t2];
+      h+='<div class="st-row upg'+(cur?' hangar-on':'')+'"><span class="nm">'+HULL_NAMES[t2]+'<span class="tag '+(cur?'hi':here?'hi':'lock')+'">'+(cur?'FLYING':here?'IN YOUR GARAGE':'AT THE STATION')+'</span><small>'+HULL_CLASS[t2]+' · '+HOLD_CAPS[t2]+' crates'+(!fits&&!cur?' · your cargo won’t fit':'')+'</small></span>'+
+        '<span class="acts">'+(cur?'':'<button class="pri" data-act="hullsel" data-tier="'+t2+'"'+(onPad&&here&&fits?'':' disabled')+'>FLY THIS ONE</button>')+'</span></div>'; });
+    if(parked>=HTg.garage && HTg.garage<4) h+='<p class="st-note">Garage full. A bigger home has more bays; the rest wait at the station hangar.</p>';
   } else if(stTab==='trade'){
     var held=Object.keys(ELEMENTS).filter(function(k){ return state.inv[k]>0; });
     h+='<p class="st-note">'+(held.length?'Sell raw elements you mined. Each stop sets its own prices.':'No elements on board. Crystals you collect on planets sell here.')+'</p>';
@@ -4575,9 +4726,9 @@ function renderTerminal(tab){
     var PR=placeRates(loc);
     if(needsOn()){
       h+='<div class="st-sub">PILOT · HUNGER '+Math.round(state.food)+' · REST '+Math.round(state.rest)+(isFed()?' · WELL FED':'')+(isSharp()?' · WELL RESTED':'')+'</div>';
-      h+='<div class="st-row upg"><span class="nm">HOT MEAL<small>'+dishFor(loc)+' · fills you up and recharges energy faster for 15 min</small></span><span class="acts"><button class="pri" data-act="meal"'+(state.credits>=PR.meal?'':' disabled')+'>EAT · '+PR.meal+'</button></span></div>';
+      h+='<div class="st-row upg"><span class="nm">HOT MEAL<small>'+dishFor(loc)+' · fills you up and recharges energy faster for 15 min</small></span><span class="acts"><button class="pri" data-act="meal"'+(state.credits>=PR.meal?'':' disabled')+'>'+(PR.meal?'EAT · '+PR.meal:'EAT · FREE')+'</button></span></div>';
       h+='<div class="st-row upg"><span class="nm">RATION PACKS<small>'+state.rations+' / 6 on board · eat one any time from the fork on your HUD'+(hasMod('galley')?' (your galley turns them into hot meals)':'')+'</small></span><span class="acts"><button data-act="ration"'+(state.rations<6&&state.credits>=20?'':' disabled')+'>BUY · 20</button></span></div>';
-      h+='<div class="st-row upg"><span class="nm">'+PR.bedName+'<small>Sleep 8 hours, wake well rested · perishable deadlines keep running</small></span><span class="acts"><button class="pri" data-act="bed"'+(state.credits>=PR.bed?'':' disabled')+'>SLEEP · '+PR.bed+'</button><button data-act="cab">CAB · FREE</button></span></div>';
+      h+='<div class="st-row upg"><span class="nm">'+PR.bedName+'<small>Sleep 8 hours, wake well rested · perishable deadlines keep running</small></span><span class="acts"><button class="pri" data-act="bed"'+(state.credits>=PR.bed?'':' disabled')+'>'+(PR.bed?'SLEEP · '+PR.bed:'SLEEP · FREE')+'</button>'+(loc.kind==='home'?'':'<button data-act="cab">CAB · FREE</button>')+'</span></div>';
     }
     h+='<div class="st-row upg"><span class="nm">PILOT NEEDS · '+(needsOn()?'ON':'OFF')+'<small>'+(needsOn()?'Hunger, fatigue and logbook checks are on. Relaxed mode turns them off.':'Relaxed mode: no hunger, fatigue or logbook checks.')+'</small></span><span class="acts"><button data-act="needs">'+(needsOn()?'RELAXED MODE':'TURN ON')+'</button></span></div>';
     var hz=heatOf(SYS.seed);
@@ -4588,10 +4739,10 @@ function renderTerminal(tab){
     h+='<div class="st-row upg"><span class="nm">WARP FUEL<small>'+Math.floor(state.fuel)+' / '+cap2+' · '+fu.toFixed(1)+' units each</small>'+
       '<span class="gauge"><span class="bar"><i style="width:'+Math.round(state.fuel/cap2*100)+'%;background:linear-gradient(90deg,#ffb24d,#ffd08a)"></i></span></span></span>'+
       '<span class="acts"><button data-act="fuel25"'+(need2>0&&state.credits>=fu?'':' disabled')+'>+25</button>'+
-      '<button class="pri" data-act="fuelfill"'+(need2>0&&state.credits>=fu?'':' disabled')+'>'+(need2>0?'FILL · '+fmt(Math.min(fillCost,state.credits)):'FULL')+'</button></span></div>';
+      '<button class="pri" data-act="fuelfill"'+(need2>0&&state.credits>=fu?'':' disabled')+'>'+(need2>0?(fu>0?'FILL · '+fmt(Math.min(fillCost,state.credits)):'FILL · FREE'):'FULL')+'</button></span></div>';
     h+='<div class="st-row upg"><span class="nm">HULL CONDITION<small>'+Math.round(state.hull)+'% · '+ru.toFixed(1)+' units per %'+(state.hull<50?' · flying slower':'')+'</small>'+
       '<span class="gauge"><span class="bar"><i style="width:'+Math.round(state.hull)+'%;background:'+(state.hull<35?'#ff5a3c':state.hull<65?'#ffb24d':'#e7e1d2')+'"></i></span></span></span>'+
-      '<span class="acts"><button class="pri" data-act="repair"'+(dmg>=1&&state.credits>=ru?'':' disabled')+'>'+(dmg>=1?'REPAIR · '+fmt(Math.min(repCost,state.credits)):'PRISTINE')+'</button></span></div>';
+      '<span class="acts"><button class="pri" data-act="repair"'+(dmg>=1&&state.credits>=ru?'':' disabled')+'>'+(dmg>=1?(ru>0?'REPAIR · '+fmt(Math.min(repCost,state.credits)):'REPAIR · FREE'):'PRISTINE')+'</button></span></div>';
   } else {
     var owned=Math.min(lvl('hold'),3), hlist=[];
     for(var hq=0;hq<=owned;hq++) hlist.push(hq); ROOK_TIERS.forEach(function(rt){ if(ownsHull(rt)) hlist.push(rt); });
@@ -4642,6 +4793,24 @@ function renderTerminal(tab){
   }
   $('stBody').innerHTML=h;
 }
+function selectHull(nt){
+  if(!ownsHull(nt) || holdUsed()>HOLD_CAPS[nt]) return false;
+    // each hull keeps its own module fit-out, and spare fuel waits in the station tanks
+    var ot=hullTier(); state.fits=state.fits||{}; state.fits[ot]=state.mods.slice();
+    state.hullSel=nt;
+    var want=(state.fits[nt]||state.mods).filter(function(id){ return state.modsOwned[id] && !(id==='hidden' && isRookTier(nt)); }), dropped=0;
+    state.mods=want.slice(0,MOD_SLOTS[nt]); dropped=want.length-state.mods.length;
+    var cap=fuelCap(); state.fuelReserve=state.fuelReserve||0;
+    if(state.fuel>cap){ state.fuelReserve+=state.fuel-cap; state.fuel=cap; }
+    else { var top=Math.min(cap-state.fuel,state.fuelReserve); state.fuel+=top; state.fuelReserve-=top; }
+    swapPlayerHull(); toast('NOW FLYING THE '+HULL_NAMES[nt]+(dropped>0?' · '+dropped+' MODULE'+(dropped>1?'S':'')+' IN STORAGE':''),'life');
+  // swapped at home: the rig on your pad changes too, and the one you left goes in the garage
+  if(S && state.mode==='surface'){ var oh=S.ship, nh=makePlayerHull(HULL_GROUND,false); nh.position.copy(oh.position); nh.position.y+=hullGear(nh)-hullGear(oh); nh.quaternion.copy(oh.quaternion);
+    S.scene.remove(oh); disposeObject(oh); S.scene.add(nh); S.ship=nh; setShipFlying(nh,false);
+    nh.traverse(function(o){ var m=o.material; if(m && m.isMeshStandardMaterial && S.envMats.indexOf(m)<0){ m.userData.envBase=m.envMapIntensity; S.envMats.push(m); } }); }
+  if(state.home){ var hl=locFromKey(state.home.key); if(hl) rebuildTownAt(hl); }
+  return true;
+}
 $('stationPanel').addEventListener('click',function(e){
   var t=e.target.closest('button'); if(!t||!termLoc) return;
   SND.click();
@@ -4683,16 +4852,7 @@ $('stationPanel').addEventListener('click',function(e){
   else if(act==='needs'){ state.needsOff=!state.needsOff; if(state.needsOff){ state.blinkT=0; } toast(state.needsOff?'RELAXED MODE · PILOT NEEDS OFF':'PILOT NEEDS ON'); }
   else if(act==='rookbuy'){ var rt=+t.dataset.tier, rp2=Math.round(ROOK_PRICE*(secOf(SYS.seed).key==='lawless'?.75:1)); if(!isRookTier(rt)||ownsHull(rt)||state.credits<rp2) return;
     state.credits-=rp2; state.rooks=state.rooks||{}; state.rooks[rt]=1; toast(HULL_NAMES[rt]+' BOUGHT · IT\u2019S IN YOUR HANGAR','life'); }
-  else if(act==='hullsel'){ var nt=+t.dataset.tier; if(!ownsHull(nt) || holdUsed()>HOLD_CAPS[nt]) return;
-    // each hull keeps its own module fit-out, and spare fuel waits in the station tanks
-    var ot=hullTier(); state.fits=state.fits||{}; state.fits[ot]=state.mods.slice();
-    state.hullSel=nt;
-    var want=(state.fits[nt]||state.mods).filter(function(id){ return state.modsOwned[id] && !(id==='hidden' && isRookTier(nt)); }), dropped=0;
-    state.mods=want.slice(0,MOD_SLOTS[nt]); dropped=want.length-state.mods.length;
-    var cap=fuelCap(); state.fuelReserve=state.fuelReserve||0;
-    if(state.fuel>cap){ state.fuelReserve+=state.fuel-cap; state.fuel=cap; }
-    else { var top=Math.min(cap-state.fuel,state.fuelReserve); state.fuel+=top; state.fuelReserve-=top; }
-    swapPlayerHull(); toast('NOW FLYING THE '+HULL_NAMES[nt]+(dropped>0?' · '+dropped+' MODULE'+(dropped>1?'S':'')+' IN STORAGE':''),'life'); }
+  else if(act==='hullsel'){ selectHull(+t.dataset.tier); }
   else if(act==='clearrec'){ var hc=Math.ceil(heatOf(SYS.seed)*700); if(state.credits<hc) return; state.credits-=hc; setHeat(SYS.seed,0); toast('RECORD CLEARED IN '+SYS.name,'life'); }
   else if(act==='licbuy'){ var lc=LICENCES.filter(function(x){ return x.id===t.dataset.id; })[0]; if(!lc||state.credits<lc.cost) return;
     state.credits-=lc.cost; state.lic[lc.id]=1; toast(lc.name+' ISSUED','life'); }
@@ -4702,6 +4862,17 @@ $('stationPanel').addEventListener('click',function(e){
     if(!BIZ[bz] || pl>=BIZ_PLOTS[tr2.lvl] || tr2.biz[pl] || tr2.biz.indexOf(bz)>=0 || state.credits<BIZ_COST) return;
     state.credits-=BIZ_COST; tr2.biz[pl]=bz; rebuildTownAt(loc); sfx('confirm',.8);
     toast(BIZ[bz].name+' OPENS IN '+loc.name,'life'); CB.queue=cbPick(['New '+BIZ[bz].name.toLowerCase()+' just opened in '+loc.name+'. Freight’s gonna be flowing.','Somebody built a '+BIZ[bz].name.toLowerCase()+' out at '+loc.name+'. About time.']); }
+  else if(act==='homebuild'){ var c1=HOME_TIERS[1].cost; if(state.home || !isProject(loc) || state.credits<c1) return;
+    state.credits-=c1; state.home={key:loc.key, sys:loc.sys, planet:loc.planet, site:loc.site||0, name:loc.name, pname:loc.pname, sysName:loc.sysName, tier:1, spent:c1, ang:null};
+    rebuildTownAt(loc); sfx('confirm',.9); SND.good(); showBanner('HOME', HOME_TIERS[1].name, 'JUST OUTSIDE '+loc.name);
+    toast('YOUR HOME IS GOING UP OUTSIDE '+loc.name+' · FIND IT ON THE PLANET MAP','life');
+    CB.queue=cbPick(['Heard you put down roots out at '+loc.name+'. Welcome to the neighbourhood, driver.','A driver with a home to go back to. Don’t see that much out here.']); }
+  else if(act==='homeup'){ var HMu=state.home; if(!HMu || HMu.tier>=3) return; var cu=HOME_TIERS[HMu.tier+1].cost; if(state.credits<cu) return;
+    state.credits-=cu; HMu.tier++; HMu.spent+=cu; var hl2=locFromKey(HMu.key); if(hl2) rebuildTownAt(hl2); sfx('confirm',.9); SND.good();
+    toast('YOUR HOME IS NOW A '+HOME_TIERS[HMu.tier].name,'life'); if(loc.kind==='home') openTerminal(homeLoc()); }
+  else if(act==='homesell'){ var HMs=state.home; if(!HMs) return; if(coConfirm!=='home'){ coConfirm='home'; renderTerminal(); return; }
+    coConfirm=null; var back=Math.floor(HMs.spent/2), hl3=locFromKey(HMs.key); state.credits+=back; state.home=null; if(state.route && state.route.loc.kind==='home') cancelRoute('');
+    if(hl3) rebuildTownAt(hl3); toast('HOME SOLD · +'+fmt(back)+' UNITS'); if(loc.kind==='home'){ closeTerminal(); renderInv(); save(); return; } }
   else if(act==='project'){ var was=isProject(loc); if(state.route && state.route.project) cancelRoute('');
     setProject(was?null:loc); sfx('confirm',.6);
     toast(was?'PROJECT CLEARED':'PROJECT SET · '+loc.name+' · LOOK FOR ★ LOADS ON BOARDS','life');
@@ -4949,6 +5120,10 @@ function renderTowns(){
       L.forEach(function(l){ h+=townRowHTML(l); });
     });
   }
+  var HM=state.home; if(HM){ var hhere=SYS&&HM.sys===SYS.seed;
+    h='<div class="tw-row proj"><div class="tw-top"><span class="tw-name">⌂ HOME</span><span class="tag hi">'+HOME_TIERS[HM.tier].name+'</span></div>'+
+      '<div class="tw-meta">Outside '+HM.name+' · '+HM.pname+(hhere?'':' · '+HM.sysName+' system')+'</div>'+
+      '<div class="tw-acts"><button type="button" class="pri" data-tw-act="home">'+(hhere?'ROUTE HOME':'ROUTE HOME · WARP')+'</button></div></div>'+h; }
   $('twList').innerHTML=h;
   var mine=Object.keys(state.towns).filter(townTouched).length, ph=sharesPerHour();
   $('twSum').textContent=mine+' TOWN'+(mine===1?'':'S')+(ph?' · ~'+fmt(ph)+'/HR IN SHARES':'')+(state.project?' · ★ '+state.project.name:'');
@@ -4964,6 +5139,7 @@ $('twX').addEventListener('click',closeTowns); $('twClose').addEventListener('cl
 document.querySelector('.tw-tabs').addEventListener('click',function(e){ var b=e.target.closest('button'); if(!b) return; SND.click(); twView=b.dataset.tw; renderTowns(); });
 $('twList').addEventListener('click',function(e){
   var b=e.target.closest('button[data-tw-act]'); if(!b) return; SND.click();
+  if(b.dataset.twAct==='home'){ closeTowns(); startRoute(homeLoc()); return; }
   var loc=locFromKey(b.dataset.key); if(!loc) return;
   if(b.dataset.twAct==='proj'){ var was=isProject(loc); if(state.route && state.route.project) cancelRoute('');
     setProject(was?null:loc); toast(was?'PROJECT CLEARED':'PROJECT SET · '+loc.name+' · LOOK FOR ★ LOADS ON BOARDS','life');
@@ -5060,8 +5236,9 @@ function routeTick(dt){
   }
   if(state.dock || state.warp || state.spool) return;
   if(state.mode==='surface'){
-    var nt=S && nearestTown(state.pos.x,state.pos.z);
-    if(nt && nt.T.key===L.key && nt.d<40){ routeDone('ARRIVED · '+L.name+(R.project&&!isProject(L)?' · PROJECT LOADS AT THE TERMINAL':' · DELIVER AT THE TERMINAL')); }
+    var nt=S && (L.kind==='home'?nearestPad(state.pos.x,state.pos.z):nearestTown(state.pos.x,state.pos.z));
+    if(nt && L.kind==='home' && nt.T.home && nt.d<60){ routeDone('HOME · '+state.home.name); }
+    else if(nt && nt.T.key===L.key && nt.d<40){ routeDone('ARRIVED · '+L.name+(R.project&&!isProject(L)?' · PROJECT LOADS AT THE TERMINAL':' · DELIVER AT THE TERMINAL')); }
     return;
   }
   if(state.mode==='atmo' && state.landing){ return; }
@@ -5100,7 +5277,7 @@ function routeTick(dt){
     return;
   }
   if(state.mode==='atmo'){
-    if(L.sys===SYS.seed && L.kind==='town' && S && S.idx===L.planet){ startAtmoAutopilot(townByKey(L.key)); if(state.ap) state.ap.route=true; }
+    if(L.sys===SYS.seed && (L.kind==='town'||L.kind==='home') && S && S.idx===L.planet && (townByKey(L.key)||(L.kind==='home'&&townByKey(state.home.key)))){ startAtmoAutopilot(townByKey(L.key)||townByKey(state.home.key)); if(state.ap) state.ap.route=true; }
     else { startOrbitAutopilot(); if(state.ap) state.ap.route=true; }
   }
 }
@@ -5496,10 +5673,12 @@ var DISHES={ocean:['FISH FRY','KELP NOODLES','SMOKED EEL PLATE'], lush:['FRUIT S
   station:['CANTINA PROTEIN BOWL','HYDROPONIC SALAD','STATION BURGER'], outpost:['MESS HALL HASH','RECONSTITUTED CHILI']};
 function needsOn(){ return !state.needsOff; }
 function dishFor(loc){
+  if(loc.kind==='home') return 'Home cooking';
   var list=loc.kind==='station'?DISHES.station:loc.outpost?DISHES.outpost:(DISHES[(SYS.biomes[loc.planet]||{}).type]||DISHES.outpost);
   return list[ihash(SYS.seed+7,(loc.key||'').length*31+(loc.site||0)*7+(loc.planet||0))%list.length];
 }
 function placeRates(loc){
+  if(loc.kind==='home') return {meal:0, bed:0, bedName:'YOUR OWN BED'};
   if(loc.kind==='station') return {meal:50, bed:80, bedName:'CREW BUNK'};
   if(loc.outpost) return {meal:90, bed:60, bedName:'BUNKHOUSE COT'};
   return {meal:60, bed:120, bedName:'MOTEL ROOM'};
@@ -5564,7 +5743,7 @@ function sleep(kind, loc){
   if(paid){ var R=placeRates(loc); if(state.credits<R.bed) return; state.credits-=R.bed; }
   state.sleeping=true; var fd=$('fade'); fd.style.opacity=1;
   setTimeout(function(){
-    state.rest=paid?100:Math.max(state.rest,85); state.restedT=paid?900:0; state.food=Math.max(0,state.food-25); state.fedT=0; state.blinkT=0;
+    state.rest=paid?100:Math.max(state.rest,85); state.restedT=paid?(loc&&loc.kind==='home'?1500:900):0; state.food=Math.max(0,state.food-25); state.fedT=0; state.blinkT=0;
     state.cargo.forEach(function(c){ if(c.expires) c.expires-=240000; });
     if(S && S.day){ S.day.phase+=TAU*8/24; if(S.day.phase>Math.PI*1.5) S.day.phase-=TAU; }
     var ambush=kind==='space' && Math.random()<secOf(SYS.seed).pirates*.5 && state.cargo.length;
@@ -6145,7 +6324,7 @@ function destMarkersSurface(from){
 }
 
 /* ---------- planet autopilot: cruise (no boost) to a town, hug the terrain, set down on the pad ---------- */
-function townByKey(k){ return S?S.towns.filter(function(T){ return T.key===k; })[0]:null; }
+function townByKey(k){ if(k==='home') return homeT(); return S?S.towns.filter(function(T){ return T.key===k; })[0]:null; }
 function atmoCruise(){ return 26*speedMul()*HULL_HANDLING[hullTier()].spd; }
 function startAtmoAutopilot(T){
   if(state.mode!=='atmo' || state.landing || !T) return;
@@ -6248,7 +6427,7 @@ function land(onPad){
   if(state.landing) return;
   var sh=S.ship; setPrompt(null);
   state.vel.set(0,0,0);
-  var nt=onPad?nearestTown(sh.position.x,sh.position.z):null, T=nt?nt.T:null; onPad=!!T;
+  var nt=onPad?nearestPad(sh.position.x,sh.position.z):null, T=nt?nt.T:null; onPad=!!T;
   var x1=onPad?T.x:sh.position.x, z1=onPad?T.z:sh.position.z;
   var y1=(onPad?T.pad.y:S.heightAt(x1,z1))+hullGear(sh);
   landingSound(onPad?LAND_T.pad:LAND_T.ground);
@@ -6268,7 +6447,8 @@ function disembark(){
   state.mode='surface'; setModeUI('surface');
   camera.fov=68; camera.updateProjectionMatrix(); finalPass.uniforms.boost.value=0; state.fovKick=0;
   updateGrass(true);
-  if(onPad){ setTimeout(function(){ if(state.mode==='surface' && S) openTerminal(townLoc(S.idx,padT.j)); },900); }
+  if(onPad && padT.home){ setTimeout(function(){ showBanner('HOME', state.home?homeTier().name:'', state.home?state.home.name:''); },500); }
+  else if(onPad){ setTimeout(function(){ if(state.mode==='surface' && S) openTerminal(townLoc(S.idx,padT.j)); },900); }
   else if(!state.landedHere){ state.landedHere=true; toast('SHIP PARKED · FOLLOW THE BEACON OR RADAR TO RETURN'); }
 }
 function board(){
@@ -6311,6 +6491,7 @@ function updateSurface(dt){
   p.x=clamp(p.x,-WORLD_E,WORLD_E); p.z=clamp(p.z,-WORLD_E,WORLD_E);
   var gh=Math.max(S.heightAt(p.x,p.z), S.waterLevel-.6), nt=nearestTown(p.x,p.z);
   if(nt && nt.d<10.2) gh=Math.max(gh,nt.T.pad.y);
+  gh=Math.max(gh,homeGround(p.x,p.z));
   var ground=gh+1.7;
   var jet=inp.hold && state.energy>1;
   if(jet){ state.vy=Math.min(state.vy+dt*(26+3*lvl('jet')),9+1.5*lvl('jet')); state.energy=Math.max(0,state.energy-dt*22*(1-.25*lvl('jet'))); state.grounded=false; }
@@ -6363,6 +6544,7 @@ function updateSurface(dt){
 
   if(termLoc) setPrompt(null);
   else if(nt && Math.hypot(p.x-nt.T.kiosk.x,p.z-nt.T.kiosk.z)<4.5 && !state.terminalCool) setPrompt('CARGO TERMINAL',nt.T.name,function(){ openTerminal(townLoc(S.idx,nt.T.j)); });
+  else if(homeT() && Math.hypot(p.x-homeT().kiosk.x,p.z-homeT().kiosk.z)<3.5 && !state.terminalCool) setPrompt('HOME TERMINAL',homeTier().name,function(){ openTerminal(homeLoc()); });
   else if(dShip<boardR) setPrompt('BOARD SHIP','TAKE OFF',board);
   else setPrompt(null);
   veilHold=Math.max(0,veilHold-dt*.7); setVeil(veilHold,null,0);
@@ -6400,6 +6582,12 @@ function renderMapList(){
       row.addEventListener('click',function(){ if(flying){ startRoute(townLoc(S.idx,T.j||0)); return; } state.waypoint=state.waypoint===T.key?null:T.key; toast(state.waypoint?'WAYPOINT · '+T.name:'WAYPOINT CLEARED'); renderMapList(); drawMap(); });
       list.appendChild(row);
     });
+  var HT=homeT();
+  if(HT){ var hrow=document.createElement('button'), hd=Math.hypot(HT.x-f.x,HT.z-f.z), hfly=state.mode==='atmo' && !state.landing, hon=state.ap && state.ap.key==='home'; hrow.type='button'; hrow.className='wp-row home';
+    hrow.innerHTML='<span class="mp-ico" style="background:#e8c66a"></span><span class="wp-name">⌂ HOME</span><span class="wp-dist">'+fmtDist(hd)+'</span>'+
+      '<span class="wp-meta">'+homeTier().name+(hfly?(hon?' · <span style="color:var(--cyan)">AUTOPILOT ENGAGED</span>':' · TAP TO FLY HOME ON AUTOPILOT'):' · YOUR PRIVATE PAD')+'</span>';
+    hrow.addEventListener('click',function(){ if(hfly) startRoute(homeLoc()); });
+    list.insertBefore(hrow,list.children[state.mode==='atmo' && !state.landing?1:0]||null); }
 }
 function drawMap(){
   var cv=$('mapCv'), x=cv.getContext('2d'), W=cv.width, sc=W/(2*WORLD_E), f=mapFocus();
@@ -6418,6 +6606,10 @@ function drawMap(){
     x.beginPath(); x.moveTo(0,-10); x.lineTo(9,-1); x.lineTo(6,-1); x.lineTo(6,8); x.lineTo(-6,8); x.lineTo(-6,-1); x.lineTo(-9,-1); x.closePath(); x.fill();
     x.fillStyle='#eef6ff'; x.fillText(T.name,0,26); x.restore();
   });
+  var HT=homeT();
+  if(HT){ x.save(); x.translate(X(HT.lot.x),X(HT.lot.z)); x.fillStyle='#e8c66a'; x.shadowColor='rgba(0,0,0,.8)'; x.shadowBlur=6;
+    x.beginPath(); x.moveTo(0,-8); x.lineTo(7,-1); x.lineTo(5,-1); x.lineTo(5,6); x.lineTo(-5,6); x.lineTo(-5,-1); x.lineTo(-7,-1); x.closePath(); x.fill();
+    x.fillText('HOME',0,22); x.restore(); }
   if(state.mode==='surface'){ var sp=S.ship.position; x.fillStyle='#e7e1d2'; x.shadowColor='#e7e1d2'; x.shadowBlur=10; x.beginPath(); x.arc(X(sp.x),X(sp.z),5,0,TAU); x.fill(); x.shadowBlur=0; }
   x.save(); x.translate(X(f.x),X(f.z)); x.rotate(Math.PI-state.yaw); x.fillStyle='#eef6ff'; x.shadowColor='rgba(0,0,0,.9)'; x.shadowBlur=6;
   x.beginPath(); x.moveTo(0,-11); x.lineTo(8,8); x.lineTo(0,3); x.lineTo(-8,8); x.closePath(); x.fill(); x.restore();
@@ -6870,7 +7062,7 @@ async function boot(){
   frame();
   setTimeout(streamShipModels,1500);
 }
-window.__nh={town:{grow:function(loc,p){ return growTown(loc,p); }, rec:townRec, kit:function(){ return TOWN_KIT; }, prompt:kitPrompt, invest:investIn, shares:function(mins,eff){ return simShares(mins,eff==null?1:eff); }, terminal:openTerminal}, stationLoc:function(){ return stationLoc(); }, lineup:function(){ var sc=new THREE.Scene(); sc.background=new THREE.Color(.16,.165,.17); sc.environment=spaceScene.environment;
+window.__nh={town:{grow:function(loc,p){ return growTown(loc,p); }, rec:townRec, kit:function(){ return TOWN_KIT; }, prompt:kitPrompt, invest:investIn, home:{pt:function(){ return homeT(); }, loc:function(){ return homeLoc(); }, land:function(){ var H=homeT(); if(!H) return false; S.ship.position.set(H.x,H.pad.y+hullGear(S.ship),H.z); state.landing={t:1, pad:true, town:H, y0:H.pad.y+10, y1:H.pad.y}; disembark(); state.camFrom=null; return true; }}, shares:function(mins,eff){ return simShares(mins,eff==null?1:eff); }, terminal:openTerminal}, stationLoc:function(){ return stationLoc(); }, lineup:function(){ var sc=new THREE.Scene(); sc.background=new THREE.Color(.16,.165,.17); sc.environment=spaceScene.environment;
     sc.add(new THREE.HemisphereLight(0xdfe6ee,0x30302c,.8)); var dl=new THREE.DirectionalLight(0xffffff,2.2); dl.position.set(-30,50,40); sc.add(dl);
     var x=0; [0,1,4,2,3].forEach(function(t){ var h=buildHull(t,true,{value:.4}); var bb=new THREE.Box3().setFromObject(h); h.position.set(x-bb.min.x,-h.userData.gear,0); x+=bb.max.x-bb.min.x+3; sc.add(h); });
     var cam=new THREE.PerspectiveCamera(30,innerWidth/innerHeight,.1,1000); cam.position.set(x/2,22,x*.95); cam.lookAt(x/2,0,0); SHOWCASE={scene:sc, cam:cam, ground:new THREE.Object3D()}; },
