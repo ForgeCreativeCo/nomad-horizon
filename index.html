@@ -26,6 +26,7 @@
   --line:rgba(214,206,186,0.28);
   --cyan:#e7e1d2;
   --amber:#ffb24d;
+  --warp:#8fb8ff;
   --ink:#eef6ff;
   --ink-dim:#93a8c4;
   --font-display:'Chakra Petch','Eurostile','Arial Narrow',sans-serif;
@@ -199,6 +200,9 @@ button:focus-visible{outline:2px solid var(--cyan);outline-offset:3px;}
 .jobline{pointer-events:auto;cursor:pointer;padding:.12rem 0;}
 .jobline .go{display:inline-block;margin-left:.4rem;padding:0 .35rem;border:1px solid rgba(255,178,77,.55);border-radius:99px;font-size:.52rem;letter-spacing:.12em;}
 .jobline.on .go{background:var(--amber);color:#170c02;border-color:var(--amber);}
+.jobline.warp{color:var(--warp);} .jobline.warp .go{border-color:rgba(143,184,255,.55);} .jobline.warp.on .go{background:var(--warp);color:#06101f;border-color:var(--warp);}
+.jobline.late{color:#ff7a5a;}
+.jobline.proj{color:#e8c66a;margin-bottom:.15rem;} .jobline.proj .go{border-color:rgba(232,198,106,.6);} .jobline.proj.on .go{background:#e8c66a;color:#170c02;border-color:#e8c66a;}
 #cbBtn{position:absolute;right:11.2rem;top:calc(3.4rem + env(safe-area-inset-top,0px));pointer-events:auto;width:2.2rem;height:2.2rem;padding:0;border-radius:50%;
   display:flex;align-items:center;justify-content:center;color:var(--cyan);cursor:pointer;font-family:var(--font-display);font-weight:700;font-size:.6rem;letter-spacing:.04em;}
 #cbBtn.off{color:var(--ink-dim);text-decoration:line-through;}
@@ -316,7 +320,12 @@ button:focus-visible{outline:2px solid var(--cyan);outline-offset:3px;}
 .wp-drop{grid-column:2 / 4;font-family:var(--font-mono);font-size:.6rem;letter-spacing:.1em;color:var(--amber);}
 #btnWarp.spooling{color:#04121a;background:radial-gradient(circle,#f0ebe0,var(--cyan));box-shadow:0 0 24px rgba(231,225,210,.8);font-variant-numeric:tabular-nums;}
 #btnWarp.has-drop::after{content:"";position:absolute;top:.5rem;right:.55rem;width:.6rem;height:.6rem;border-radius:50%;background:var(--amber);box-shadow:0 0 10px var(--amber);}
-.st-row .nm small.fx .xs{color:var(--amber);}
+.st-row .nm small.fx .xs{color:var(--warp);}
+.st-row.job.warp{box-shadow:inset 3px 0 0 var(--warp);} .st-row.job.warp .nm small{color:var(--warp);}
+.st-row.job.proj{box-shadow:inset 3px 0 0 #e8c66a;}
+.tag.k-run{color:#06101f;background:var(--warp);}
+.st-note.legend i{display:inline-block;width:.6rem;height:.6rem;margin:0 .35rem 0 .1rem;vertical-align:-.05rem;border-radius:2px;}
+.st-note.legend .lg-warp{background:var(--warp);} .st-note.legend .lg-proj{background:#e8c66a;}
 .wp-meta{grid-column:2 / 4;font-family:var(--font-mono);font-size:.6rem;letter-spacing:.06em;color:var(--ink-dim);}
 #navPanel{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:30;width:min(92vw,27rem);max-height:84%;overflow:hidden;
   padding:1rem;pointer-events:auto;display:flex;flex-direction:column;gap:.55rem;background:rgba(6,11,22,.86);}
@@ -3298,14 +3307,14 @@ try{
   if(sv){
     state.credits=sv.credits||0; state.found=sv.found||{}; state.sysSeed=sv.sys||0; state.up=sv.up||{}; state.cargo=sv.cargo||[]; state.taken=sv.taken||{}; state.boardGen=sv.boardGen||{}; state.delivered=sv.delivered||0; state.towns=sv.towns||{};
     state.mods=sv.mods||[]; state.modsOwned=sv.modsOwned||{}; state.lic=sv.lic||{}; state.fuel=sv.fuel; state.hull=sv.hull==null?100:sv.hull; state.company=sv.company||null; state.hullSel=sv.hullSel==null?null:sv.hullSel; state.rooks=sv.rooks||{}; retireWedge(sv); state.fits=sv.fits||{}; state.fuelReserve=sv.fuelReserve||0; state.cleared=sv.cleared===undefined?(sv.sys||0):sv.cleared; state.heat=sv.heat||{}; state.flares=sv.flares==null?3:sv.flares;
-    state.food=sv.food==null?100:sv.food; state.rest=sv.rest==null?100:sv.rest; state.rations=sv.rations==null?2:sv.rations; state.fedT=sv.fedT||0; state.restedT=sv.restedT||0; state.needsOff=!!sv.needsOff; state.shareLast=sv.shareLast==null?null:sv.shareLast; state.shareAcc=sv.shareAcc||0;
+    state.food=sv.food==null?100:sv.food; state.rest=sv.rest==null?100:sv.rest; state.rations=sv.rations==null?2:sv.rations; state.fedT=sv.fedT||0; state.restedT=sv.restedT||0; state.needsOff=!!sv.needsOff; state.shareLast=sv.shareLast==null?null:sv.shareLast; state.shareAcc=sv.shareAcc||0; state.project=sv.project||null;
     Object.keys(sv.inv||{}).forEach(function(k){ var nk=OLD_KEYS[k]||k; if(ELEMENTS[nk]) state.inv[nk]=(state.inv[nk]||0)+sv.inv[k]; });
   }
 }catch(e){}
 drawThrottle();
 function save(){ try{ localStorage.setItem('nh_save',JSON.stringify({credits:state.credits,inv:state.inv,found:state.found,sys:state.sysSeed,up:state.up,cargo:state.cargo,taken:state.taken,boardGen:state.boardGen,delivered:state.delivered,towns:state.towns,
   mods:state.mods,modsOwned:state.modsOwned,lic:state.lic,fuel:state.fuel,hull:state.hull,company:state.company,hullSel:state.hullSel,rooks:state.rooks,fits:state.fits,fuelReserve:state.fuelReserve,cleared:state.cleared,heat:state.heat,flares:state.flares,
-  food:state.food,rest:state.rest,rations:state.rations,fedT:state.fedT,restedT:state.restedT,needsOff:state.needsOff,shareLast:state.shareLast,shareAcc:state.shareAcc})); }catch(e){} }
+  food:state.food,rest:state.rest,rations:state.rations,fedT:state.fedT,restedT:state.restedT,needsOff:state.needsOff,shareLast:state.shareLast,shareAcc:state.shareAcc,project:state.project})); }catch(e){} }
 
 function toast(msg, cls){ if(typeof SND!=='undefined' && state.mode!=='title' && !(typeof AU!=='undefined' && AU.hush)){ if(cls==='life') SND.good(); else SND.blip(); } var el=document.createElement('div'); el.className='toast'+(cls?' '+cls:''); el.textContent=msg; $('toastWrap').appendChild(el); setTimeout(function(){ el.remove(); },2400); }
 function renderInv(){
@@ -3317,8 +3326,19 @@ function renderInv(){
   var groups={};
   state.cargo.forEach(function(c){ var k=c.dest.key; if(!groups[k]) groups[k]={d:c.dest, n:0, tl:'', frag:false}; var g=groups[k]; g.n+=c.crates;
     var tl=timeLeft(c); if(tl && (!g.tl || tl<g.tl)) g.tl=tl; if(c.kind==='fragile') g.frag=true; });
-  Object.keys(groups).forEach(function(k){ var g=groups[k], c=document.createElement('div'), on=state.route && state.route.loc.key===g.d.key; c.className='jobline'+(g.tl==='LATE'?' late':'')+(on?' on':'');
-    c.textContent='\u25b8 '+g.n+' \u2192 '+g.d.name+(SYS && g.d.sys!==SYS.seed?' ('+g.d.sysName+')':'')+(g.tl?' \u00b7 '+g.tl:'');
+  if(state.project){ var P=state.project, here=projectLoc(), pr=townRec(P), pc=document.createElement('div'), pon=!!(state.route && state.route.project), pb=here?projectBoards().length:0;
+    pc.className='jobline proj'+(pon?' on':'');
+    pc.textContent='\u2605 PROJECT \u00b7 '+P.name+' \u00b7 '+(pr.lvl>=3?'CITY':TOWN_LVLS[pr.lvl]+' '+Math.round(townProgress(P)*100)+'%')+
+      (here?(pb?' \u00b7 LOADS AT '+pb+' STOP'+(pb>1?'S':''):' \u00b7 NO LOADS POSTED'):' \u00b7 WARP '+P.sysName);
+    var pg=document.createElement('span'); pg.className='go'; pg.textContent=pon?'ROUTE ON':here?'FIND LOAD':'GO'; pc.appendChild(pg);
+    pc.addEventListener('click',function(e){ e.stopPropagation(); projectTap(); });
+    row.appendChild(pc); }
+  // jobs in this system first, then warp jobs grouped by system, so the list reads as a route
+  var gk=Object.keys(groups), far=function(d){ return SYS && d.sys!==SYS.seed; };
+  gk.sort(function(a,b){ var A=groups[a].d, B=groups[b].d; return (far(A)-far(B)) || (far(A)?String(A.sysName).localeCompare(B.sysName):0); });
+  gk.forEach(function(k){ var g=groups[k], c=document.createElement('div'), on=state.route && !state.route.project && state.route.loc.key===g.d.key, fr=far(g.d);
+    c.className='jobline'+(fr?' warp':'')+(g.tl==='LATE'?' late':'')+(on?' on':'');
+    c.textContent='\u25b8 '+g.n+' \u2192 '+(isProject(g.d)?'\u2605 ':'')+g.d.name+(fr?' \u00b7 WARP '+g.d.sysName:'')+(g.tl?' \u00b7 '+g.tl:'');
     var go=document.createElement('span'); go.className='go'; go.textContent=on?'ROUTE ON':'AUTO'; c.appendChild(go);
     c.addEventListener('click',function(e){ e.stopPropagation(); if(state.route && state.route.loc.key===g.d.key){ apOff(''); cancelRoute('ROUTE CANCELLED'); } else startRoute(g.d); });
     row.appendChild(c); });
@@ -3755,7 +3775,7 @@ function remoteLoc(seed, r){
 }
 function boardOffers(loc){
   var g=state.boardGen[loc.key]||0, r=rng(ihash(ihash(SYS.seed+11,loc.planet+20+(loc.site||0)*100),g*31+7));
-  var others=locations().filter(function(l){ return l.key!==loc.key; }), out=[], nbs=neighbourSeeds(SYS.seed,3);
+  var others=locations().filter(function(l){ return l.key!==loc.key; }), out=projectOffers(loc,g), nbs=neighbourSeeds(SYS.seed,3);
   if(!others.length) return out;
   var nOff=4+(loc.kind==='town'?Math.max(0,townLevel(loc)-1):1);
   for(var k=0;k<nOff;k++){
@@ -3880,6 +3900,47 @@ function holdingsHTML(curKey){
       '<small>'+(t.pname?t.pname+' · ':'')+(t.sysName?t.sysName+' system · ':'')+'stake '+fmt(t.inv)+' units · paid '+fmt(Math.round(t.earned||0))+'</small>'+
       '<small class="fx">~'+fmt(shareRate(t))+' units/hr</small></span></div>'; });
   return h;
+}
+/* Project town: one town you're building up. Every board in its system keeps a slot or two for loads going
+   there (construction while it grows, its businesses' wants once they're open), at standard rates. */
+function projectLoc(){ var p=state.project; return p && SYS && p.sys===SYS.seed ? p : null; }
+function isProject(d){ return !!(state.project && d && d.key===state.project.key); }
+function setProject(loc){
+  state.project=loc?{key:loc.key, kind:'town', name:loc.name, label:loc.label, planet:loc.planet, site:loc.site, outpost:loc.outpost, pname:loc.pname, sys:loc.sys, sysName:loc.sysName}:null;
+}
+function projectOffers(loc, g){
+  var P=projectLoc(); if(!P || loc.key===P.key) return [];
+  var tr=townRec(P), wants=(tr.biz||[]).filter(Boolean), out=[], n=loc.kind==='station'?2:1;
+  var r=rng(ihash(ihash(SYS.seed+53,loc.planet+20+(loc.site||0)*100),g*31+11));
+  for(var k=0;k<n;k++){
+    var id=loc.key+':'+g+':p'+k, kind='construction', names=CARGO_NAMES.construction, bizTag=null;
+    if(tr.lvl>=3 || (wants.length && r()<.35)){ if(!wants.length) break; bizTag=wants[Math.floor(r()*wants.length)]; kind=BIZ[bizTag].wantKind; names=BIZ[bizTag].want; }
+    var crates=r()<.5?2:1, dist=locDist(loc,P), nm=names[Math.floor(r()*names.length)];
+    if(state.taken[id]) continue;
+    var reward=Math.round((210+dist*.55)*KIND_MULT[kind]*(crates===2?1.75:1)*(1+.08*tr.lvl)*(bizTag?1.35:1)/10)*10;
+    out.push({id:id, kind:kind, biz:bizTag, name:nm, crates:crates, reward:reward, from:loc.name, dest:bizTag?Object.assign({},P,{biz:bizTag}):P, ly:0, limit:0});
+  }
+  return out;
+}
+/* boards in this system with a project load waiting, nearest first */
+function projectBoards(){
+  var P=projectLoc(); if(!P) return [];
+  var pi=-1; if(S) Object.keys(surfaces).forEach(function(k){ if(surfaces[k]===S) pi=+k; });
+  var from=pi>=0?SYS.planets[pi].pos:ship.position;
+  return locations().filter(function(l){ return l.key!==P.key; }).map(function(l){
+    var n=projectOffers(l,state.boardGen[l.key]||0).length, d;
+    if(pi>=0 && l.kind==='town' && l.planet===pi){ var st=planetTerrain(SYS.biomes[pi]).sites[l.site||0]; d=Math.hypot(st.x-S.ship.position.x,st.z-S.ship.position.z)*1e-3; }
+    else d=from.distanceTo(locPos(l));
+    return {loc:l, n:n, d:d};
+  }).filter(function(b){ return b.n>0; }).sort(function(a,b){ return a.d-b.d; });
+}
+function projectTap(){
+  var P=state.project; if(!P) return;
+  if(state.route && state.route.project){ apOff(''); cancelRoute('ROUTE CANCELLED'); return; }
+  if(!projectLoc()){ startRoute(P); state.route.project=true; renderInv(); return; }
+  var B=projectBoards();
+  if(!B.length){ toast('NO '+P.name+' LOADS POSTED RIGHT NOW · THEY COME BACK AS BOARDS REFRESH'); return; }
+  startRoute(B[0].loc); state.route.project=true; renderInv();
 }
 /* Fleet runs grow towns: each finished run drops at a town in the system you're in (long hauls sometimes
    cross to a neighbouring system), and about half of them add growth there; while you're away, a quarter. */
@@ -4322,16 +4383,21 @@ function renderTerminal(tab){
     var other=state.cargo.filter(function(c){ return c.dest.key!==loc.key; });
     if(other.length){
       h+='<div class="st-sub">IN YOUR HOLD</div>';
-      other.forEach(function(c){ var tl=timeLeft(c);
-        h+='<div class="st-row job"><span class="nm">'+c.name+tagHTML(c.kind,c.grade)+'<small>To '+destLabel(c.dest)+'</small>'+
+      other.forEach(function(c){ var tl=timeLeft(c), fr=SYS&&c.dest.sys!==SYS.seed;
+        h+='<div class="st-row job'+(fr?' warp':'')+(isProject(c.dest)?' proj':'')+'"><span class="nm">'+(isProject(c.dest)?'★ ':'')+c.name+tagHTML(c.kind,c.grade)+'<small>To '+destLabel(c.dest)+'</small>'+
           '<small class="fx">'+fmt(cargoPay(c).pay)+' units'+(tl?' · '+tl+' left':'')+(c.kind==='fragile'?' · condition '+Math.round(c.cond*100)+'%':'')+'</small></span></div>'; });
     }
     var offers=boardOffers(loc);
     h+='<div class="st-sub">CONTRACTS FROM '+loc.name+'</div>';
     if(!offers.length) h+='<p class="st-note">No contracts posted right now.</p>';
+    var anyW=offers.some(function(o){ return o.ly; }), anyP=offers.some(function(o){ return isProject(o.dest); });
+    if(anyW||anyP) h+='<p class="st-note legend">'+(anyW?'<i class="lg-warp"></i>Blue jobs need a warp to another system. ':'')+(anyP?'<i class="lg-proj"></i>★ Gold jobs build '+state.project.name+'.':'')+'</p>';
+    var runs={}; remoteDests().forEach(function(d){ runs[d.sys]=1; });
+    var rank=function(o){ return isProject(o.dest)?0:o.ly?2:1; };
+    offers=offers.map(function(o,i){ return {o:o, i:i}; }).sort(function(a,b){ return rank(a.o)-rank(b.o) || a.i-b.i; }).map(function(x){ return x.o; });
     offers.forEach(function(o){
-      var fits=used+o.crates<=cap, need=kindNeeds(o.kind);
-      h+='<div class="st-row job'+(need?' locked':'')+'"><span class="nm">'+o.name+tagHTML(o.kind,o.grade)+'<small>'+o.crates+' crate'+(o.crates>1?'s':'')+' to '+destLabel(o.dest)+'</small>'+
+      var fits=used+o.crates<=cap, need=kindNeeds(o.kind), pj=isProject(o.dest);
+      h+='<div class="st-row job'+(need?' locked':'')+(o.ly?' warp':'')+(pj?' proj':'')+'"><span class="nm">'+(pj?'★ ':'')+o.name+tagHTML(o.kind,o.grade)+(o.ly&&runs[o.dest.sys]?'<span class="tag k-run">ON YOUR '+o.dest.sysName+' RUN</span>':'')+'<small>'+o.crates+' crate'+(o.crates>1?'s':'')+' to '+destLabel(o.dest)+'</small>'+
         '<small class="fx">'+(o.ly?'<span class="xs">WARP '+o.ly+' LY</span> ':'')+'Pays '+fmt(o.reward)+' units'+(o.limit?' · '+Math.round(o.limit/60)+' min limit':'')+(o.kind==='fragile'?' · pay drops if you crash':'')+'</small></span>'+
         '<span class="acts"><button class="pri" data-act="accept" data-id="'+o.id+'"'+(fits&&!need?'':' disabled')+'>'+(need?need:fits?'LOAD':'HOLD FULL')+'</button></span></div>';
     });
@@ -4340,6 +4406,11 @@ function renderTerminal(tab){
     h+='<div class="co-head"><span><b>'+loc.name+'</b><small>'+townTitle(loc)+(loc.outpost&&lv>0?' · FOUNDED AS A '+(loc.label||'OUTPOST'):'')+' · '+loc.pname+'</small></span></div>';
     h+='<div class="st-row"><span class="nm">'+(lv<3?'GROWTH TO '+TOWN_LVLS[lv+1]:'FULLY GROWN')+'<small>'+(lv<3?tr.g+' / '+need+' growth':'This is a city. Bigger boards, better pay.')+'</small>'+
       '<span class="gauge"><span class="bar"><i style="width:'+pct+'%;background:#c9a24a"></i></span><b>'+pct+'%</b></span></span></div>';
+    var pjHere=isProject(loc), pjNone=pjHere && lv>=3 && !(tr.biz||[]).some(Boolean);
+    h+='<div class="st-row upg'+(pjHere?' hangar-on':'')+'"><span class="nm">'+(pjHere?'★ YOUR PROJECT<span class="tag hi">FOCUS</span>':'MAKE THIS YOUR PROJECT')+
+      '<small>'+(pjHere?(pjNone?'A city with no businesses has nothing left to ask for: open a business to keep loads coming.':'Every board in the '+loc.sysName+' system keeps a slot for loads to '+loc.name+'. Tap the ★ line on your HUD to fly to the nearest one.')
+        :'Boards across the system will always post loads for '+loc.name+', marked in gold.'+(state.project?' Replaces '+state.project.name+'.':''))+'</small></span>'+
+      '<span class="acts"><button'+(pjHere?'':' class="pri"')+' data-act="project">'+(pjHere?'STOP':'SET PROJECT')+'</button></span></div>';
     h+='<p class="st-note">Every crate you deliver here grows '+loc.name+'. <b>Construction</b> loads count triple, and growing towns post more of them on boards across the system.'+(state.company?' Your company’s runs grow it too.':'')+'</p>';
     if(tr.fleet) h+='<p class="st-note">'+(state.company?state.company.name:'Your fleet')+' has brought <b>'+fmt(tr.fleet)+' growth</b> to '+loc.name+'.</p>';
     var steps=[['SETTLEMENT','A full town core: more homes, more residents, a busier pad.'],['TOWN','A new district ring: housing and industry blocks, a ring road with traffic. More contracts, +16% pay.'],['CITY','An outer city ring of taller blocks. The biggest boards in the system, +24% pay.']];
@@ -4540,6 +4611,10 @@ $('stationPanel').addEventListener('click',function(e){
     if(!BIZ[bz] || pl>=BIZ_PLOTS[tr2.lvl] || tr2.biz[pl] || tr2.biz.indexOf(bz)>=0 || state.credits<BIZ_COST) return;
     state.credits-=BIZ_COST; tr2.biz[pl]=bz; rebuildTownAt(loc); sfx('confirm',.8);
     toast(BIZ[bz].name+' OPENS IN '+loc.name,'life'); CB.queue=cbPick(['New '+BIZ[bz].name.toLowerCase()+' just opened in '+loc.name+'. Freight’s gonna be flowing.','Somebody built a '+BIZ[bz].name.toLowerCase()+' out at '+loc.name+'. About time.']); }
+  else if(act==='project'){ var was=isProject(loc); if(state.route && state.route.project) cancelRoute('');
+    setProject(was?null:loc); sfx('confirm',.6);
+    toast(was?'PROJECT CLEARED':'PROJECT SET · '+loc.name+' · LOOK FOR ★ LOADS ON BOARDS','life');
+    if(!was) CB.queue=cbPick(['Heard you’re building up '+loc.name+'. I’ll keep an ear out for loads headed that way.','So '+loc.name+' is your town now, huh? Good place to put down roots.']); }
   else if(act==='invest'){ var ia=+t.dataset.amt, ir=investIn(loc,ia); if(!ir) return;
     SND.cash(); toast('INVESTED '+fmt(ia)+' IN '+loc.name+(ir.pts?' · +'+ir.pts+' GROWTH':''),'life');
     if(ir.grew==null) CB.queue=cbPick(['Word is somebody’s putting real money into '+loc.name+'. Cranes going up.','Fresh money in '+loc.name+'. Expect more work out that way.']); }
@@ -4820,7 +4895,7 @@ function routeTick(dt){
   if(state.dock || state.warp || state.spool) return;
   if(state.mode==='surface'){
     var nt=S && nearestTown(state.pos.x,state.pos.z);
-    if(nt && nt.T.key===L.key && nt.d<40){ routeDone('ARRIVED · '+L.name+' · DELIVER AT THE TERMINAL'); }
+    if(nt && nt.T.key===L.key && nt.d<40){ routeDone('ARRIVED · '+L.name+(R.project&&!isProject(L)?' · PROJECT LOADS AT THE TERMINAL':' · DELIVER AT THE TERMINAL')); }
     return;
   }
   if(state.mode==='atmo' && state.landing){ return; }
