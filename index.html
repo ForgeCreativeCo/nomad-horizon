@@ -4035,6 +4035,153 @@ function buildHome(scene, b, site, key, M){
     lot:{x:sp.x, z:sp.z, rot:rot, w:w, d:d, y:fy, ramp:ramp}, door:dw, kiosk:new THREE.Vector3(kw.x,fy,kw.z)};
   return {group:g, pt:pt, rigs:spare};
 }
+/* ---------- inside your home: its own small scene, walked on foot. Rooms are rectangles you can walk in, joined by
+   doorways; walls and furniture block you. The bed, kitchen, terminal and workbench work like their outside versions. ---------- */
+function homeWindowTex(night){
+  var c=document.createElement('canvas'); c.width=256; c.height=128; var x=c.getContext('2d'), gr=x.createLinearGradient(0,0,0,128);
+  if(night){ gr.addColorStop(0,'#03050b'); gr.addColorStop(.7,'#0d1220'); gr.addColorStop(1,'#151a24'); } else { gr.addColorStop(0,'#8fa6b8'); gr.addColorStop(.62,'#d4c8ae'); gr.addColorStop(1,'#b9ad92'); }
+  x.fillStyle=gr; x.fillRect(0,0,256,128);
+  if(night){ x.fillStyle='rgba(255,255,255,.8)'; for(var i=0;i<40;i++) x.fillRect(Math.random()*256,Math.random()*80,1,1); }
+  x.fillStyle=night?'#07080b':'#5e5a4f'; x.beginPath(); x.moveTo(0,128); for(var k=0;k<=16;k++) x.lineTo(k*16,92+Math.sin(k*1.7)*9+Math.sin(k*.6)*7); x.lineTo(256,128); x.fill();
+  if(night){ x.fillStyle='#ffb24d'; for(var j=0;j<6;j++) x.fillRect(30+j*37,100+(j%3)*4,2,2); }
+  var t=new THREE.CanvasTexture(c); t.encoding=THREE.sRGBEncoding; return t;
+}
+function homeWallTex(){
+  var c=document.createElement('canvas'); c.width=1024; c.height=512; var x=c.getContext('2d');
+  x.fillStyle='#1b1813'; x.fillRect(0,0,1024,512); x.strokeStyle='#c9a24a'; x.lineWidth=6; x.strokeRect(14,14,996,484);
+  x.fillStyle='#e8c66a'; x.font='bold 54px "Barlow Condensed","Arial Narrow",sans-serif'; x.fillText('ON THE ROAD',48,92);
+  var cities=Object.keys(state.towns).filter(function(k){ return state.towns[k].lvl>=3; }).length, grown=Object.keys(state.towns).filter(function(k){ return state.towns[k].lvl>=2; }).length;
+  var rows=[[fmt(state.delivered||0),'CRATES DELIVERED'],[String(grown),'TOWNS GROWN'],[String(cities),'CITIES BUILT'],[String(holdings().length),'TOWNS YOU HOLD SHARES IN']];
+  if(state.company) rows.push([String(state.company.ships.length),state.company.name+' SHIPS']);
+  x.font='bold 64px "IBM Plex Mono", monospace';
+  rows.forEach(function(r,i){ x.fillStyle='#eef6ff'; x.font='bold 60px "IBM Plex Mono", monospace'; x.fillText(r[0],48,170+i*70); x.fillStyle='#93a8c4'; x.font='500 30px "IBM Plex Mono", monospace'; x.fillText(r[1],300,162+i*70); });
+  var t=new THREE.CanvasTexture(c); t.encoding=THREE.sRGBEncoding; return t;
+}
+function buildInterior(tier){
+  var sc=new THREE.Scene(), T=stationTextures(), walk=[], block=[], spots=[], H=tier===3?3.2:tier===2?3:2.9, night=S?(S.dayF||0)<.35:false;
+  sc.background=new THREE.Color(.02,.02,.025);
+  var wallM=new THREE.MeshStandardMaterial({color:lin('#a39b8c'), map:texRep(T.plate,2,1), roughness:.8, metalness:.1});
+  var floorM=new THREE.MeshStandardMaterial({color:lin('#4d4740'), map:texRep(T.plate,4,4), roughness:.75, metalness:.15});
+  var ceilM=new THREE.MeshStandardMaterial({color:lin('#2f3032'), roughness:.9});
+  var trim=new THREE.MeshStandardMaterial({color:lin('#9c4f2b'), roughness:.6, metalness:.3});
+  var dark=new THREE.MeshStandardMaterial({color:lin('#2b2c2d'), roughness:.55, metalness:.5});
+  var wood=new THREE.MeshStandardMaterial({color:lin('#5a4634'), roughness:.7});
+  var metal=new THREE.MeshStandardMaterial({color:lin('#8d9093'), roughness:.35, metalness:.8});
+  var fab=[lin('#6b5a48'),lin('#3f4c55'),lin('#7a3e2a'),lin('#5a6247')].map(function(c){ return new THREE.MeshStandardMaterial({color:c, roughness:.95}); });
+  var screenM=new THREE.MeshBasicMaterial({color:new THREE.Color(1.5,.95,.35)}), lampM=new THREE.MeshBasicMaterial({color:new THREE.Color(2.2,1.6,.9)});
+  var winM=new THREE.MeshBasicMaterial({map:homeWindowTex(night)}), glass=new THREE.MeshStandardMaterial({color:lin('#9fb1bd'), metalness:.5, roughness:.05, transparent:true, opacity:.18});
+  sc.add(new THREE.HemisphereLight(0xffe6c8,0x30281e,.35));
+  function box(w,h,d,m,x,y,z,blk){ var o=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),m); o.position.set(x,y,z); sc.add(o); if(blk) block.push([x-w/2,z-d/2,x+w/2,z+d/2]); return o; }
+  function plane(w,h,m,x,y,z,ry){ var o=new THREE.Mesh(new THREE.PlaneGeometry(w,h),m); o.position.set(x,y,z); o.rotation.y=ry||0; sc.add(o); return o; }
+  function room(x0,z0,x1,z1,lamp){ box(x1-x0,.1,z1-z0,floorM,(x0+x1)/2,-.05,(z0+z1)/2); box(x1-x0,.1,z1-z0,ceilM,(x0+x1)/2,H+.05,(z0+z1)/2); walk.push([x0,z0,x1,z1]);
+    if(lamp!==false){ var cx=(x0+x1)/2, cz=(z0+z1)/2; box(.9,.06,.9,lampM,cx,H-.03,cz); var L=new THREE.PointLight(0xffd2a0,lamp||2.4,Math.max(x1-x0,z1-z0)*1.6,2); L.position.set(cx,H-.4,cz); sc.add(L); } }
+  function door(x,z,alongX){ walk.push(alongX?[x-.55,z-.6,x+.55,z+.6]:[x-.6,z-.55,x+.6,z+.55]); }
+  // a wall along X (at z) or along Z (at x), with doorway gaps [centre, width]; lintels over the gaps
+  function wall(axis,at,a0,a1,gaps,m){ gaps=(gaps||[]).slice().sort(function(p,q){ return p[0]-q[0]; }); var cur=a0, segs=[];
+    gaps.forEach(function(g){ segs.push([cur,g[0]-g[1]/2]); cur=g[0]+g[1]/2; }); segs.push([cur,a1]);
+    segs.forEach(function(s){ var L=s[1]-s[0]; if(L<=.01) return; var c=(s[0]+s[1])/2; if(axis==='x') box(L,H,.2,m||wallM,c,H/2,at); else box(.2,H,L,m||wallM,at,H/2,c); });
+    gaps.forEach(function(g){ var lh=H-2.3; if(axis==='x') box(g[1],lh,.2,wallM,g[0],2.3+lh/2,at); else box(.2,lh,g[1],wallM,at,2.3+lh/2,g[0]); });
+    if(!m){ if(axis==='x') box(a1-a0,.12,.22,trim,(a0+a1)/2,.06,at); else box(.22,.12,a1-a0,trim,at,.06,(a0+a1)/2); } }
+  // a window on a wall's inside face: a dark frame flush with the wall, the view just in front of it (ry turns it to face the room)
+  function win(x,z,ry,w,h){ var nx=Math.sin(ry), nz=Math.cos(ry); box(ry?.02:w+.16,h+.16,ry?w+.16:.02,dark,x-nx*.015,1.6,z-nz*.015); plane(w,h,winM,x,1.6,z,ry); }
+  function spot(x,z,r,label,sub,fn){ spots.push({x:x,z:z,r:r,label:label,sub:sub,fn:fn}); }
+  function bed(x,z,w,l,alongX){ var bw=alongX?l:w, bd=alongX?w:l; box(bw,.42,bd,wood,x,.21,z,true); box(bw-.1,.18,bd-.1,fab[0],x,.51,z); box(alongX?.5:bw-.3,.14,alongX?bd-.3:.5,new THREE.MeshStandardMaterial({color:lin('#d8d2c4'), roughness:.9}),alongX?x-bw/2+.35:x,.66,alongX?z:z-bd/2+.35);
+    box(alongX?bw*.55:bw-.06,.05,alongX?bd-.06:bd*.55,fab[1],alongX?x+bw*.2:x,.62,alongX?z:z+bd*.2); }
+  function chair(x,z,m){ box(.45,.05,.45,m||wood,x,.46,z); box(.45,.5,.05,m||wood,x,.72,z-.2); [[-.2,-.2],[.2,-.2],[-.2,.2],[.2,.2]].forEach(function(o){ box(.04,.46,.04,dark,x+o[0],.23,z+o[1]); }); }
+  function table(x,z,w,d){ box(w,.06,d,wood,x,.74,z,true); [[-1,-1],[1,-1],[-1,1],[1,1]].forEach(function(o){ box(.06,.72,.06,dark,x+o[0]*(w/2-.08),.36,z+o[1]*(d/2-.08)); }); }
+  function kitchen(x,z,len,alongX,frx,frz){ var w=alongX?len:.8, d=alongX?.8:len; box(w,.92,d,wallM,x,.46,z,true); box(w+.04,.05,d+.04,dark,x,.945,z);
+    box(alongX?.62:.6,.03,alongX?.6:.62,new THREE.MeshStandardMaterial({color:lin('#151515'), roughness:.4, metalness:.6}),x+(alongX?len/2-.5:0),.98,z+(alongX?0:-len/2+.5));
+    box(alongX?len:.42,.7,alongX?.42:len,fab[3],x+(alongX?0:(x>0?.2:-.2)),2.05,z+(alongX?(z>0?.2:-.2):0)); box(.8,1.9,.8,metal,frx,.95,frz,true); }
+  function sofa(x,z,len,face){ var w=face?len:.9, d=face?.9:len; box(w,.45,d,fab[2],x,.225,z,true); var bx=face?0:(face===0?-.38:.38), bz=face?(face>0?-.38:.38):0;
+    box(face?len:.18,.5,face?.18:len,fab[2],x+bx,.65,z+bz); }
+  function terminal(x,z,ry){ var dsk=box(ry?.7:1.4,.75,ry?1.4:.7,dark,x,.375,z,true); var sx=x+(ry?(x>0?.3:-.3):0), sz=z+(ry?0:(z>0?.3:-.3)); var s0=plane(.8,.5,screenM,sx,1.25,sz,ry?(x>0?-Math.PI/2:Math.PI/2):(z>0?Math.PI:0)); }
+  function addLamp(x,y,z,i){ var L=new THREE.PointLight(0xffc890,i||1.6,9,2); L.position.set(x,y,z); sc.add(L); box(.25,.25,.25,lampM,x,y,z); }
+  var sleepFn=function(){ sleep('paid',homeLoc()); }, eatFn=function(){ eatMeal(homeLoc()); if(state.rations<6){ state.rations=6; renderNeeds(); toast('PANTRY · RATION PACKS RESTOCKED'); } save(); };
+  var termFn=function(){ openTerminal(homeLoc()); }, shopFn=function(){ openTerminal(homeLoc()); renderTerminal('services'); }, outFn=function(){ exitHome(); };
+  var spawn, exitAt;
+  if(tier===1){
+    room(-5,-3.5,5,3.5,2.6);
+    wall('x',-3.5,-5,5); wall('x',3.5,-5,5,[[0,1.3]]); wall('z',-5,-3.5,3.5); wall('z',5,-3.5,3.5);
+    win(1,-3.38,0,2.6,1.1); win(-4.88,-.8,Math.PI/2,1.6,1);
+    bed(-3.75,-2.75,1.05,2.1,true); kitchen(4.55,-1.6,3.2,false,4.55,.6); table(-.6,.4,1.2,.9); chair(-.6,-.35); chair(-.6,1.15,wood);
+    terminal(-4.55,1.9,true); box(2.4,.02,1.6,fab[1],-.6,.01,.4);
+    spot(-3.75,-1.8,1.3,'SLEEP','YOUR OWN BED · FREE',sleepFn); spot(3.55,-1.6,1.4,'EAT','HOME COOKING · FREE',eatFn);
+    spot(-3.7,1.9,1.2,'HOME TERMINAL','PREFAB CABIN',termFn); spot(0,2.9,1.1,'GO OUTSIDE','',outFn);
+    spawn={x:0,z:2.6}; exitAt={x:0,z:3.5};
+  } else if(tier===2){
+    room(-7,-4.5,4,4.5,2.8); room(4,-4.5,9.5,0,2); room(4,0,9.5,4.5,2.2); door(4,-2.2,false); door(4,2.4,false);
+    wall('x',-4.5,-7,9.5); wall('x',4.5,-7,9.5,[[-1.5,1.3]]); wall('z',-7,-4.5,4.5); wall('z',9.5,-4.5,4.5); wall('z',4,-4.5,4.5,[[-2.2,1.1],[2.4,1.1]]); wall('x',0,4,9.5);
+    win(1,-4.38,0,2.6,1.1); win(-6.88,1,Math.PI/2,1.8,1); win(9.38,-2.2,-Math.PI/2,1.6,1);
+    kitchen(-4.6,-4.05,4,true,-6.55,-2.9); table(-4.5,.6,1.6,1); chair(-5,-.15); chair(-4,-.15); chair(-5,1.35); chair(-4,1.35);
+    sofa(1,-3.7,2.6,1); box(1.1,.4,.6,wood,1,.2,-2.4,true); box(3,.02,2,fab[3],1,.01,-2.6);
+    terminal(-6.55,3,true);
+    bed(8.2,-3.2,1.6,2.1,true); box(1.6,2.1,.6,wood,5.2,1.05,-4.15,true);
+    box(2.6,.9,.8,metal,7.2,.45,4.05,true); box(2.8,1.2,.05,trim,7.2,1.75,4.42); box(.9,.6,.6,dark,5.6,.3,1.4,true); box(.7,.5,.5,metal,5.6,.85,1.4); addLamp(7.2,2.2,3.6,1.2);
+    spot(7.2,-1.9,1.3,'SLEEP','YOUR OWN BED · FREE',sleepFn); spot(-4.6,-3.1,1.5,'EAT','HOME COOKING · FREE',eatFn);
+    spot(-5.7,3,1.2,'HOME TERMINAL','FRONTIER HOUSE',termFn); spot(7.2,3.2,1.3,'WORKSHOP','FUEL AND REPAIRS · HALF PRICE',shopFn); spot(-1.5,3.9,1.1,'GO OUTSIDE','',outFn);
+    spawn={x:-1.5,z:3.6}; exitAt={x:-1.5,z:4.5};
+  } else {
+    room(-9,-6,5,6,3); room(5,-6,12,-1,2.2); room(5,-1,12,6,2.4); room(-15,-6,-9,.5,2.2); room(-15,.5,-9,6,1.6);
+    door(5,-3.5,false); door(5,2.5,false); door(-9,-2.8,false); door(-9,3.2,false);
+    wall('x',-6,-15,12); wall('x',6,-9,12,[[0,1.4]]); wall('x',6,-15,-9,[],glass); wall('z',-15,-6,.5); wall('z',-15,.5,6,[],glass); wall('z',12,-6,6);
+    wall('z',5,-6,6,[[-3.5,1.1],[2.5,1.1]]); wall('z',-9,-6,6,[[-2.8,1.1],[3.2,1.1]]); wall('x',-1,5,12); wall('x',.5,-15,-9);
+    plane(6,H,winM,-12,H/2,6.3,Math.PI); plane(5.5,H,winM,-15.3,H/2,3.25,Math.PI/2);
+    win(-3,-5.88,0,2.6,1.2); win(2,-5.88,0,2.6,1.2); win(11.88,-3.5,-Math.PI/2,2,1.1);
+    kitchen(-5,-5.55,6,true,-8.45,-4.2); box(3,.95,1.1,wallM,-5,.475,-2.9,true); box(3.1,.05,1.2,dark,-5,.97,-2.9);
+    table(-5,1.6,2.8,1.1); [-6,-5,-4].forEach(function(cx){ chair(cx,.75); chair(cx,2.45); });
+    sofa(1.8,-4.9,3.2,1); sofa(3.85,-3.3,2,0); box(1.3,.4,.7,wood,1.8,.2,-3.5,true); box(4,.02,3,fab[1],2,.01,-3.6);
+    box(.5,1,1.6,dark,4.65,.5,-.3,true); box(.06,.5,1.2,new THREE.MeshBasicMaterial({color:new THREE.Color(3,1.1,.25)}),4.38,.6,-.3);
+    terminal(3.8,5.4,false);
+    bed(9.2,-4.4,2.2,2.2,true); box(.5,.5,.5,wood,10.6,.25,-2.9,true); box(.5,.5,.5,wood,7.8,.25,-2.9,true); addLamp(10.6,.75,-2.9,.8); addLamp(7.8,.75,-2.9,.8);
+    box(.8,.9,3,metal,11.55,.45,2.5,true); box(.05,1.3,3.2,trim,11.9,1.8,2.5); box(1,.7,.7,dark,8,.35,1.8,true); box(.8,.55,.55,metal,8,.98,1.8);
+    // trophy room: your record on the wall, your rigs in miniature on a shelf
+    plane(5,2.5,new THREE.MeshBasicMaterial({map:homeWallTex()}),-14.88,1.7,-2.75,Math.PI/2); addLamp(-13.6,2.8,-2.75,1.4);
+    box(4.2,.06,.55,wood,-12,1.05,-5.62); box(4.2,1.05,.1,wood,-12,.52,-5.85,true); block.push([-14.2,-6,-9.8,-5.3]);
+    var mini=[0,1,2,3,4].filter(ownsHull); mini.forEach(function(t,i){ var hm=buildHull(t,true,{value:.15}), s=.75/Math.max(1,hm.userData.len); hm.scale.setScalar(s); hm.rotation.y=Math.PI/2; hm.position.set(-13.6+i*.85,1.08+hm.userData.gear*s,-5.62); sc.add(hm); });
+    // glass lounge
+    sofa(-12.5,4.6,2.4,1); chair(-10.4,3); box(.8,.45,.8,wood,-12.5,.22,3.2,true); [[-14.4,1.2],[-9.6,5.4]].forEach(function(p){ box(.5,.6,.5,dark,p[0],.3,p[1],true); box(.7,.9,.7,fab[3],p[0],1.05,p[1]); });
+    spot(9.2,-2.8,1.4,'SLEEP','YOUR OWN BED · FREE',sleepFn); spot(-5,-4.4,1.6,'EAT','HOME COOKING · FREE',eatFn);
+    spot(3.8,4.5,1.2,'HOME TERMINAL','HILLTOP ESTATE',termFn); spot(10.6,2.5,1.4,'WORKSHOP','FUEL AND REPAIRS · FREE',shopFn);
+    spot(-13.4,-2.75,1.6,'TROPHY ROOM','YOUR RECORD',termFn); spot(0,5.4,1.1,'GO OUTSIDE','',outFn);
+    spawn={x:0,z:5.2}; exitAt={x:0,z:6};
+  }
+  return {scene:sc, walk:walk, block:block, spots:spots, spawn:spawn, exitAt:exitAt, H:H};
+}
+function homeWalkOk(I,x,z){
+  var m=.28, inside=I.walk.some(function(r){ return x>r[0]+m && x<r[2]-m && z>r[1]+m && z<r[3]-m; }) ||
+    I.walk.some(function(r){ return x>r[0]-.01 && x<r[2]+.01 && z>r[1]-.01 && z<r[3]+.01 && (r[2]-r[0]<1.3||r[3]-r[1]<1.3); });
+  return inside && !I.block.some(function(b){ return x>b[0]-m && x<b[2]+m && z>b[1]-m && z<b[3]+m; });
+}
+function enterHome(){
+  var HT2=homeT(); if(!HT2 || !state.home || state.inHome) return;
+  var I=buildInterior(state.home.tier); I.p=new THREE.Vector3(I.spawn.x,1.7,I.spawn.z); I.outYaw=state.yaw; I.bob=0;
+  state.inHome=I; setPrompt(null); sfx('hatchOpen',.5,1.3); veilHold=1;
+  state.yaw=Math.PI; state.pitch=-.05; setScene(I.scene); shipTag(null); closeMap();
+}
+function exitHome(){
+  var I=state.inHome; if(!I) return; var HT2=homeT();
+  state.inHome=null; setPrompt(null); sfx('hatchClose',.5,1.3); veilHold=1;
+  if(HT2){ var fwd=HT2.lot.rot; state.pos.set(HT2.door.x+Math.sin(fwd)*1.6, HT2.hs+1.7, HT2.door.z+Math.cos(fwd)*1.6); state.yaw=fwd; }
+  state.pitch=-.05; state.vy=0; state.grounded=true; state.terminalCool=1;
+  setScene(S.scene); disposeObject(I.scene);
+}
+function updateInterior(dt){
+  var I=state.inHome, inp=termLoc?{x:0,y:0,hold:false}:inputAxes();
+  if(termLoc){ look.dx=look.dy=0; }
+  state.yaw-=look.dx*.0032; state.pitch=clamp(state.pitch-look.dy*.0024,-1.2,1.2); look.dx=look.dy=0;
+  var fx=Math.sin(state.yaw), fz=Math.cos(state.yaw), rx=-Math.cos(state.yaw), rz=Math.sin(state.yaw), mag=Math.min(1,Math.hypot(inp.x,inp.y)), sp=3.4;
+  var nx=I.p.x+(-inp.y*fx+inp.x*rx)*sp*dt, nz=I.p.z+(-inp.y*fz+inp.x*rz)*sp*dt;
+  if(homeWalkOk(I,nx,nz)){ I.p.x=nx; I.p.z=nz; } else if(homeWalkOk(I,nx,I.p.z)) I.p.x=nx; else if(homeWalkOk(I,I.p.x,nz)) I.p.z=nz;
+  I.bob+=dt*mag*8; var stepK=Math.floor(I.bob/Math.PI); if(stepK!==I.stepK){ if(I.stepK!=null && mag>.15) footstep(.15+.12*mag); I.stepK=stepK; }
+  camera.position.set(I.p.x+rx*Math.cos(I.bob*.5)*.02*mag, 1.7+Math.sin(I.bob)*.04*mag, I.p.z+rz*Math.cos(I.bob*.5)*.02*mag);
+  V1.set(Math.sin(state.yaw)*Math.cos(state.pitch),Math.sin(state.pitch),Math.cos(state.yaw)*Math.cos(state.pitch)); camera.lookAt(V2.copy(camera.position).add(V1));
+  if(state.grounded!==true) state.grounded=true; state.energy=Math.min(100,state.energy+dt*18*needsEnergyMul());
+  state.terminalCool=Math.max(0,(state.terminalCool||0)-dt); state.exposureTarget=.72; finalPass.uniforms.sunVis.value=0;
+  var near=null, nd=1e9; I.spots.forEach(function(s){ var d=Math.hypot(s.x-I.p.x,s.z-I.p.z); if(d<s.r && d<nd){ nd=d; near=s; } });
+  if(termLoc || state.sleeping) setPrompt(null); else if(near && !state.terminalCool) setPrompt(near.label,near.sub,near.fn); else setPrompt(null);
+  shipTag(null);
+  veilHold=Math.max(0,veilHold-dt*1.6); setVeil(veilHold,null,0);
+}
 function homeBuildCost(){ var H=state.home; return H?(H.tier<3?HOME_TIERS[H.tier+1].cost:0):HOME_TIERS[1].cost; }
 /* Investing: units turn into growth (one point per INVEST_PER_G) and a stake that pays an hourly share of the
    town's income. Yield rises with the town's stage and its businesses. Paid into the company account if you
@@ -4868,10 +5015,10 @@ $('stationPanel').addEventListener('click',function(e){
     toast('YOUR HOME IS GOING UP OUTSIDE '+loc.name+' · FIND IT ON THE PLANET MAP','life');
     CB.queue=cbPick(['Heard you put down roots out at '+loc.name+'. Welcome to the neighbourhood, driver.','A driver with a home to go back to. Don’t see that much out here.']); }
   else if(act==='homeup'){ var HMu=state.home; if(!HMu || HMu.tier>=3) return; var cu=HOME_TIERS[HMu.tier+1].cost; if(state.credits<cu) return;
-    state.credits-=cu; HMu.tier++; HMu.spent+=cu; var hl2=locFromKey(HMu.key); if(hl2) rebuildTownAt(hl2); sfx('confirm',.9); SND.good();
+    state.credits-=cu; HMu.tier++; HMu.spent+=cu; var hl2=locFromKey(HMu.key), wasIn=!!state.inHome; if(wasIn) exitHome(); if(hl2) rebuildTownAt(hl2); if(wasIn) enterHome(); sfx('confirm',.9); SND.good();
     toast('YOUR HOME IS NOW A '+HOME_TIERS[HMu.tier].name,'life'); if(loc.kind==='home') openTerminal(homeLoc()); }
   else if(act==='homesell'){ var HMs=state.home; if(!HMs) return; if(coConfirm!=='home'){ coConfirm='home'; renderTerminal(); return; }
-    coConfirm=null; var back=Math.floor(HMs.spent/2), hl3=locFromKey(HMs.key); state.credits+=back; state.home=null; if(state.route && state.route.loc.kind==='home') cancelRoute('');
+    coConfirm=null; if(state.inHome) exitHome(); var back=Math.floor(HMs.spent/2), hl3=locFromKey(HMs.key); state.credits+=back; state.home=null; if(state.route && state.route.loc.kind==='home') cancelRoute('');
     if(hl3) rebuildTownAt(hl3); toast('HOME SOLD · +'+fmt(back)+' UNITS'); if(loc.kind==='home'){ closeTerminal(); renderInv(); save(); return; } }
   else if(act==='project'){ var was=isProject(loc); if(state.route && state.route.project) cancelRoute('');
     setProject(was?null:loc); sfx('confirm',.6);
@@ -5576,6 +5723,7 @@ function audioUpdate(dt){
     wind=.05; wf=420; jet=(state.vy>.5 && !state.grounded)?.16:0;
   }
   if(termLoc && m==='surface'){ wind*=.4; }
+  if(state.inHome) wind*=.05;
   // loading-dock life: warehouse room tone at terminals and the pier, the odd forklift backing up
   var wh=0, crew=0, town=0;
   if(S && S.towns && (m==='surface' || m==='atmo')){
@@ -5583,6 +5731,7 @@ function audioUpdate(dt){
     if(ntw && ntw.d<160 && !ntw.T.outpost){ var alt=m==='atmo'?Math.max(0,fp.y-ntw.T.hs):0; town=.55*(1-ntw.d/160)*(1-clamp(alt/60,0,1)); }
   }
   if(termLoc && termLoc.kind==='town' && !termLoc.outpost) town=Math.max(town,.22);
+  if(state.inHome) town*=.15;
   if(AU.beds.town) setAt(AU.beds.town.gain.gain,town,.6);
   // night insects on worlds that would have them
   var cr=0;
@@ -5591,6 +5740,7 @@ function audioUpdate(dt){
     var gy=m==='surface'?0:Math.max(0,S.ship.position.y-Math.max(S.heightAt(S.ship.position.x,S.ship.position.z),S.waterLevel));
     cr=night*bf*(m==='surface'?.5:.25*(1-clamp(gy/80,0,1)));
   }
+  if(state.inHome) cr*=.3;
   if(AU.beds.crickets) setAt(AU.beds.crickets.gain.gain,cr,1.2);
   // re-entry rumble builds with the heat glow on the way down
   var heatG=(m==='space' && !state.warp && !state.dock)?clamp((state.entryHeat||0)*1.6,0,1)*.75:0;
@@ -6480,6 +6630,7 @@ $('btnScan').addEventListener('click',doScan);
    Update: on foot
    ========================================================================= */
 function updateSurface(dt){
+  if(state.inHome){ updateInterior(dt); return; }
   var inp=termLoc?{x:0,y:0,hold:false}:inputAxes();
   if(termLoc){ look.dx=look.dy=0; }
   state.yaw-=look.dx*.0032; state.pitch=clamp(state.pitch-look.dy*.0024,-1.2,1.2); look.dx=look.dy=0;
@@ -6545,6 +6696,7 @@ function updateSurface(dt){
   if(termLoc) setPrompt(null);
   else if(nt && Math.hypot(p.x-nt.T.kiosk.x,p.z-nt.T.kiosk.z)<4.5 && !state.terminalCool) setPrompt('CARGO TERMINAL',nt.T.name,function(){ openTerminal(townLoc(S.idx,nt.T.j)); });
   else if(homeT() && Math.hypot(p.x-homeT().kiosk.x,p.z-homeT().kiosk.z)<3.5 && !state.terminalCool) setPrompt('HOME TERMINAL',homeTier().name,function(){ openTerminal(homeLoc()); });
+  else if(homeT() && Math.hypot(p.x-homeT().door.x,p.z-homeT().door.z)<2.4 && !state.terminalCool) setPrompt('GO INSIDE',homeTier().name,enterHome);
   else if(dShip<boardR) setPrompt('BOARD SHIP','TAKE OFF',board);
   else setPrompt(null);
   veilHold=Math.max(0,veilHold-dt*.7); setVeil(veilHold,null,0);
