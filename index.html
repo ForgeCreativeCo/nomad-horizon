@@ -3529,14 +3529,54 @@ joywrap.addEventListener('mousedown',function(e){ joyStart(e.clientX,e.clientY,'
 window.addEventListener('mousemove',function(e){ if(joy.active&&joy.id==='m') joySet(e.clientX,e.clientY); });
 window.addEventListener('mouseup',function(){ if(joy.id==='m') joyEnd(); });
 
-var look={active:false,id:null,lx:0,ly:0,dx:0,dy:0};
+/* Looking around. Touch: drag anywhere. On foot the drag is scaled to the screen, so a full-width swipe turns about
+   LOOK.swipeDeg whatever the phone, and quick flicks turn further. Desktop: click the view once to capture the mouse
+   (pointer lock) and it looks wherever it moves, no button held; Esc, or opening any panel, frees the cursor.
+   Without pointer lock, click-and-drag still works. */
+var LOOK={swipeDeg:200, flick:.6, mouse:.75};   // on-foot degrees per full-width swipe · extra turn for fast flicks · captured-mouse gain
+var look={active:false,id:null,lx:0,ly:0,dx:0,dy:0,src:'',t:0};
 var lz=$('lookzone');
+function lookAdd(dx, dy, src){
+  if(src==='touch'){ var k=1+LOOK.flick*clamp((Math.hypot(dx,dy)-12)/40,0,1); dx*=k; dy*=k; }
+  look.dx+=dx; look.dy+=dy; look.src=src;
+}
+/* scale for the look deltas: on foot they turn you .0032 rad (yaw) / .0024 rad (pitch) per unit; flight free-look .006 / .004 */
+function lookGain(foot){
+  if(look.src==='lock') return LOOK.mouse;
+  if(foot && look.src==='touch') return clamp(LOOK.swipeDeg*Math.PI/180/(.0032*Math.max(320,window.innerWidth)),1,3);
+  return 1;
+}
+var canLock=!!lz.requestPointerLock && !!window.matchMedia && matchMedia('(pointer:fine)').matches, lockHint=false;
+function mouseLocked(){ return document.pointerLockElement===lz; }
+function lockBlocked(){
+  return state.mode==='title' || !!termLoc || mapOpen || state.sleeping || document.hidden ||
+    ['navPanel','townsPanel','warpPanel','lawPanel','stationPanel'].some(function(id){ var el=$(id); return el && !el.hidden; });
+}
 lz.addEventListener('touchstart',function(e){ var t=e.changedTouches[0]; look.active=true; look.id=t.identifier; look.lx=t.clientX; look.ly=t.clientY; },{passive:true});
-lz.addEventListener('touchmove',function(e){ var t=findTouch(e.changedTouches,look.id); if(!t) return; look.dx+=t.clientX-look.lx; look.dy+=t.clientY-look.ly; look.lx=t.clientX; look.ly=t.clientY; },{passive:true});
+lz.addEventListener('touchmove',function(e){ var t=findTouch(e.changedTouches,look.id); if(!t) return; lookAdd(t.clientX-look.lx,t.clientY-look.ly,'touch'); look.lx=t.clientX; look.ly=t.clientY; },{passive:true});
 lz.addEventListener('touchend',function(e){ if(findTouch(e.changedTouches,look.id)) look.active=false; });
-lz.addEventListener('mousedown',function(e){ look.active=true; look.id='m'; look.lx=e.clientX; look.ly=e.clientY; });
-window.addEventListener('mousemove',function(e){ if(look.active&&look.id==='m'){ look.dx+=e.clientX-look.lx; look.dy+=e.clientY-look.ly; look.lx=e.clientX; look.ly=e.clientY; } });
+lz.addEventListener('mousedown',function(e){
+  if(e.button!==0 || mouseLocked()) return;
+  look.active=true; look.id='m'; look.lx=e.clientX; look.ly=e.clientY;   // drag works until (or unless) the lock takes
+  if(canLock && !lockBlocked()){ try{ var r=lz.requestPointerLock(); if(r && r.catch) r.catch(function(){}); }catch(err){} }
+});
+window.addEventListener('mousemove',function(e){
+  if(mouseLocked()){ lookAdd(clamp(e.movementX||0,-250,250),clamp(e.movementY||0,-250,250),'lock'); look.active=true; look.t=performance.now(); return; }
+  if(look.active&&look.id==='m'){ lookAdd(e.clientX-look.lx,e.clientY-look.ly,'mouse'); look.lx=e.clientX; look.ly=e.clientY; }
+});
 window.addEventListener('mouseup',function(){ if(look.id==='m') look.active=false; });
+document.addEventListener('pointerlockchange',function(){
+  if(mouseLocked()){ look.id='lock'; look.dx=look.dy=0; look.t=performance.now();
+    if(!lockHint){ lockHint=true; toast('MOUSE LOOK ON · ESC FREES THE CURSOR'); } }
+  else if(look.id==='lock'){ look.active=false; look.id=null; }
+});
+document.addEventListener('pointerlockerror',function(){ canLock=false; });   // stay on click-and-drag
+/* a panel, terminal or map needs the cursor back; in flight the camera eases home once the mouse goes still */
+setInterval(function(){
+  if(!mouseLocked()) return;
+  if(lockBlocked()){ document.exitPointerLock(); return; }
+  if(performance.now()-look.t>450) look.active=false;
+},100);
 
 var keys={};
 window.addEventListener('keydown',function(e){ if(e.target && e.target.tagName==='INPUT') return; keys[e.code]=true;
@@ -3845,7 +3885,7 @@ function flyShip(dt, obj, sc, cruiseSpd, boostSpd, openK){
   if(state.camYaw==null){ state.camYaw=state.yaw; state.camPitch=state.pitch; }
   state.camYaw+=wrapA(state.yaw-state.camYaw)*kc; state.camPitch+=(state.pitch-state.camPitch)*kc;
   // free-look: drag orbits the camera around the ship, easing back behind it on release
-  state.lookYaw=(state.lookYaw||0)-look.dx*.006; state.lookPitch=clamp((state.lookPitch||0)-look.dy*.004,-.9,1.1); look.dx=look.dy=0;
+  var lg=lookGain(false); state.lookYaw=(state.lookYaw||0)-look.dx*.006*lg; state.lookPitch=clamp((state.lookPitch||0)-look.dy*.004*lg,-.9,1.1); look.dx=look.dy=0;
   if(!look.active){ var e=1-Math.exp(-2.5*dt); state.lookYaw*=1-e; state.lookPitch*=1-e; }
   state.lookYaw=wrapA(state.lookYaw);
   var dist=(10+state.fovKick*.15)*sc, cy=state.camYaw+Math.PI+state.lookYaw, cp=-state.camPitch+.24+state.lookPitch;
@@ -4433,7 +4473,7 @@ function exitHome(){
 function updateInterior(dt){
   var I=state.inHome, inp=termLoc?{x:0,y:0,hold:false}:inputAxes();
   if(termLoc){ look.dx=look.dy=0; }
-  state.yaw-=look.dx*.0032; state.pitch=clamp(state.pitch-look.dy*.0024,-1.2,1.2); look.dx=look.dy=0;
+  var lg=lookGain(true); state.yaw-=look.dx*.0032*lg; state.pitch=clamp(state.pitch-look.dy*.0024*lg,-1.2,1.2); look.dx=look.dy=0;
   var fx=Math.sin(state.yaw), fz=Math.cos(state.yaw), rx=-Math.cos(state.yaw), rz=Math.sin(state.yaw), mag=Math.min(1,Math.hypot(inp.x,inp.y)), sp=3.4;
   var nx=I.p.x+(-inp.y*fx+inp.x*rx)*sp*dt, nz=I.p.z+(-inp.y*fz+inp.x*rz)*sp*dt;
   if(homeWalkOk(I,nx,nz)){ I.p.x=nx; I.p.z=nz; } else if(homeWalkOk(I,nx,I.p.z)) I.p.x=nx; else if(homeWalkOk(I,I.p.x,nz)) I.p.z=nz;
@@ -7292,7 +7332,7 @@ function seatCam(dt, sh, settle){
     var kx=joy.x+((keys.KeyD||keys.ArrowRight)?1:0)-((keys.KeyA||keys.ArrowLeft)?1:0), ky=joy.y+((keys.KeyS||keys.ArrowDown)?1:0)-((keys.KeyW||keys.ArrowUp)?1:0);
     look.dx+=clamp(kx,-1,1)*dt*300; look.dy+=clamp(ky,-1,1)*dt*300;
   }
-  state.lookYaw=wrapA((state.lookYaw||0)-look.dx*.006); state.lookPitch=clamp((state.lookPitch||0)-look.dy*.004,-.9,1.1); look.dx=look.dy=0;
+  var lg=lookGain(false); state.lookYaw=wrapA((state.lookYaw||0)-look.dx*.006*lg); state.lookPitch=clamp((state.lookPitch||0)-look.dy*.004*lg,-.9,1.1); look.dx=look.dy=0;
   if(settle && !look.active){ var e=1-Math.exp(-2.5*dt); state.lookYaw*=1-e; state.lookPitch*=1-e; }
   state.camYaw=state.yaw; state.camPitch=0; state.fovKick=0;
   camera.fov=62; camera.updateProjectionMatrix(); finalPass.uniforms.boost.value=0;
@@ -7349,7 +7389,7 @@ function updateSurface(dt){
   if(state.inHome){ updateInterior(dt); return; }
   var inp=termLoc?{x:0,y:0,hold:false}:inputAxes();
   if(termLoc){ look.dx=look.dy=0; }
-  state.yaw-=look.dx*.0032; state.pitch=clamp(state.pitch-look.dy*.0024,-1.2,1.2); look.dx=look.dy=0;
+  var lg=lookGain(true); state.yaw-=look.dx*.0032*lg; state.pitch=clamp(state.pitch-look.dy*.0024*lg,-1.2,1.2); look.dx=look.dy=0;
   var fx=Math.sin(state.yaw), fz=Math.cos(state.yaw), rx=-Math.cos(state.yaw), rz=Math.sin(state.yaw);
   var mag=Math.min(1,Math.hypot(inp.x,inp.y)), speed=state.grounded?7.5:10;
   var mx=(-inp.y*fx + inp.x*rx)*speed, mz=(-inp.y*fz + inp.x*rz)*speed;

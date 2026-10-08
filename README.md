@@ -26,7 +26,7 @@ The installed app opens full screen in landscape and works offline after the fir
 | Steer (turn rate) | Left thumbstick (pitch inverted by default; PITCH button toggles) | Arrow keys, A / D |
 | Set speed (stays set, includes reverse) | Throttle lever | W / S |
 | Boost | BOOST button | Space or Shift |
-| Look around the ship | Drag anywhere (eases back on release) | Drag with the mouse |
+| Look around the ship | Drag anywhere (eases back on release) | Move the mouse (click the view once to capture it; Esc frees the cursor) |
 | Dock, land, board | On-screen prompt | E |
 
 **On foot**
@@ -34,7 +34,7 @@ The installed app opens full screen in landscape and works offline after the fir
 | Action | Touch | Keyboard / mouse |
 | --- | --- | --- |
 | Move | Left thumbstick | WASD |
-| Look | Drag anywhere | Drag with the mouse |
+| Look | Drag anywhere (a full-width swipe turns about 200°; quick flicks turn further) | Move the mouse (click the view once to capture it; Esc frees the cursor) |
 | Jetpack | JET button | Space or Shift |
 | Scan | SCAN button | F |
 | Terminal, board ship | On-screen prompt | E |
