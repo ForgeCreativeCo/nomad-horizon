@@ -23,11 +23,16 @@ The installed app opens full screen in landscape and works offline after the fir
 
 | Action | Touch | Keyboard / mouse |
 | --- | --- | --- |
-| Steer (turn rate) | Left thumbstick (pitch inverted by default; PITCH button toggles) | Arrow keys, A / D |
-| Set speed (stays set, includes reverse) | Throttle lever | W / S |
+| Steer (turn rate) | Left thumbstick (pitch inverted by default; PITCH button toggles) | WASD or arrow keys |
+| Set speed (stays set, includes reverse) | Throttle lever | R / F (X cuts it to zero) |
 | Boost | BOOST button | Space or Shift |
-| Look around the ship | Drag anywhere (eases back on release) | Move the mouse (click the view once to capture it; Esc frees the cursor) |
+| Look around the ship | Drag anywhere (eases back on release) | Move the mouse (click the view once to capture it) |
 | Dock, land, board | On-screen prompt | E |
+| Fly to your tracked job | Nav droid GO | G |
+| Land at the nearest pad (in an atmosphere) | Planet map GO | L |
+| Nav droid · warp · pulse | Nav chip · WARP · PULSE | N · J · P |
+
+**Everywhere:** every on-screen control has a key, so you never have to let go of the mouse. In any panel, **1–9** pick a row (the number shows on it), **Tab** switches tabs, **Enter** does the main thing (DELIVER ALL, the first choice in an encounter) and **Esc** closes it. **H** eats a ration and **Z** sleeps. **Esc** with nothing open (or freeing a captured mouse) pauses the game: resume, graphics, keyboard layout, pitch, mouse look speed, sound, music, CB, pilot needs, tips, the full key list, save export and quit to title. Prefer W/S on the throttle? Pick **CLASSIC** keyboard flight there (W/S throttle, A/D yaw, arrows pitch).
 
 **On foot**
 

@@ -149,11 +149,12 @@ canvas#scene{position:absolute;inset:0;width:100%;height:100%;display:block;}
 #throttle{position:absolute;right:7.6rem;bottom:calc(1.2rem + env(safe-area-inset-bottom,0px));z-index:11;display:flex;flex-direction:column;align-items:center;gap:.35rem;
   opacity:0;transition:opacity .8s ease;pointer-events:none;}
 #throttle.on{opacity:1;pointer-events:auto;}
-#thVal{font-family:var(--font-mono);font-size:.66rem;letter-spacing:.08em;color:var(--amber);font-variant-numeric:tabular-nums;min-width:2.6rem;text-align:center;}
+#thVal{margin-bottom:.95rem;font-family:var(--font-mono);font-size:.66rem;letter-spacing:.08em;color:var(--amber);font-variant-numeric:tabular-nums;min-width:2.6rem;text-align:center;}
 #thTrack{position:relative;width:2.6rem;height:min(10rem,42vh);border-radius:.6rem;background:var(--glass);border:1px solid var(--line);touch-action:none;cursor:ns-resize;
   backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);overflow:visible;}
 #thFill{position:absolute;left:.45rem;right:.45rem;border-radius:.3rem;background:linear-gradient(0deg,rgba(255,178,77,.35),rgba(255,178,77,.85));box-shadow:0 0 10px rgba(255,178,77,.4);}
 #thRev{position:absolute;left:.45rem;right:.45rem;top:auto;bottom:auto;border-radius:.3rem;background:rgba(255,110,90,.6);}
+#throttle .th-lbl{margin-top:.95rem;}
 #thTrack .th-zero{position:absolute;left:-.25rem;right:-.25rem;bottom:20%;height:2px;background:var(--ink-dim);opacity:.7;}
 #thKnob{position:absolute;left:-.35rem;right:-.35rem;height:1.7rem;border-radius:.4rem;background:linear-gradient(180deg,#f0ebe0,var(--cyan));box-shadow:0 0 14px rgba(231,225,210,.5);}
 #throttle .th-lbl{font-family:var(--font-mono);font-size:.55rem;letter-spacing:.2em;color:var(--ink-dim);}
@@ -254,6 +255,21 @@ button:focus-visible{outline:2px solid var(--cyan);outline-offset:3px;}
 .co-input{width:100%;box-sizing:border-box;font:inherit;font-family:var(--font-display);font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--ink);
   background:rgba(255,255,255,.05);border:1px solid var(--line);border-radius:.35rem;padding:.6rem .7rem;margin:.2rem 0 .5rem;}
 .st-row .acts.wrap{flex-wrap:wrap;justify-content:flex-end;}
+#pauseMenu{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:60;width:min(94vw,40rem);max-height:90%;overflow:auto;padding:1rem 1.1rem;pointer-events:auto;background:rgba(6,11,22,.96);}
+.pm-head{display:flex;align-items:center;justify-content:space-between;font-family:var(--font-display);font-weight:700;font-size:1.3rem;letter-spacing:.2em;color:var(--ink);margin-bottom:.6rem;}
+.pm-head button,.pm-row button{font-family:var(--font-mono);font-size:.62rem;letter-spacing:.12em;color:var(--ink);background:rgba(255,255,255,.06);border:1px solid var(--line);border-radius:2px;padding:.5rem .8rem;cursor:pointer;}
+.pm-head button{color:#170c02;background:var(--amber);border-color:var(--amber);}
+.pm-sec{font-family:var(--font-mono);font-size:.58rem;letter-spacing:.2em;color:var(--amber);margin:.8rem 0 .35rem;}
+.pm-row{display:flex;align-items:center;justify-content:space-between;gap:.8rem;padding:.4rem 0;border-bottom:1px solid rgba(214,206,186,.12);font-size:.8rem;color:var(--ink);}
+.pm-row small{display:block;font-size:.66rem;color:var(--ink-dim);}
+.pm-row input[type=range]{width:9rem;accent-color:var(--amber);}
+.pm-keys{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.15rem 1.2rem;font-size:.72rem;color:var(--ink-dim);}
+.pm-keys div{display:flex;justify-content:space-between;gap:.6rem;padding:.12rem 0;} .pm-keys b{color:var(--ink);font-weight:400;}
+@media (max-width:560px){ .pm-keys{grid-template-columns:1fr;} }
+kbd{display:inline-block;min-width:1.1rem;padding:0 .3rem;margin-left:.25rem;font-family:var(--font-mono);font-size:.56rem;line-height:1.1rem;text-align:center;color:var(--ink);background:rgba(255,255,255,.08);border:1px solid var(--line);border-radius:2px;}
+.pm-head button kbd{color:#170c02;border-color:rgba(0,0,0,.35);background:rgba(0,0,0,.08);}
+body.kbd [data-kb]{position:relative;}
+body.kbd [data-kb]::before{content:attr(data-kb);position:absolute;left:-.45rem;top:-.45rem;z-index:2;min-width:1.05rem;height:1.05rem;line-height:1.05rem;text-align:center;font-family:var(--font-mono);font-size:.55rem;color:#170c02;background:var(--amber);border-radius:2px;pointer-events:none;}
 #guide{position:absolute;left:50%;top:calc(3.4rem + env(safe-area-inset-top,0px));transform:translateX(-50%);z-index:29;width:min(92vw,24rem);padding:.7rem .9rem;pointer-events:auto;
   background:rgba(6,11,22,.88);border-color:rgba(255,178,77,.7);box-shadow:0 0 22px rgba(255,178,77,.18);}
 #guide.side{left:.75rem;top:auto;bottom:calc(1rem + env(safe-area-inset-bottom,0px));transform:none;width:min(46vw,22rem);}
@@ -595,6 +611,7 @@ body.droidopen #joywrap,body.droidopen #actions,body.droidopen #throttle{visibil
       <div id="wpList"></div>
       <button id="wpClose" type="button">CANCEL</button>
     </div>
+    <div id="pauseMenu" class="panel" hidden role="dialog" aria-label="Paused"><div class="pm-head"><span>PAUSED</span><button id="pmResume" type="button">RESUME <kbd>ESC</kbd></button></div><div id="pmBody"></div></div>
     <div id="guide" class="panel" hidden><div id="gdEye"></div><div id="gdText"></div><div id="gdBtns"><button id="gdOk" type="button">GOT IT</button><button id="gdSkip" type="button">SKIP GUIDE</button></div></div>
     <div id="lawPanel" class="panel" hidden><div id="lwHead"><span id="lwEye"></span><span id="lwTimer"></span></div><div id="lwTitle"></div><div id="lwBody"></div><div id="lwBtns"></div></div>
     <div id="navPanel" class="panel" hidden role="dialog" aria-label="Nav droid">
@@ -650,7 +667,7 @@ body.droidopen #joywrap,body.droidopen #actions,body.droidopen #throttle{visibil
       </div>
       <div class="save-row"><button id="saveExport" type="button">EXPORT SAVE</button><button id="saveImport" type="button">IMPORT SAVE</button><input id="saveFile" type="file" accept=".json,application/json" hidden><span id="saveNote"></span></div>
       <div class="install-row"><button id="installBtn" type="button" hidden>INSTALL APP</button><span id="iosHint" hidden>Install: tap <b>Share</b>, then <b>Add to Home Screen</b></span></div>
-      <div class="hint">Left thumb moves &middot; drag anywhere to look &middot; best in landscape &middot; WASD + drag + Space/E/F on desktop</div>
+      <div class="hint">Left thumb moves &middot; drag anywhere to look &middot; best in landscape &middot; WASD to steer, R/F throttle, E to act, Esc for menu and keys on desktop</div>
     </div>
   </div>
 </div>
@@ -3549,7 +3566,7 @@ function lookGain(foot){
 var canLock=!!lz.requestPointerLock && !!window.matchMedia && matchMedia('(pointer:fine)').matches, lockHint=false;
 function mouseLocked(){ return document.pointerLockElement===lz; }
 function lockBlocked(){
-  return state.mode==='title' || !!termLoc || mapOpen || state.sleeping || document.hidden ||
+  return state.mode==='title' || !!termLoc || mapOpen || state.sleeping || document.hidden || (typeof PAUSED!=='undefined' && PAUSED) ||
     ['navPanel','townsPanel','warpPanel','lawPanel','stationPanel'].some(function(id){ var el=$(id); return el && !el.hidden; });
 }
 lz.addEventListener('touchstart',function(e){ var t=e.changedTouches[0]; look.active=true; look.id=t.identifier; look.lx=t.clientX; look.ly=t.clientY; },{passive:true});
@@ -3842,7 +3859,7 @@ function inputAxes(){
 function flightAxes(){
   if(blinking()) return {x:0, y:0, hold:false};
   var x=joy.x+((keys.KeyD||keys.ArrowRight)?1:0)-((keys.KeyA||keys.ArrowLeft)?1:0);
-  var y=joy.y+(keys.ArrowDown?1:0)-(keys.ArrowUp?1:0);
+  var y=joy.y+((keys.ArrowDown||(KB.wasd&&keys.KeyS))?1:0)-((keys.ArrowUp||(KB.wasd&&keys.KeyW))?1:0);
   if(state.ap && state.apAxes && (state.mode==='space'||state.mode==='atmo')) return {x:state.apAxes.x, y:state.apAxes.y, hold:!!state.apAxes.hold && state.mode==='space'};
   return {x:clamp(x,-1,1), y:clamp(y,-1,1), hold:holdA||keys.Space||keys.ShiftLeft||keys.ShiftRight};
 }
@@ -3852,7 +3869,7 @@ function flyShip(dt, obj, sc, cruiseSpd, boostSpd, openK){
   var inp=flightAxes(), HH=HULL_HANDLING[obj.userData.tier||0]; sc=hullCam(obj);
   cruiseSpd*=HH.spd*(1+2*(openK||0)); boostSpd*=HH.spd*(1+2.8*(openK||0));
   // throttle keys (desktop)
-  if(keys.KeyW) setThrottle(state.throttle+dt*.7); if(keys.KeyS) setThrottle(state.throttle-dt*.7);
+  if(keys.KeyR||(!KB.wasd&&keys.KeyW)) setThrottle(state.throttle+dt*.7); if(keys.KeyF||(!KB.wasd&&keys.KeyS)) setThrottle(state.throttle-dt*.7);
   // turn rates with inertia
   var turnK=1-.55*(state.mode==='space'?(state.pulseK||0):0);
   var tYaw=-curve(inp.x)*HH.yaw*turnK, tPitch=(INVERT_PITCH?1:-1)*curve(inp.y)*HH.pitch*turnK, k=1-Math.exp(-HH.agi*needsAgi()*dt);
@@ -5522,7 +5539,7 @@ function updateAutopilot(dt){
   var A=state.ap; if(!A) return;
   if(state.mode!=='space'||state.warp||state.dock){ apOff(''); return; }
   if(state.law||state.chase||pirateActive()){ apOff(state.route?'':'AUTOPILOT OFF · YOU HAVE CONTROL'); return; }
-  var manual=Math.abs(joy.x)>.35||Math.abs(joy.y)>.35||keys.KeyA||keys.KeyD||keys.ArrowLeft||keys.ArrowRight||keys.ArrowUp||keys.ArrowDown;
+  var manual=Math.abs(joy.x)>.35||Math.abs(joy.y)>.35||keys.KeyA||keys.KeyD||keys.ArrowLeft||keys.ArrowRight||keys.ArrowUp||keys.ArrowDown||(KB.wasd&&(keys.KeyW||keys.KeyS));
   if(manual){ apOff('AUTOPILOT OFF · MANUAL CONTROL'); cancelRoute('ROUTE CANCELLED'); if(state.pulse) dropPulse(''); return; }
   if(state.scale){ apOff(''); return; }   // the scale has us; the route picks up after release
   A.t+=dt;
@@ -7177,7 +7194,7 @@ function updateAtmoAutopilot(dt){
   var A=state.ap; if(!A || (A.kind!=='town' && A.kind!=='orbit')) return;
   if(A.kind==='orbit'){
     if(state.mode!=='atmo' || state.landing){ apOff(''); return; }
-    if(Math.abs(joy.x)>.35||Math.abs(joy.y)>.35||keys.KeyA||keys.KeyD||keys.ArrowLeft||keys.ArrowRight||keys.ArrowUp||keys.ArrowDown){ apOff('AUTOPILOT OFF · MANUAL CONTROL'); cancelRoute('ROUTE CANCELLED'); return; }
+    if(Math.abs(joy.x)>.35||Math.abs(joy.y)>.35||keys.KeyA||keys.KeyD||keys.ArrowLeft||keys.ArrowRight||keys.ArrowUp||keys.ArrowDown||(KB.wasd&&(keys.KeyW||keys.KeyS))){ apOff('AUTOPILOT OFF · MANUAL CONTROL'); cancelRoute('ROUTE CANCELLED'); return; }
     var op=S.ship.position; A.dist=Math.max(0,300-op.y);
     var eP0=clamp(.75-state.pitch,-1,1);
     state.apAxes={x:-clamp(-state.yawRate*.5,-.2,.2), y:(INVERT_PITCH?1:-1)*clamp(eP0*3,-1,1)};
@@ -7185,7 +7202,7 @@ function updateAtmoAutopilot(dt){
     return;
   }
   if(state.mode!=='atmo' || state.landing){ apOff(''); return; }
-  var manual=Math.abs(joy.x)>.35||Math.abs(joy.y)>.35||keys.KeyA||keys.KeyD||keys.ArrowLeft||keys.ArrowRight||keys.ArrowUp||keys.ArrowDown;
+  var manual=Math.abs(joy.x)>.35||Math.abs(joy.y)>.35||keys.KeyA||keys.KeyD||keys.ArrowLeft||keys.ArrowRight||keys.ArrowUp||keys.ArrowDown||(KB.wasd&&(keys.KeyW||keys.KeyS));
   if(manual){ apOff('AUTOPILOT OFF · MANUAL CONTROL'); cancelRoute('ROUTE CANCELLED'); return; }
   var T=townByKey(A.key); if(!T){ apOff(''); return; }
   var sh=S.ship, p=sh.position, dx=T.x-p.x, dz=T.z-p.z, dh=Math.hypot(dx,dz); A.dist=dh;
@@ -7891,6 +7908,7 @@ var DIRECTOR=null;   // trailer hook: while set, the trailer tool drives frames 
 function frame(){
   requestAnimationFrame(frame);
   if(DIRECTOR) return;
+  if(PAUSED){ clock.getDelta(); composer.render(0); return; }
   tick(Math.min(.05,clock.getDelta()));
 }
 function tick(dtIn){
@@ -8077,13 +8095,115 @@ function guideTick(){
 function guideFinish(){
   state.tut={done:true}; $('guide').hidden=true; save();
   showLaw({type:'project', tone:'good', eye:'FIRST SHIFT · DONE', title:'You’re a freight hauler now.',
-    body:'<p>Take more contracts from any board and tap a cargo line to fly the route. Bigger hulls carry more: trade up in <b>UPGRADES</b> at any station.</p><p>Warp to other systems for bigger pay, grow the towns you supply, and one day start your own company. Tips will pop up as new things open up.</p>',
+    body:'<p>Take more contracts from any board and press GO in the nav droid (or G) to fly the route. Bigger hulls carry more: trade up in <b>UPGRADES</b> at any station.</p><p>Warp to other systems for bigger pay, grow the towns you supply, and one day start your own company. Tips will pop up as new things open up.</p>',
     buttons:[{label:'LET’S HAUL', cls:'pri', fn:function(){}}]});
   sfx('confirm',.8);
 }
 $('gdOk').addEventListener('click',function(){ GD.tip=null; $('guide').hidden=true; });
 $('gdSkip').addEventListener('click',function(){ state.tut={done:true}; $('guide').hidden=true; save(); toast('GUIDE SKIPPED · TIPS WILL STILL POP UP'); });
 setInterval(guideTick,300);
+/* ---------- keyboard: every control has a key, so you never have to let go of the mouse.
+   Flight: WASD or arrows steer, R/F throttle, X cuts it, Space/Shift boost. Panels: 1-9 pick a row (the number shows
+   on it), Tab switches tabs, Enter does the main thing, Esc closes. Esc with nothing open pauses. ---------- */
+var KB={wasd:true};
+try{ KB.wasd=localStorage.getItem('nh_keys')!=='classic'; var ms=parseFloat(localStorage.getItem('nh_mouse')); if(ms>0) LOOK.mouse=ms; }catch(e){}
+var PAUSED=false, pausedAt=0;
+function vis(id){ var el=$(id); return !!el && !el.hidden; }
+function panelOpen(){ return vis('lawPanel')||vis('stationPanel')||vis('navPanel')||vis('townsPanel')||vis('warpPanel')||mapOpen; }
+/* what 1-9 and Tab act on in whatever panel is in front */
+function kbList(){
+  if(vis('lawPanel')) return {items:[].slice.call(document.querySelectorAll('#lwBtns button'))};
+  if(vis('stationPanel')) return {tabs:[].slice.call(document.querySelectorAll('#stTabs button')), items:[].slice.call(document.querySelectorAll('#stTabs button')), main:document.querySelector('#stBody .bigact:not([disabled])')};
+  if(vis('navPanel')){ var pane=DR.tab==='jobs'?'#drJobs [data-dr-act="go"]':DR.tab==='loads'?'#drLoads [data-dr-act]':'#nvList .wp-row';
+    return {tabs:[].slice.call(document.querySelectorAll('.dr-tabs button')), items:[].slice.call(document.querySelectorAll(pane))}; }
+  if(mapOpen) return {items:[].slice.call(document.querySelectorAll('#mpList .wp-row'))};
+  if(vis('townsPanel')) return {tabs:[].slice.call(document.querySelectorAll('.tw-tabs button')), items:[].slice.call(document.querySelectorAll('#twList [data-tw-act="go"],#twList [data-tw-act="home"]'))};
+  if(vis('warpPanel')) return {items:[].slice.call(document.querySelectorAll('#wpList .wp-row,#wpList button'))};
+  return null;
+}
+function kbPress(el){ if(!el) return; var go=el.querySelector && el.querySelector('[data-go]'); (go||el).click(); }
+/* number badges on the rows of whatever panel is open (mouse-and-keyboard only) */
+setInterval(function(){
+  document.querySelectorAll('[data-kb]').forEach(function(el){ el.removeAttribute('data-kb'); });
+  if(!document.body.classList.contains('kbd') || PAUSED) return;
+  var L=kbList(); if(!L) return;
+  if(vis('stationPanel')) return;   // terminal tabs show 1-5 in their own labels
+  L.items.slice(0,9).forEach(function(el,i){ el.setAttribute('data-kb',String(i+1)); });
+},300);
+window.addEventListener('touchstart',function(){ document.body.classList.remove('kbd'); },{passive:true});
+function trackedLoc(){ var G=jobGroups(); if(!G.length) return null; var g=G.filter(function(x){ return x.key===state.track; })[0]||G[0]; return g.d; }
+window.addEventListener('keydown',function(e){
+  if(e.target && (e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA')) return;
+  if(window.matchMedia && matchMedia('(pointer:fine)').matches) document.body.classList.add('kbd');
+  var c=e.code, inGame=state.mode!=='title';
+  if(c==='Escape'){
+    if(PAUSED){ if(performance.now()-pausedAt>250) closePause(); e.stopImmediatePropagation(); return; }
+    if(inGame && !panelOpen() && !vis('guide')){ openPause(); e.stopImmediatePropagation(); return; }
+    if(vis('stationPanel')){ $('undockBtn').click(); e.stopImmediatePropagation(); return; }
+    if(vis('guide') && !$('gdOk').hidden){ $('gdOk').click(); }
+    return;   // the panels' own Esc handlers close them
+  }
+  if(PAUSED){ if(c==='Enter'){ closePause(); e.preventDefault(); } e.stopImmediatePropagation(); return; }
+  if(!inGame) return;
+  var L=kbList();
+  if(L){
+    var d=/^Digit([1-9])$/.exec(c)||/^Numpad([1-9])$/.exec(c);
+    if(d){ var it=L.items[+d[1]-1]; if(it && !it.disabled){ kbPress(it); } e.preventDefault(); e.stopImmediatePropagation(); return; }
+    if(c==='Tab' && L.tabs && L.tabs.length){ var on=L.tabs.findIndex(function(b){ return b.classList.contains('on'); }); L.tabs[(on+(e.shiftKey?L.tabs.length-1:1))%L.tabs.length].click(); e.preventDefault(); return; }
+    if(c==='Enter'){ var m=L.main||(vis('lawPanel')?document.querySelector('#lwBtns button.pri')||L.items[0]:null); if(m) m.click(); e.preventDefault(); return; }
+  }
+  if(c==='Enter' && vis('guide') && !$('gdOk').hidden){ $('gdOk').click(); e.preventDefault(); return; }
+  if(c==='Tab'){ e.preventDefault(); return; }
+  if(panelOpen()) return;
+  var fly=state.mode==='space'||state.mode==='atmo';
+  if(c==='KeyX' && fly){ setThrottle(0); toast('THROTTLE CUT'); }
+  else if(c==='KeyG'){ var tl=trackedLoc(); if(tl){ startRoute(tl); } else toast('NO JOBS ABOARD · OPEN THE NAV DROID (N) FOR LOADS'); }
+  else if(c==='KeyL'){
+    if(state.mode==='atmo' && S && !state.landing){ var np=nearestPad(S.ship.position.x,S.ship.position.z); if(np) startRoute(np.T.key==='home'?homeLoc():townLoc(S.idx,np.T.j||0)); }
+    else if(state.mode==='space') toast('L LANDS IN AN ATMOSPHERE · G FLIES TO YOUR TRACKED JOB'); }
+  else if(c==='KeyJ' && state.mode==='space' && !state.dock){ $('btnWarp').click(); }
+  else if(c==='KeyH'){ eatRation(); }
+  else if(c==='KeyZ'){ tapSleep(); }
+},true);
+/* the browser frees a captured mouse on Esc before the page sees the key: treat that as Esc too */
+var lockOurs=false;
+document.addEventListener('pointerlockchange',function(){
+  if(document.pointerLockElement) return;
+  if(lockOurs){ lockOurs=false; return; }
+  if(state.mode!=='title' && !PAUSED && !panelOpen() && !document.hidden) openPause();
+});
+var _exitLock=document.exitPointerLock&&document.exitPointerLock.bind(document);
+if(_exitLock) document.exitPointerLock=function(){ lockOurs=true; return _exitLock(); };
+/* ---------- the pause menu: resume, settings, controls, save ---------- */
+var KEYLIST=[['Steer','WASD / arrows'],['Throttle up / down','R / F'],['Cut throttle','X'],['Boost / jetpack','Space / Shift'],['Dock, land, board, use','E'],
+  ['Nav droid','N'],['Planet map','M'],['My towns','T'],['Warp','J'],['Pulse drive','P'],['Fly to tracked job','G'],['Land at nearest pad','L'],
+  ['Scan (on foot)','F'],['Eat a ration','H'],['Sleep','Z'],['Pick a row in a panel','1 – 9'],['Switch tabs','Tab'],['Main action','Enter'],['Close / pause','Esc'],['Look','Mouse (click to capture)']];
+function renderPause(){
+  var gq=Q.name, h='';
+  h+='<div class="pm-sec">SETTINGS</div>';
+  function row(label, sub, btn, act){ return '<div class="pm-row"><span>'+label+(sub?'<small>'+sub+'</small>':'')+'</span>'+(btn?'<button type="button" data-pm="'+act+'">'+btn+'</button>':'')+'</div>'; }
+  h+=row('Graphics','Lower settings run cooler on laptops and phones.',gq,'gfx');
+  h+=row('Keyboard flight',KB.wasd?'W/S pitch and A/D yaw like the arrows; R/F throttle.':'Classic: W/S throttle, A/D yaw, arrows pitch.',KB.wasd?'WASD STEERS':'CLASSIC',"keys");
+  h+=row('Pitch',INVERT_PITCH?'Push up to dive, pull down to climb.':'Push up to climb, pull down to dive.',INVERT_PITCH?'INVERTED':'STANDARD','pitch');
+  h+='<div class="pm-row"><span>Mouse look speed<small>For a captured mouse.</small></span><input type="range" id="pmMouse" min="0.25" max="2" step="0.05" value="'+LOOK.mouse+'"></div>';
+  h+=row('Sound','',AU.on?'ON':'OFF','snd')+row('Music','',MU.on?'ON':'OFF','mus')+row('CB radio','',CB.on?'ON':'OFF','cb');
+  h+=row('Pilot needs','Hunger, fatigue and logbook checks.',needsOn()?'ON':'RELAXED','needs');
+  h+=row('Tips','Show the one-time tips again.','RESET','tips');
+  h+='<div class="pm-sec">CONTROLS</div><div class="pm-keys">'+KEYLIST.map(function(k){ return '<div><span>'+k[0]+'</span><b>'+k[1]+'</b></div>'; }).join('')+'</div>';
+  h+='<div class="pm-sec">GAME</div>'+row('Save file','Download your save to keep or move to another device.','EXPORT','export')+row('Title screen','Your game is saved first.','QUIT TO TITLE','quit');
+  $('pmBody').innerHTML=h;
+  var mr=$('pmMouse'); mr.addEventListener('input',function(){ LOOK.mouse=+mr.value; try{ localStorage.setItem('nh_mouse',String(LOOK.mouse)); }catch(e){} });
+}
+function openPause(){ if(PAUSED) return; PAUSED=true; pausedAt=performance.now(); for(var k in keys) keys[k]=false; joyEnd(); setHold(false); renderPause(); $('pauseMenu').hidden=false; save(); }
+function closePause(){ PAUSED=false; $('pauseMenu').hidden=true; clock.getDelta(); }
+$('pmResume').addEventListener('click',closePause);
+$('pmBody').addEventListener('click',function(e){ var b=e.target.closest('button[data-pm]'); if(!b) return; var a=b.dataset.pm;
+  if(a==='gfx') $('gfxBtn').click(); else if(a==='pitch') $('pitchBtn').click(); else if(a==='snd') $('sndBtn').click(); else if(a==='mus') $('musBtn').click(); else if(a==='cb') $('cbBtn').click();
+  else if(a==='keys'){ KB.wasd=!KB.wasd; try{ localStorage.setItem('nh_keys',KB.wasd?'wasd':'classic'); }catch(err){} }
+  else if(a==='needs'){ state.needsOff=!state.needsOff; save(); } else if(a==='tips'){ state.hints={}; save(); toast('TIPS WILL SHOW AGAIN'); }
+  else if(a==='export'){ if(exportSave()) toast('SAVE FILE DOWNLOADED','life'); }
+  else if(a==='quit'){ save(); saveLock=true; location.reload(); return; }
+  renderPause(); });
 /* ---------- save files: export to a .json you keep anywhere, import one back (title screen) ---------- */
 function exportSave(){
   if(state.mode!=='title') save();
