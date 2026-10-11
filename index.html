@@ -3820,10 +3820,10 @@ function enterAtmosphere(p, quiet){
   state.mode='atmo'; setScene(S.scene); setModeUI('atmo');
   var fx=Math.sin(state.yaw), fz=Math.cos(state.yaw), spot=surfFromNormal(state.entryNormal), lim=WORLD_E-260;
   var tx=clamp(spot.x,-lim,lim), tz=clamp(spot.z,-lim,lim);
-  S.ship.position.set(tx-fx*170,215,tz-fz*170);
+  S.ship.position.set(tx-fx*620,ENTRY_Y,tz-fz*620);
   updateChunks(S, tx-fx*60, tz-fz*60, true);
-  state.pitch=-.3;
-  state.vel.set(fx,-.35,fz).normalize().multiplyScalar(clamp(state.vel.length()*.7,18,45));
+  state.pitch=-.42;
+  state.vel.set(fx,-.5,fz).normalize().multiplyScalar(clamp(state.vel.length()*.8,40,70));
   setShipFlying(S.ship,true);
   S.ship.quaternion.copy(ship.quaternion);
   camera.position.copy(S.ship.position).add(new THREE.Vector3(-fx*15,4,-fz*15));
@@ -5591,7 +5591,7 @@ var apChipT=0;
 function updateApChip(force){
   var el=$('apChip'), A=state.ap;
   if(!A || (state.mode!=='space' && !(state.mode==='atmo' && (A.kind==='town'||A.kind==='orbit')))){ if(!el.hidden) el.hidden=true; return; }
-  if(A.kind==='orbit'){ apChipT-=1/60; if(!force && apChipT>0) return; apChipT=.25; var od=A.dist==null?300:A.dist;
+  if(A.kind==='orbit'){ apChipT-=1/60; if(!force && apChipT>0) return; apChipT=.25; var od=A.dist==null?EXIT_Y:A.dist;
     el.hidden=false; $('apName').textContent='BACK TO ORBIT'; $('apInfo').textContent='CLIMBING · '+Math.round(od)+' M TO GO'; return; }
   if(A.kind==='town'){ apChipT-=1/60; if(!force && apChipT>0) return; apChipT=.25; var td=A.dist==null?0:A.dist;
     el.hidden=false; $('apName').textContent=A.name; $('apInfo').textContent=(td<70?'ON APPROACH':'CRUISE')+' · '+fmtDist(td)+' · ETA '+clockStr(td/Math.max(1,atmoCruise())+4); return; }
@@ -7228,7 +7228,7 @@ function updateAtmoAutopilot(dt){
   if(A.kind==='orbit'){
     if(state.mode!=='atmo' || state.landing){ apOff(''); return; }
     if(Math.abs(joy.x)>.35||Math.abs(joy.y)>.35||keys.KeyA||keys.KeyD||keys.ArrowLeft||keys.ArrowRight||keys.ArrowUp||keys.ArrowDown||(KB.wasd&&(keys.KeyW||keys.KeyS))){ apOff('AUTOPILOT OFF · MANUAL CONTROL'); cancelRoute('ROUTE CANCELLED'); return; }
-    var op=S.ship.position; A.dist=Math.max(0,300-op.y);
+    var op=S.ship.position; A.dist=Math.max(0,EXIT_Y-op.y);
     var eP0=clamp(.75-state.pitch,-1,1);
     state.apAxes={x:-clamp(-state.yawRate*.5,-.2,.2), y:(INVERT_PITCH?1:-1)*clamp(eP0*3,-1,1)};
     setThrottle(1);
@@ -7256,6 +7256,44 @@ function updateAtmoAutopilot(dt){
   var alt=p.y-Math.max(S.heightAt(p.x,p.z),S.waterLevel), spd=state.vel.length();
   if(dh<30 && alt<45 && spd<24){ apOff(''); toast('AUTOPILOT · SETTING DOWN AT '+T.name); land(true); }
 }
+/* =========================================================================
+   Descent: you come out of the re-entry high above a cloud deck, punch through it, and break out under an
+   overcast ceiling with the land below. The deck stretches to the horizon (it hides the edges of the charted
+   surface), uses the same cloud field that throws the cloud shadows on the ground, and only fades in as you
+   climb toward it, so the sky from the ground is unchanged. Above it the air is thin and the rig runs faster.
+   ========================================================================= */
+var DECK_Y=520, ENTRY_Y=930, EXIT_Y=1000;
+var DECK_VS='varying vec3 vW; void main(){ vec4 w=modelMatrix*vec4(position,1.0); vW=w.xyz; gl_Position=projectionMatrix*viewMatrix*w; }';
+var DECK_FS=['uniform sampler2D cloudTex; uniform vec2 cloudOff; uniform vec3 topCol, botCol, sunCol, fogCol, sunDir; uniform float cover, alphaK, seed;',
+  'varying vec3 vW;',
+  'void main(){',
+  ' vec2 q=vW.xz*0.0011+cloudOff+vec2(seed,seed*0.7);',
+  ' float n=texture2D(cloudTex,q).g*0.6+texture2D(cloudTex,q*2.9+0.37).g*0.3+texture2D(cloudTex,q*7.3+0.11).g*0.1;',
+  ' float body=smoothstep(1.0-cover,1.0-cover+0.22,n), puff=smoothstep(0.25,0.85,n);',
+  ' float a=mix(0.35,1.0,body)*alphaK;',
+  ' vec3 c=gl_FrontFacing?topCol*(0.62+0.42*puff)+sunCol*puff*puff*0.25*clamp(sunDir.y+0.2,0.0,1.0):botCol*(1.25-0.55*puff);',
+  ' float d=length(vW.xz-cameraPosition.xz); float f=smoothstep(1300.0,3200.0,d);',
+  ' gl_FragColor=vec4(mix(c,fogCol,f),a*(1.0-f*0.15));',
+  '}'].join('\n');
+function buildDeck(s){
+  var b=s.biome, U={cloudTex:FOGU.cloudTex, cloudOff:FOGU.cloudOff, topCol:{value:lin(b.cloudCol||'#e8e8ea')}, botCol:{value:lin(b.cloudCol||'#e8e8ea').multiplyScalar(.42)},
+    sunCol:{value:new THREE.Color()}, fogCol:{value:new THREE.Color()}, sunDir:{value:new THREE.Vector3(0,1,0)}, cover:{value:clamp((b.cloud||0)+.2,.55,.75)}, alphaK:{value:0}, seed:{value:((b.seed||0)%97)/97}};
+  if(!b.cloud || b.cloud<.3) U.topCol.value.lerp(lin(b.horizon),.45);   // dry worlds: a dust-and-haze layer rather than white cloud
+  var m=new THREE.Mesh(new THREE.PlaneGeometry(9000,9000,1,1), new THREE.ShaderMaterial({uniforms:U, vertexShader:DECK_VS, fragmentShader:DECK_FS, transparent:true, depthWrite:false, side:THREE.DoubleSide}));
+  m.rotation.x=-Math.PI/2; m.frustumCulled=false; m.renderOrder=5; s.scene.add(m);
+  return {mesh:m, U:U};
+}
+function updateDeck(s, camY){
+  if(!s.deck) s.deck=buildDeck(s);
+  var D=s.deck, U=D.U, k=camY>DECK_Y?1:sstep(DECK_Y-200,DECK_Y-30,camY);
+  D.mesh.visible=k>.01; U.alphaK.value=k;
+  D.mesh.position.set(camera.position.x,DECK_Y,camera.position.z);
+  U.sunDir.value.copy(s.sunDir); U.sunCol.value.copy(FOGU.fogSunCol.value); if(s.scene.fog) U.fogCol.value.copy(s.scene.fog.color);
+  // inside the deck: a whiteout, buffeting
+  var inK=1-sstep(8,55,Math.abs(camY-DECK_Y));
+  if(inK>0) addRumble(inK*.35, inK*.6);
+  return inK;
+}
 function updateAtmo(dt){
   var sh=S.ship, f;
   if(state.landing){
@@ -7275,7 +7313,7 @@ function updateAtmo(dt){
   } else {
     (sh.userData.tilts||[]).forEach(function(pv){ pv.rotation.x+=(-Math.PI/2-pv.rotation.x)*(1-Math.pow(.05,dt)); });   // pods swing aft after a vertical lift
     updateAtmoAutopilot(dt);
-    f=flyShip(dt, sh, 1.5, 26*speedMul(), 62*speedMul());
+    f=flyShip(dt, sh, 1.5, 26*speedMul(), 62*speedMul(), sstep(DECK_Y-40,DECK_Y+260,sh.position.y)*.8);
     var g=Math.max(S.heightAt(sh.position.x,sh.position.z), S.waterLevel)+hullGear(sh)+.35;
     if(sh.position.y<g){ var hitV=-state.vel.y; sh.position.y=g; if(state.vel.y<0) state.vel.y*=-.1; cargoImpact(hitV); }
     if(!inWorld(sh.position.x,sh.position.z)){ sh.position.x=clamp(sh.position.x,-WORLD_E,WORLD_E); sh.position.z=clamp(sh.position.z,-WORLD_E,WORLD_E);
@@ -7285,7 +7323,7 @@ function updateAtmo(dt){
   }
   updateWorld(dt, sh.position);
   var alt=sh.position.y-Math.max(S.heightAt(sh.position.x,sh.position.z),S.waterLevel);
-  var eh=clamp(1-(state.t-(state.entryT||-99))/3.2,0,1); setPlasma(sh, eh*eh*.9);
+  var eh=clamp(1-(state.t-(state.entryT||-99))/8,0,1); setPlasma(sh, eh*eh*.9);
   if(eh>0){ addRumble(eh*.7, eh*1.2); if(Q.heat) finalPass.uniforms.heatK.value=Math.max(finalPass.uniforms.heatK.value,eh*.8); }
   var wxk=S.wx?S.wx.k*S.wx.cfg.turb:0, spd0=state.vel.length();
   addRumble(Math.min(.12,spd0/62*.045)*(alt<60?1.6:1)+wxk*(alt<220?1:.4));
@@ -7296,9 +7334,10 @@ function updateAtmo(dt){
   aimLamp(V1.copy(sh.position).addScaledVector(UP,-1), V2.set(Math.sin(state.yaw)*.8,-.6,Math.cos(state.yaw)*.8), (1-S.dayF)*4);
 
   veilHold=Math.max(0,veilHold-dt*.7);
-  var altVeil=sstep(230,300,sh.position.y), climb=clamp(state.vel.y/30,0,1);
-  setVeil(Math.max(altVeil,veilHold), S.biome.horizon, altVeil*(1-altVeil)*4*climb);
-  if(!state.landing && sh.position.y>300){ exitAtmosphere(); return; }
+  var deckIn=updateDeck(S, camera.position.y), altVeil=sstep(EXIT_Y-90,EXIT_Y,sh.position.y), climb=clamp(state.vel.y/30,0,1);
+  if(deckIn>altVeil && deckIn>veilHold) setVeil(deckIn*.9, S.biome.cloudCol||S.biome.horizon, 0);
+  else setVeil(Math.max(altVeil,veilHold), S.biome.horizon, altVeil*(1-altVeil)*4*climb);
+  if(!state.landing && sh.position.y>EXIT_Y){ exitAtmosphere(); return; }
 
   updateApChip(false);
   var spd=state.vel.length(), nt=nearestTown(sh.position.x,sh.position.z), padD=nt?nt.d:1e9;
@@ -7474,6 +7513,7 @@ function updateSurface(dt){
   }
 
   updateWorld(dt, p);
+  if(S.deck) S.deck.mesh.visible=false;
   updateGrass(false, p);
   updateFauna(dt, p, state.yaw, true);
   aimLamp(camera.position, V1, (1-S.dayF)*3.2);
@@ -7529,7 +7569,7 @@ function renderMapList(){
   var f=mapFocus(), list=$('mpList'); list.innerHTML='';
   if(state.mode==='atmo' && !state.landing){
     var orow=document.createElement('button'), oon=state.ap && state.ap.kind==='orbit'; orow.type='button'; orow.className='wp-row';
-    orow.innerHTML='<span class="mp-ico" style="background:#e7e1d2"></span><span class="wp-name">BACK TO ORBIT</span><span class="wp-dist">'+Math.max(0,Math.round(300-S.ship.position.y))+' M UP</span>'+
+    orow.innerHTML='<span class="mp-ico" style="background:#e7e1d2"></span><span class="wp-name">BACK TO ORBIT</span><span class="wp-dist">'+Math.max(0,Math.round(EXIT_Y-S.ship.position.y))+' M UP</span>'+
       '<span class="wp-meta">'+(oon?'<span style="color:var(--cyan)">AUTOPILOT ENGAGED</span>':'TAP TO CLIMB OUT TO SPACE ON AUTOPILOT')+'</span>';
     orow.addEventListener('click',startOrbitAutopilot); list.appendChild(orow);
   }
