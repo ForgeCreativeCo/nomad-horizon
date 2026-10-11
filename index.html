@@ -1005,7 +1005,7 @@ var DETAIL_FS={
     ' gl_FragColor=vec4(clamp(h,0.0,1.0),clamp(alb,0.0,1.0),0.0,1.0); }'].join('\n'),
   sand:['void main(){ vec2 uv=vUv;',
     ' float w=fb(uv*3.0,3.0,4);',
-    ' float rip=sin((uv.x*9.0+uv.y*2.0+w*2.4)*6.2831853); rip=0.5+0.5*rip; rip=pow(rip,1.6);',
+    ' float rip=sin((uv.x*9.0+uv.y*2.0+w*2.4)*6.2831853); rip=0.5+0.5*rip; rip=pow(max(rip,0.0),1.6);',
     ' float grain=fb(uv*96.0,96.0,3);',
     ' float h=rip*0.55+w*0.3+grain*0.15;',
     ' float alb=0.7+w*0.2+grain*0.18-rip*0.08;',
@@ -1225,7 +1225,7 @@ function sunGlowMesh(col){
       'void main(){ float r=length(vUv); if(r>1.0) discard; float a=atan(vUv.y,vUv.x);',
       ' float halo=exp(-r*7.0)*1.6+exp(-r*22.0)*5.0+exp(-r*2.6)*0.22;',
       ' float sp=pow(abs(cos(a*3.0+0.4)),90.0)+pow(abs(cos(a*2.0+1.2)),160.0)*0.6; sp*=exp(-r*5.5)*1.4;',
-      ' float ring=exp(-pow((r-0.42)*26.0,2.0))*0.05;',
+      ' float ring=exp(-((r-0.42)*26.0)*((r-0.42)*26.0))*0.05;',
       ' vec3 c=color*(halo+sp+ring)*(1.0-smoothstep(0.85,1.0,r));',
       ' gl_FragColor=vec4(c,1.0); }'].join('\n'),
     transparent:true, blending:THREE.AdditiveBlending, depthWrite:false});
@@ -1371,7 +1371,7 @@ var NEBULA_FS=[
   'uniform vec3 c1,c2,c3;',
   'void main(){',
   '  vec3 d=dirFromUv(vUv);',
-  '  vec3 bn=normalize(vec3(0.3,1.0,0.2)); float bd=dot(d,bn); float band=exp(-pow(bd*2.4,2.0));',
+  '  vec3 bn=normalize(vec3(0.3,1.0,0.2)); float bd=dot(d,bn); float band=exp(-(bd*2.4)*(bd*2.4));',
   '  vec3 wv=vec3(tri(d,0.8,vec2(0.3,0.1),2),tri(d,0.8,vec2(0.7,0.4),2),tri(d,0.8,vec2(0.2,0.9),2))-0.5; vec3 dw=normalize(d+wv*0.22);',
   '  float n1=tri(dw,0.7,vec2(0.1,0.3),1), n2=tri(dw,1.9,vec2(0.6,0.2),2), n3=tri(dw,5.0,vec2(0.4,0.8),1), n4=tri(dw,13.0,vec2(0.9,0.1),0);',
   '  float neb=pow(clamp(n1*0.55+n2*0.27+n3*0.12+n4*0.06,0.0,1.0),3.0)*3.0*smoothstep(0.42,0.78,n1*0.7+n2*0.3);',
@@ -1514,7 +1514,7 @@ var SYS=null, BIOMES=[], planetTex=[];
 var FLAME_MAT_SRC = {
   uniforms:{ intensity:{value:1}, time:{value:0}, color:{value:new THREE.Color(.55,.62,1.25)} },
   vertexShader:'varying vec2 vUv; void main(){ vUv=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }',
-  fragmentShader:'uniform float intensity,time; uniform vec3 color; varying vec2 vUv; void main(){ float t=1.0-vUv.y; float f=0.8+0.2*sin(time*73.0+vUv.x*31.0)*sin(time*41.0); float sh=0.5+0.5*sin(t*38.0-time*90.0); float a=pow(t,3.4)*f*intensity*0.55*(0.75+0.25*sh); gl_FragColor=vec4(color*a+vec3(1.4,1.3,1.2)*pow(t,12.0)*a*2.0,1.0); }'
+  fragmentShader:'uniform float intensity,time; uniform vec3 color; varying vec2 vUv; void main(){ float t=clamp(1.0-vUv.y,0.0,1.0); float f=0.8+0.2*sin(time*73.0+vUv.x*31.0)*sin(time*41.0); float sh=0.5+0.5*sin(t*38.0-time*90.0); float a=pow(t,3.4)*f*intensity*0.55*(0.75+0.25*sh); gl_FragColor=vec4(color*a+vec3(1.4,1.3,1.2)*pow(t,12.0)*a*2.0,1.0); }'
 };
 function buildShip(landed){
   var g=new THREE.Group();
@@ -2110,7 +2110,7 @@ var ATMO_FS=['uniform vec3 color, sunPos; uniform float limb, intensity; varying
   ' float inner=pow(clamp(1.0-(t-limb)/(1.0-limb),0.0,1.0),5.0); float outer=pow(clamp(t/limb,0.0,1.0),3.4);',
   ' float g=t>limb?inner:outer;',
   ' float lit=smoothstep(-0.45,0.55,dot(n,l)); float fwd=pow(max(dot(-v,l),0.0),6.0)*1.5;',
-  ' float nl=dot(n,l); float term=exp(-pow((nl+0.08)*4.5,2.0));',
+  ' float nl=dot(n,l); float term=exp(-((nl+0.08)*4.5)*((nl+0.08)*4.5));',
   ' vec3 c=color*g*(lit+fwd)*intensity+vec3(1.0,0.42,0.16)*g*term*intensity*0.55;',
   ' gl_FragColor=vec4(c,1.0); }'].join('\n');
 function atmoMaterial(color, scale, intensity, sunPos){
@@ -2202,8 +2202,8 @@ function buildSystem(sys){
     var atmoCol=lin(b.horizon).multiplyScalar(1.4).lerp(lin(b.zenith),.35);
     var atmo=new THREE.Mesh(new THREE.SphereGeometry(radius*1.06,96,64), atmoMaterial(atmoCol,1.06,1.7,SPACE_SUN));
     vis.add(atmo);
-    if(b.ring){ var rg=ringMesh(radius*1.45, radius*2.3, lin(b.peak).lerp(lin(b.rock),.45).multiplyScalar(.42)); rg.rotation.x=-Math.PI/2+.38; rg.rotation.y=.2; vis.add(rg); }
-    planets.push({mesh:mesh, vis:vis, pos:pd.pos.clone(), soft:[atmo.material, cl.material], clouds:cl, radius:radius, index:i, biome:b, spin:.012+i*.003});
+    var rg=null; if(b.ring){ rg=ringMesh(radius*1.45, radius*2.3, lin(b.peak).lerp(lin(b.rock),.45).multiplyScalar(.42)); rg.rotation.x=-Math.PI/2+.38; rg.rotation.y=.2; vis.add(rg); }
+    planets.push({mesh:mesh, vis:vis, pos:pd.pos.clone(), soft:[atmo.material, cl.material], atmo:atmo, ring:rg, clouds:cl, radius:radius, index:i, biome:b, spin:.012+i*.003});
   });
 
   station=null;
@@ -2231,8 +2231,8 @@ function buildSystem(sys){
 var SKY_FS=['uniform vec3 zenith, horizon, below, sunDir, sunCol, cloudCol; uniform float time, cover, night; uniform sampler2D noiseTex, starTex; varying vec3 vDir;',
  'float cl(vec2 q){ return texture2D(noiseTex,q).g*0.52+texture2D(noiseTex,q*2.31+0.3).g*0.27+texture2D(noiseTex,q*5.13+0.7).r*0.14+texture2D(noiseTex,q*11.7+0.1).b*0.07; }',
  'void main(){ vec3 d=normalize(vDir); float h=d.y; float sd=max(dot(d,sunDir),0.0); float hp=max(h,0.0);',
- ' vec3 col=mix(zenith*0.92,horizon,pow(1.0-hp,2.8));',
- ' col=mix(col,horizon*1.06,pow(1.0-hp,9.0)*0.7);',
+ ' vec3 col=mix(zenith*0.92,horizon,pow(max(1.0-hp,0.0),2.8));',
+ ' col=mix(col,horizon*1.06,pow(max(1.0-hp,0.0),9.0)*0.7);',
  ' if(night>0.001 && h>0.0){ vec2 su=d.xz/(h+0.35);',
  '   float st=texture2D(starTex,su*0.9+0.5).r; float tw=0.7+0.3*sin(time*2.7+su.x*90.0+su.y*70.0);',
  '   float mw=texture2D(noiseTex,su*0.35+0.3).g; mw=mw*mw*mw*(1.0-abs(su.x*0.6-su.y*0.4));',
@@ -2589,7 +2589,7 @@ async function buildSurface(idx){
   var beacon=new THREE.Mesh(new THREE.CylinderGeometry(1,1,1,20,1,true), new THREE.ShaderMaterial({
     uniforms:{color:{value:new THREE.Color(.5,2.2,3.2)}, time:{value:0}, fade:{value:1}},
     vertexShader:'varying vec2 vUv; void main(){ vUv=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }',
-    fragmentShader:'uniform vec3 color; uniform float time, fade; varying vec2 vUv; void main(){ float y=vUv.y; float a=pow(1.0-y,1.4)*(0.7+0.3*sin(time*3.0-y*60.0)); gl_FragColor=vec4(color*a*fade,1.0); }',
+    fragmentShader:'uniform vec3 color; uniform float time, fade; varying vec2 vUv; void main(){ float y=clamp(vUv.y,0.0,1.0); float a=pow(1.0-y,1.4)*(0.7+0.3*sin(time*3.0-y*60.0)); gl_FragColor=vec4(color*a*fade,1.0); }',
     transparent:true, blending:THREE.AdditiveBlending, depthWrite:false, side:THREE.DoubleSide}));
   beacon.geometry.translate(0,.5,0); beacon.frustumCulled=false; beacon.visible=false; scene.add(beacon);
 
@@ -2655,7 +2655,7 @@ function padTexture(){
 }
 /* pools of light on the ground: sodium floods and street lamps, visible only after dark */
 var POOL_FS='uniform vec3 color; uniform float k; varying vec2 vUv; void main(){ float d=length(vUv-0.5)*2.0; float a=pow(max(1.0-d,0.0),1.8); gl_FragColor=vec4(color*a*k,1.0); }';
-var CONE_FS='uniform vec3 color; uniform float k; varying vec2 vUv; void main(){ float y=vUv.y; float a=pow(y,2.2)*0.02; gl_FragColor=vec4(color*max(a,0.0)*k,1.0); }';
+var CONE_FS='uniform vec3 color; uniform float k; varying vec2 vUv; void main(){ float y=clamp(vUv.y,0.0,1.0); float a=pow(y,2.2)*0.02; gl_FragColor=vec4(color*max(a,0.0)*k,1.0); }';
 var UV_VS='varying vec2 vUv; void main(){ vUv=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }';
 function lightPool(par,x,y,z,rad,col,list,cone){
   // one material per light colour per town, so the merge pass below can draw all pools of a colour at once
@@ -3217,7 +3217,7 @@ function buildTown(scene, b, site, key){
   var beacon=new THREE.Mesh(new THREE.CylinderGeometry(1,1,1,20,1,true), new THREE.ShaderMaterial({
     uniforms:{color:{value:op?new THREE.Color(1.1,2.6,.9):new THREE.Color(3.2,1.8,.4)}, time:{value:0}, fade:{value:1}},
     vertexShader:'varying vec2 vUv; void main(){ vUv=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }',
-    fragmentShader:'uniform vec3 color; uniform float time, fade; varying vec2 vUv; void main(){ float y=vUv.y; float a=pow(1.0-y,1.6)*(0.75+0.25*sin(time*2.0-y*40.0)); gl_FragColor=vec4(color*a*fade,1.0); }',
+    fragmentShader:'uniform vec3 color; uniform float time, fade; varying vec2 vUv; void main(){ float y=clamp(vUv.y,0.0,1.0); float a=pow(1.0-y,1.6)*(0.75+0.25*sin(time*2.0-y*40.0)); gl_FragColor=vec4(color*a*fade,1.0); }',
     transparent:true, blending:THREE.AdditiveBlending, depthWrite:false, side:THREE.DoubleSide}));
   beacon.geometry.translate(0,.5,0); beacon.frustumCulled=false; beacon.position.set(site.x,hs,site.z); scene.add(beacon);
   var home=buildHome(scene,b,site,key,{tex:T, TW:TW, hull:hull, winMat:winMat, dark:dark, accent:accent, lampMat:lampMat, padLampMat:padLampMat, screenMat:screenMat, pools:pools});
@@ -5933,10 +5933,14 @@ function ssPlace(obj, pos, cam){
 function scaledSpace(){
   if(!sysGroup) return;
   var cam=camera.position;
-  planets.forEach(function(p){
-    var d=ssPlace(p.vis,p.pos,cam), far=d>SS_SOFT;
-    if(p.far!==far){ p.far=far; p.soft.forEach(function(m){ m.depthTest=!far; }); }
-  });
+  /* Far planets are shrunk toward the camera, where depth precision is too coarse to separate a planet from its
+     cloud and haze shells. Rather than switch depth testing off (which painted far haze over the station), a far
+     planet's body stops writing depth and far planets draw back to front after everything near: the station and
+     your rig still hide them, and their shells no longer fight the surface. */
+  var far=[];
+  planets.forEach(function(p){ p.d=ssPlace(p.vis,p.pos,cam); var f=p.d>SS_SOFT; if(f) far.push(p);
+    if(p.far!==f){ p.far=f; p.mesh.material.depthWrite=!f; if(!f){ p.mesh.renderOrder=0; p.clouds.renderOrder=0; p.atmo.renderOrder=0; if(p.ring) p.ring.renderOrder=0; } } });
+  far.sort(function(a,b){ return b.d-a.d; }).forEach(function(p,k){ var o=1+k; p.mesh.renderOrder=o; p.clouds.renderOrder=o; p.atmo.renderOrder=o; if(p.ring) p.ring.renderOrder=o; });
   if(spaceSunMesh){ ssPlace(spaceSunMesh,SPACE_SUN,cam); if(spaceSunMesh.userData.glow) spaceSunMesh.userData.glow.quaternion.copy(camera.quaternion); }
 }
 
@@ -7729,7 +7733,7 @@ function sparks(F,x,y,z,n,o){ o=o||{}; for(var i=0;i<n;i++) fxEmit(F,{x:x, y:y, 
 /* ---------- re-entry plasma: a hot sheath on the leading face of the hull ---------- */
 var PLASMA_FS=['uniform float k, time; varying vec3 vP; varying vec3 vN; varying vec3 vV;',
   'float hn(vec3 p){ return fract(sin(dot(p,vec3(12.9898,78.233,37.719)))*43758.5453); }',
-  'void main(){ float fr=pow(1.0-abs(dot(normalize(vN),normalize(vV))),1.6);',
+  'void main(){ float fr=pow(max(1.0-abs(dot(normalize(vN),normalize(vV))),0.0),1.6);',
   ' float lead=smoothstep(0.55,-0.95,vP.z)*0.85+smoothstep(0.2,-1.0,vP.y)*0.35;',
   ' float tail=smoothstep(-0.2,1.0,vP.z);',
   ' float st=0.55+0.45*sin(vP.x*23.0+vP.z*6.0-time*41.0)*sin(vP.y*19.0-time*29.0);',
