@@ -1349,11 +1349,23 @@ function bake(fs, uniforms, w, h, srgb){
 }
 
 var PLANET_FS=[
-  'uniform vec3 cDeep,cShallow,cLow,cLow2,cHigh,cPeak; uniform float water, seed, mode, polar;',
+  'uniform vec3 cDeep,cShallow,cLow,cLow2,cHigh,cPeak; uniform float water, seed, mode, polar, gas;',
   'float f3(vec3 d, vec2 o){ return tri(d,0.5,o,1)*0.5+tri(d,1.3,o+0.5,1)*0.25+tri(d,3.4,o+0.9,1)*0.13+tri(d,8.0,o+0.2,0)*0.08+tri(d,19.0,o+0.6,0)*0.04; }',
   'void main(){',
   '  vec3 d=dirFromUv(vUv); vec2 o=vec2(seed*0.173,seed*0.291);',
   '  vec3 wv=vec3(tri(d,0.9,o+1.3,2),tri(d,0.9,o+2.1,2),tri(d,0.9,o+3.7,2))-0.5; vec3 dw=normalize(d+wv*0.24);',
+  '  if(gas>0.5){',
+  '    float sw=tri(dw,6.0,o+3.3,1), sw2=tri(dw,19.0,o+1.9,0); float y=d.y+(sw-0.5)*0.05+(sw2-0.5)*0.015;',
+  '    float b1=sin(y*21.0+seed*3.0)*0.5+0.5, b2=sin(y*57.0+seed*5.0+sw*2.0)*0.5+0.5, b3=sin(y*9.0+seed)*0.5+0.5;',
+  '    vec3 gc=gas<1.5?mix(mix(cLow,cLow2,smoothstep(0.25,0.75,b1)),mix(cHigh,cPeak,b2),smoothstep(0.45,0.85,b3*0.6+b2*0.4)*0.7)',
+  '                   :mix(cLow,cLow2,0.45+(sw-0.5)*0.5+(b3-0.5)*0.12);',
+  '    gc*=0.9+0.2*sw2;',
+  '    if(mode<0.5) gl_FragColor=vec4(pow(max(gc,0.0),vec3(1.0/2.2)),1.0);',
+  '    else if(mode<1.5) gl_FragColor=vec4(0.5,0.95,0.0,1.0);',
+  '    else if(mode<2.5){ float c=gas<1.5?0.0:smoothstep(0.35,0.7,sw*0.7+sw2*0.3)*0.6; gl_FragColor=vec4(c,c,c,1.0); }',
+  '    else { float n=tri(dw,60.0,o+9.0,0); float l=smoothstep(0.86,0.93,n)*smoothstep(0.2,0.0,abs(d.y)-0.45); gl_FragColor=vec4(vec3(l),1.0); }',
+  '    return;',
+  '  }',
   '  float e=f3(dw,o); e=clamp((e-0.29)*2.3,0.0,1.0);',
   '  float rg=1.0-abs(tri(dw,6.5,o+4.0,1)*2.0-1.0); rg*=rg; float rg2=1.0-abs(tri(dw,17.0,o+4.6,0)*2.0-1.0); rg2*=rg2;',
   '  float mnt=smoothstep(0.62,0.9,e); e=clamp(e+(rg*0.7+rg2*0.3)*mnt*0.14,0.0,1.0);',
@@ -1417,10 +1429,10 @@ function genWord(r,n){ var w=''; for(var i=0;i<n;i++) w+=SYL[Math.floor(r()*SYL.
 function title(w){ return w.charAt(0).toUpperCase()+w.slice(1); }
 
 var ELEMENTS={AMETHINE:'#b26cff', CYANITE:'#46dcff', AURUM:'#ffd040', CRYONITE:'#8ab8ff', PYRITE:'#ff7436', TOXIUM:'#9dff3a', PRISMA:'#ff5cd0'};
-var TYPE_EL={lush:'AMETHINE', ocean:'CYANITE', desert:'AURUM', frozen:'CRYONITE', scorched:'PYRITE', toxic:'TOXIUM', exotic:'PRISMA'};
+var TYPE_EL={lush:'AMETHINE', ocean:'CYANITE', desert:'AURUM', frozen:'CRYONITE', scorched:'PYRITE', toxic:'TOXIUM', exotic:'PRISMA', gas:'CRYONITE', cloud:'AURUM'};
 var TYPE_META={lush:'LUSH · EXOTIC FLORA', ocean:'OCEANIC · TEMPERATE', desert:'ARID · MINERAL-DENSE', frozen:'FROZEN · SUB-ZERO',
-  scorched:'SCORCHED · VOLCANIC', toxic:'TOXIC · CAUSTIC', exotic:'ANOMALOUS · UNSTABLE'};
-var TYPE_SHORT={lush:'LUSH', ocean:'OCEAN', desert:'DESERT', frozen:'FROZEN', scorched:'SCORCHED', toxic:'TOXIC', exotic:'EXOTIC'};
+  scorched:'SCORCHED · VOLCANIC', toxic:'TOXIC · CAUSTIC', exotic:'ANOMALOUS · UNSTABLE', gas:'GAS GIANT · AMMONIA SKIMMERS', cloud:'CLOUD WORLD · BALLOON TOWNS'};
+var TYPE_SHORT={gas:'GAS GIANT', cloud:'CLOUD', lush:'LUSH', ocean:'OCEAN', desert:'DESERT', frozen:'FROZEN', scorched:'SCORCHED', toxic:'TOXIC', exotic:'EXOTIC'};
 
 /* art direction: every world keeps its signature hue, but muted and believable.
    Sky and ground lose chroma; flora accents lose most of it. Mineral colours stay for gameplay. */
@@ -1491,15 +1503,31 @@ function genBiome(seed, name, starCol, forceType){
     planet:{deep:water?hsl(wh,.7,.08):hsl(gh,gs*.6,gl*.5), shallow:water?hsl(wh,.6,.3):hsl(gh,gs*.7,gl*.7),
       low:hsl(gh,gs,gl), low2:hsl(gh+.05,gs+.1,gl+.1), high:hsl(gh+J(.1),.14,.28), peak:hsl(sh,.1,.9), polar:polar}};
   if(type==='frozen'){ b.rock=hsl(.6,.12,.45); b.sand=hsl(.58,.15,.85); b.flat2=hsl(.58,.1,.86); }
+  if(type==='gas' || type==='cloud') floatBiome(b, r);
   return finishBiome(b);
 }
+/* Gas giants (banded, ammonia skimmer platforms) and cloud worlds (a Venus-like yellow shroud, towns hung from
+   balloons). Neither has a surface you can reach: platforms ride above a sea of cloud, and below it the pressure
+   crushes a hull. */
+var SEA_Y=0, FLOOR_Y=-300;
+function floatBiome(b, r){
+  var gas=b.type==='gas', ice=gas && r()<.3, h=gas?(ice?.53+r()*.08:.06+r()*.06):.11+r()*.03;
+  b.float=true; b.gas=gas?1:2; b.water=null; b.grassDensity=0; b.flora=0; b.fauna=0; b.ring=gas && r()<.4;
+  b.zenith=hsl(h,gas?.3:.35,gas?.36:.5); b.horizon=hsl(h+.01,gas?.38:.5,gas?.7:.78); b.below=hsl(h,.3,.18);
+  b.cloud=gas?.6:.85; b.cloudCol=hsl(h+.01,gas?.3:.42,gas?.84:.86); b.fog=.0042+r()*.001;
+  b.seaCol=hsl(h-.01,gas?.42:.45,gas?.5:.66);
+  b.flat=b.flat2=b.sand=b.rock=hsl(h,.08,.4); b.peak=hsl(h,.2,.86);
+  b.planet={deep:hsl(h,.4,.3), shallow:hsl(h,.4,.4), low:hsl(h,gas?.45:.85,gas?.56:.5), low2:hsl(h+.03,gas?.32:.7,gas?.8:.6),
+    high:hsl(h-.03,gas?.5:.8,gas?.38:.4), peak:hsl(h+.05,.18,.9), polar:0};
+}
 
+HOME_BIOMES.push((function(){ var b=genBiome(505,'TALLOW DEEP','#fff0dc','gas'); b.dayHours=11; b.dayLen=11*DAY_SEC_PER_H; b.meta=TYPE_META.gas+' · 11 H DAY'; b.texSeed=4*3.7+1; b.skyBody=1; b.ring=true; return b; })());
 var STAR_CLASSES=[{cls:'M',col:'#ffb07e',name:'RED DWARF'},{cls:'K',col:'#ffd3a4',name:'ORANGE'},{cls:'G',col:'#fff3dc',name:'YELLOW'},
   {cls:'F',col:'#f4f6ff',name:'WHITE'},{cls:'A',col:'#d4e3ff',name:'BLUE-WHITE'}];
 function systemName(seed){ var r=rng(ihash(seed,991)); return genWord(r,2+(r()<.4?1:0)).toUpperCase()+'-'+(10+Math.floor(r()*890)); }
 function homeSystem(){
   return finishStation({seed:0, name:'ORIGIN', star:{cls:'G',col:'#fff0dc',name:'YELLOW'}, sunPos:new THREE.Vector3(-260,240,-1300).multiplyScalar(SUN_FAR),
-    planets:[{pos:new THREE.Vector3(-90,-10,-190).multiplyScalar(SYS_SPREAD),radius:22*PLANET_R},{pos:new THREE.Vector3(190,22,-70).multiplyScalar(SYS_SPREAD),radius:26*PLANET_R},{pos:new THREE.Vector3(-40,-24,170).multiplyScalar(SYS_SPREAD),radius:24*PLANET_R},{pos:new THREE.Vector3(230,-14,210).multiplyScalar(SYS_SPREAD),radius:19*PLANET_R}],
+    planets:[{pos:new THREE.Vector3(-90,-10,-190).multiplyScalar(SYS_SPREAD),radius:22*PLANET_R},{pos:new THREE.Vector3(190,22,-70).multiplyScalar(SYS_SPREAD),radius:26*PLANET_R},{pos:new THREE.Vector3(-40,-24,170).multiplyScalar(SYS_SPREAD),radius:24*PLANET_R},{pos:new THREE.Vector3(230,-14,210).multiplyScalar(SYS_SPREAD),radius:19*PLANET_R},{pos:new THREE.Vector3(-250,40,60).multiplyScalar(SYS_SPREAD),radius:44*PLANET_R}],
     biomes:HOME_BIOMES, neb:['#3a2a8a','#1a7a9a','#c87a5a'], belt:3, arrival:new THREE.Vector3(0,0,24)});
 }
 function genSystem(seed){
@@ -1514,6 +1542,7 @@ function genSystem(seed){
     planets.push({pos:new THREE.Vector3(Math.cos(ang)*dist,(r()-.5)*50*SYS_SPREAD,Math.sin(ang)*dist), radius:(16+r()*12)*PLANET_R});
     var pr=rng(ihash(seed,100+i)), suf=['',' PRIME',' MINOR',' IV',' VII',' B','',''];
     var isHab=habIdx.indexOf(i)>=0, ft=isHab?['lush','ocean','desert'][Math.floor(pr()*3)]:['frozen','scorched','toxic','exotic'][Math.floor(pr()*4)];
+    var fr=rng(ihash(seed,4400+i))(); if(!isHab && fr<.26){ ft='gas'; planets[i].radius*=1.75; } else if(!isHab && fr<.4){ ft='cloud'; isHab=true; }
     var b=genBiome(ihash(seed,i+1), genWord(pr,2+(pr()<.5?1:0)).toUpperCase()+suf[Math.floor(pr()*suf.length)], star.col, ft);
     if(isHab){ b.habitable=true; b.town={name:townName(b.seed)}; b.fauna=Math.max(b.fauna,.8); b.meta+=' \u00b7 SETTLED'; }
     biomes.push(b);
@@ -2178,7 +2207,7 @@ function buildSpaceStatic(){
 function bakePlanetTextures(b, i, res){
   var P=b.planet;
   var u=function(m){ return {cDeep:{value:lin(P.deep)}, cShallow:{value:lin(P.shallow)}, cLow:{value:lin(P.low)}, cLow2:{value:lin(P.low2)}, cHigh:{value:lin(P.high)}, cPeak:{value:lin(P.peak)},
-    water:{value:b.water?1:0}, seed:{value:b.texSeed!=null?b.texSeed:(b.seed%997)*.0371+i}, mode:{value:m}, polar:{value:P.polar}}; };
+    water:{value:b.water?1:0}, gas:{value:b.gas||0}, seed:{value:b.texSeed!=null?b.texSeed:(b.seed%997)*.0371+i}, mode:{value:m}, polar:{value:P.polar}}; };
   var t={color:bake(PLANET_FS,u(0),res,res/2,true), height:bake(PLANET_FS,u(1),res/2,res/4,false), clouds:bake(PLANET_FS,u(2),res/2,res/4,false), lights:b.town?bake(PLANET_FS,u(3),res,res/2,false):null};
   tud(t.color).shared=tud(t.height).shared=tud(t.clouds).shared=true; if(t.lights) tud(t.lights).shared=true; // owned by the system, not by surfaces
   return t;
@@ -2217,10 +2246,10 @@ function buildSystem(sys){
     var vis=new THREE.Group(); vis.position.copy(pd.pos); sysGroup.add(vis);
     var mesh=new THREE.Mesh(new THREE.SphereGeometry(radius,96,64),mat); mesh.rotation.z=.25-i*.12;
     vis.add(mesh);
-    var cl=new THREE.Mesh(new THREE.SphereGeometry(radius*1.012,96,64), new THREE.MeshStandardMaterial({color:0xffffff, alphaMap:tex.clouds, transparent:true, depthWrite:false, roughness:1, opacity:Math.min(1,b.cloud*1.3)}));
+    var cl=new THREE.Mesh(new THREE.SphereGeometry(radius*1.012,96,64), new THREE.MeshStandardMaterial({color:0xffffff, alphaMap:tex.clouds, transparent:true, depthWrite:false, roughness:1, opacity:b.float?.4:Math.min(1,b.cloud*1.3)}));
     mesh.add(cl);
     var atmoCol=lin(b.horizon).multiplyScalar(1.4).lerp(lin(b.zenith),.35);
-    var atmo=new THREE.Mesh(new THREE.SphereGeometry(radius*1.06,96,64), atmoMaterial(atmoCol,1.06,1.7,SPACE_SUN));
+    var atmo=new THREE.Mesh(new THREE.SphereGeometry(radius*1.06,96,64), atmoMaterial(atmoCol,1.06,b.float?1.1:1.7,SPACE_SUN));
     vis.add(atmo);
     var rg=null; if(b.ring){ rg=ringMesh(radius*1.45, radius*2.3, lin(b.peak).lerp(lin(b.rock),.45).multiplyScalar(.42)); rg.rotation.x=-Math.PI/2+.38; rg.rotation.y=.2; vis.add(rg); }
     planets.push({mesh:mesh, vis:vis, pos:pd.pos.clone(), soft:[atmo.material, cl.material], atmo:atmo, ring:rg, clouds:cl, radius:radius, index:i, biome:b, spin:.012+i*.003});
@@ -2300,14 +2329,15 @@ function makeHeightFn(b, seed){
     return h;
   };
 }
+var FLOAT_OUTPOSTS=[{label:'AMMONIA SKIMMER', suf:' SKIMMER'},{label:'GAS REFINERY', suf:' REFINERY'},{label:'RESEARCH AEROSTAT', suf:' AEROSTAT'}];
 var OUTPOST_TYPES=[{label:'MINING CAMP', suf:' CAMP'},{label:'RESEARCH OUTPOST', suf:' RESEARCH'},{label:'FUEL DEPOT', suf:' FUEL DEPOT'}];
 /* height field + settlement sites for a planet (deterministic, cached, no GPU work) */
 function planetTerrain(b){
   if(b._ter) return b._ter;
-  var H=makeHeightFn(b,b.seed), samp=[], i, j, k;
+  var H=b.float?function(){ return FLOOR_Y; }:makeHeightFn(b,b.seed), samp=[], i, j, k;
   for(j=0;j<16;j++) for(i=0;i<16;i++) samp.push(H(-1300+i*173.3+37,-1300+j*173.3+11));
   samp.sort(function(a,c){ return a-c; });
-  var lift=-samp[Math.floor((b.water?(b.type==='ocean'?.42:.22):.5)*samp.length)];
+  var lift=b.float?0:-samp[Math.floor((b.water?(b.type==='ocean'?.42:.22):.5)*samp.length)];
   var r=rng(ihash(b.seed,5150)), hab=!!b.town, n=hab?2+Math.floor(r()*3):1+(r()<.5?1:0), sites=[], sep=hab?850:950;
   for(var t=0;t<320 && sites.length<n;t++){
     if(t===200) sep=600;
@@ -2324,15 +2354,28 @@ function planetTerrain(b){
   sites.forEach(function(s,j2){
     s.j=j2; s.outpost=!hab;
     if(hab){ s.label='TOWN'; s.name=j2===0?b.town.name:townName(ihash(b.seed,300+j2)); }
-    else { var rr=rng(ihash(b.seed,700+j2)), ty=OUTPOST_TYPES[Math.floor(rr()*OUTPOST_TYPES.length)]; s.label=ty.label; s.name=genWord(rr,2).toUpperCase()+ty.suf; }
+    else { var rr=rng(ihash(b.seed,700+j2)), OT=b.float?FLOAT_OUTPOSTS:OUTPOST_TYPES, ty=OT[Math.floor(rr()*OT.length)]; s.label=ty.label; s.name=genWord(rr,2).toUpperCase()+ty.suf; }
+    if(b.float){ s.hs=34+(ihash(b.seed,9191+j2)%40); s.pr=hab?150:80; }   // platform deck height and radius
   });
-  b._ter={H:H, lift:lift, sites:sites};
+  b._ter={H:H, lift:lift, sites:sites, float:!!b.float};
   return b._ter;
 }
 function siteHeight(T,x,z){
+  if(T.float) return floatHeight(T,x,z);
   var h=T.H(x,z)+T.lift, s=T.sites, k, dx, dz, d2;
   for(k=0;k<s.length;k++){ dx=x-s[k].x; dz=z-s[k].z; d2=dx*dx+dz*dz; if(d2<FLAT_R*FLAT_R) h=lerp(h,s[k].hs,1-sstep(FLAT_IN,FLAT_R,Math.sqrt(d2))); }
   return h;
+}
+/* floating worlds: platform decks (and a home's annex and its bridge) are solid; everywhere else is the deep floor */
+function floatHeight(T,x,z,m){
+  var s=T.sites, k, dx, dz, pr; m=m||0;
+  for(k=0;k<s.length;k++){ dx=x-s[k].x; dz=z-s[k].z; pr=s[k].pr-m; if(dx*dx+dz*dz<pr*pr) return s[k].hs; }
+  var hm=T.homeAt!==undefined?T.homeAt:homeOnTer(T);
+  if(hm){ var st=s[(state.home&&state.home.site)||0]; if(st){
+    if(Math.hypot(x-hm.x,z-hm.z)<60-m) return st.hs;
+    var ax=hm.x-st.x, az=hm.z-st.z, L=Math.hypot(ax,az), t=clamp(((x-st.x)*ax+(z-st.z)*az)/(L*L),0,1);
+    if(Math.hypot(x-st.x-ax*t,z-st.z-az*t)<6-Math.min(m,3)) return st.hs; } }
+  return FLOOR_Y;
 }
 function nearSiteR(T,x,z,pad){ var s=T.sites; for(var k=0;k<s.length;k++){ var dx=x-s[k].x, dz=z-s[k].z, r=(s[k].cr||46)+pad; if(dx*dx+dz*dz<r*r) return true; } return false; }
 function nearSite(T,x,z,r){ var s=T.sites; for(var k=0;k<s.length;k++){ var dx=x-s[k].x, dz=z-s[k].z; if(dx*dx+dz*dz<r*r) return true; } return false; }
@@ -2398,8 +2441,9 @@ function* chunkBuilder(s, ci, cj, N){
   geo.setAttribute('color',new THREE.BufferAttribute(col,3)); geo.setAttribute('uv',new THREE.BufferAttribute(uv,2));
   geo.setIndex(new THREE.BufferAttribute(idx,1)); geo.computeBoundingSphere();
   var grp=new THREE.Group(), mesh=new THREE.Mesh(geo,A.terrainMat); mesh.receiveShadow=true; mesh.castShadow=hi && Q.shadows>0; grp.add(mesh);
+  if(b.float){ mesh.visible=false; mesh.castShadow=false; }   // only for collision: the platforms and the cloud sea are what you see
   var c={key:ci+','+cj, ci:ci, cj:cj, N:N, x0:x0, z0:z0, step:step, hts:hts, group:grp, mesh:mesh, ims:[], res:[]};
-  if(!hi) return c;
+  if(!hi || b.float) return c;
   yield 0;
 
   // props, seeded per tile so they come back identical when the tile reloads
@@ -2577,12 +2621,13 @@ async function buildSurface(idx){
   }
   var farGround=new THREE.Mesh(new THREE.PlaneGeometry(9000,9000,1,1), (b.water?new THREE.MeshStandardMaterial({color:lin(b.water), roughness:.12, metalness:0, envMapIntensity:1.3}):new THREE.MeshStandardMaterial({color:lin(b.flat).lerp(lin(b.rock),.35).multiplyScalar(.8), roughness:1, metalness:0, envMapIntensity:.4})));
   var lowH=1e9; for(var gj=0;gj<24;gj++) for(var gi=0;gi<24;gi++) lowH=Math.min(lowH,siteHeight(ter,-WORLD_E+(gi+.5)*WORLD_E/12,-WORLD_E+(gj+.5)*WORLD_E/12));
-  farGround.rotation.x=-Math.PI/2; farGround.position.y=lowH-6; farGround.renderOrder=-5; scene.add(farGround);
+  farGround.rotation.x=-Math.PI/2; farGround.position.y=lowH-6; farGround.renderOrder=-5; scene.add(farGround); farGround.visible=!b.float;
   if((w=yieldMaybe())) await w;
 
   // towns (habitable worlds) or outposts (everywhere else); any town-kit models with a url load first
   if(Object.keys(TOWN_KIT).some(function(id){ return TOWN_KIT[id].url && !TOWN_GLB[id] && !TOWN_KIT[id].failed; })) await loadTownKit();
   var towns=ter.sites.map(function(site){ return buildTown(scene,b,site,SYS.seed+':T'+idx+(site.j?'.'+site.j:'')); });
+  if(b.float) ter.sites.forEach(function(site){ buildPlatform(scene,b,site,ter); });
   if((w=yieldMaybe())) await w;
   // wind-blown grass
   var bladeGeo=new THREE.BufferGeometry(), bw=.05, bh=.75;
@@ -2639,7 +2684,8 @@ async function bakePlanetMap(b, ter){
   var cW=new THREE.Color(b.water||'#000'), cD=cW.clone().multiplyScalar(.45), t=new THREE.Color(), peakH=b.mount*.55;
   for(j=0;j<MP;j++) for(i=0;i<MP;i++){
     var h=hm[j*MP+i], hl=hm[j*MP+Math.max(0,i-1)], hu=hm[Math.max(0,j-1)*MP+i], o=(j*MP+i)*4;
-    if(b.water && h<0){ t.copy(cW).lerp(cD,sstep(0,-18,h)); }
+    if(b.float){ if(h<-100) t.set(b.seaCol).multiplyScalar(.75+fbm((i+.5)*.05+b.seed%7,(j+.5)*.12,3)*.5); else t.set('#8a8a86'); }
+    else if(b.water && h<0){ t.copy(cW).lerp(cD,sstep(0,-18,h)); }
     else {
       var sl=Math.hypot(h-hl,h-hu)/cell;
       t.copy(cF).lerp(cF2,.5).lerp(cR,sstep(.15,.5,sl)*.8).lerp(cP,sstep(peakH,peakH*1.35,h)*.85);
@@ -3283,7 +3329,7 @@ function disposeSurface(s){ if(!s) return; disposeObject(s.scene); if(s.envRT) s
 function hashCell(i,j,k){ return hash2(i*1.731+k*13.17, j*2.137-k*7.31); }
 function updateGrass(force, focus){
   if(!S) return;
-  var g=S.grass, cnt=Math.min(Q.grass,GRASS_MAX);
+  var g=S.grass, cnt=S.biome.float?0:Math.min(Q.grass,GRASS_MAX);
   if(cnt<=0){ g.count=0; return; }
   var p=focus||state.pos;
   if(!force && Math.abs(p.x-S.grassCenter.x)<3.5 && Math.abs(p.z-S.grassCenter.y)<3.5) return;
@@ -3448,6 +3494,7 @@ function placeCreature(s,c,cx,cz,spread,R){
   c.pos.set(cx,s.heightAt(cx,cz),cz); c.home.set(cx,cz);
 }
 function spawnFauna(s){
+  if(s.biome.float){ s.species=[]; s.fauna=[]; return; }
   var R=rng(ihash(s.biome.seed,77)); s.species=genSpecies(s.biome); s.fauna=[];
   s.species.forEach(function(sp){
     sp.assets={body:new THREE.MeshStandardMaterial({color:lin(sp.body), roughness:.72, metalness:.04}),
@@ -4021,6 +4068,7 @@ function serviceRates(loc){
   if(loc.kind==='home'){ var sh=homeTier().shop; return {fuel:1-sh, repair:1-sh, note:sh>=1?'Your workshop: fuel and repairs are free.':sh>0?'Your workshop: half the station price for fuel and repairs.':'No workshop yet (a FRONTIER HOUSE adds one): station prices.'}; }
   if(loc.kind==='station') return {fuel:1, repair:1, note:'Station rates.'};
   if(loc.outpost && /FUEL DEPOT/.test(loc.name)) return {fuel:.6, repair:1.6, note:'Fuel depot: cheapest fuel in the system.'};
+  if(loc.outpost && /REFINERY/.test(loc.name)) return {fuel:.55, repair:1.7, note:'Gas refinery: fuel straight off the cracking towers, the cheapest anywhere.'};
   if(loc.outpost) return {fuel:1.4, repair:1.6, note:'Remote outpost: everything costs extra.'};
   return {fuel:1.2, repair:1.3, note:'Town rates: a little above the station.'};
 }
@@ -7151,6 +7199,7 @@ function updateWarp(dt){
    Shared world upkeep for a planet surface
    ========================================================================= */
 function updateWorld(dt, focus){
+  if(S && S.biome.float) updateSea(S);
   var clock=updateDay(dt);
   setClock('LOCAL', clock);
   S.sky.position.copy(camera.position);
@@ -7242,7 +7291,7 @@ function updateAtmoAutopilot(dt){
   // look ahead along the path for the highest ground, keep clear of it
   var ux=dh>.01?dx/dh:0, uz=dh>.01?dz/dh:0, hi=-1e9;
   for(var k=0;k<=8;k++){ var a=Math.min(dh,k*25); hi=Math.max(hi,S.heightAt(p.x+ux*a,p.z+uz*a)); }
-  hi=Math.max(hi,S.waterLevel);
+  hi=Math.max(hi,S.waterLevel); if(S.biome.float) hi=Math.max(hi,SEA_Y+20);
   if(dh<T.cityR+60) hi=Math.max(hi,T.hs+T.skyH);   // clear the district towers on the way in
   var padY=T.pad.y+hullGear(sh), want;
   if(dh>260) want=hi+42;
@@ -7253,7 +7302,7 @@ function updateAtmoAutopilot(dt){
   var eY=wrapA(wantYaw-state.yaw), eP=wantPitch-state.pitch;
   state.apAxes={x:-clamp(eY*3,-1,1), y:(INVERT_PITCH?1:-1)*clamp(eP*3,-1,1)};
   setThrottle(dh<70?clamp(dh/90,.3,1):1);
-  var alt=p.y-Math.max(S.heightAt(p.x,p.z),S.waterLevel), spd=state.vel.length();
+  var alt=p.y-Math.max(S.heightAt(p.x,p.z),S.waterLevel,S.biome.float?SEA_Y:-1e9), spd=state.vel.length();
   if(dh<30 && alt<45 && spd<24){ apOff(''); toast('AUTOPILOT · SETTING DOWN AT '+T.name); land(true); }
 }
 /* =========================================================================
@@ -7264,24 +7313,93 @@ function updateAtmoAutopilot(dt){
    ========================================================================= */
 var DECK_Y=520, ENTRY_Y=930, EXIT_Y=1000;
 var DECK_VS='varying vec3 vW; void main(){ vec4 w=modelMatrix*vec4(position,1.0); vW=w.xyz; gl_Position=projectionMatrix*viewMatrix*w; }';
-var DECK_FS=['uniform sampler2D cloudTex; uniform vec2 cloudOff; uniform vec3 topCol, botCol, sunCol, fogCol, sunDir; uniform float cover, alphaK, seed;',
+var DECK_FS=['uniform sampler2D cloudTex; uniform vec2 cloudOff; uniform vec3 topCol, botCol, sunCol, fogCol, sunDir; uniform float cover, alphaK, seed, solid, scale, fogNear, fogFar;',
   'varying vec3 vW;',
   'void main(){',
-  ' vec2 q=vW.xz*0.0011+cloudOff+vec2(seed,seed*0.7);',
+  ' vec2 q=vW.xz*scale+cloudOff+vec2(seed,seed*0.7);',
   ' float n=texture2D(cloudTex,q).g*0.6+texture2D(cloudTex,q*2.9+0.37).g*0.3+texture2D(cloudTex,q*7.3+0.11).g*0.1;',
   ' float body=smoothstep(1.0-cover,1.0-cover+0.22,n), puff=smoothstep(0.25,0.85,n);',
-  ' float a=mix(0.35,1.0,body)*alphaK;',
+  ' float a=max(mix(0.35,1.0,body)*alphaK,solid);',
   ' vec3 c=gl_FrontFacing?topCol*(0.62+0.42*puff)+sunCol*puff*puff*0.25*clamp(sunDir.y+0.2,0.0,1.0):botCol*(1.25-0.55*puff);',
-  ' float d=length(vW.xz-cameraPosition.xz); float f=smoothstep(1300.0,3200.0,d);',
+  ' float d=length(vW.xz-cameraPosition.xz); float f=smoothstep(fogNear,fogFar,d);',
   ' gl_FragColor=vec4(mix(c,fogCol,f),a*(1.0-f*0.15));',
   '}'].join('\n');
 function buildDeck(s){
   var b=s.biome, U={cloudTex:FOGU.cloudTex, cloudOff:FOGU.cloudOff, topCol:{value:lin(b.cloudCol||'#e8e8ea')}, botCol:{value:lin(b.cloudCol||'#e8e8ea').multiplyScalar(.42)},
-    sunCol:{value:new THREE.Color()}, fogCol:{value:new THREE.Color()}, sunDir:{value:new THREE.Vector3(0,1,0)}, cover:{value:clamp((b.cloud||0)+.2,.55,.75)}, alphaK:{value:0}, seed:{value:((b.seed||0)%97)/97}};
+    sunCol:{value:new THREE.Color()}, fogCol:{value:new THREE.Color()}, sunDir:{value:new THREE.Vector3(0,1,0)}, cover:{value:clamp((b.cloud||0)+.2,.55,.75)}, alphaK:{value:0}, seed:{value:((b.seed||0)%97)/97}, solid:{value:0}, scale:{value:.0011}, fogNear:{value:1300}, fogFar:{value:3200}};
   if(!b.cloud || b.cloud<.3) U.topCol.value.lerp(lin(b.horizon),.45);   // dry worlds: a dust-and-haze layer rather than white cloud
   var m=new THREE.Mesh(new THREE.PlaneGeometry(9000,9000,1,1), new THREE.ShaderMaterial({uniforms:U, vertexShader:DECK_VS, fragmentShader:DECK_FS, transparent:true, depthWrite:false, side:THREE.DoubleSide}));
   m.rotation.x=-Math.PI/2; m.frustumCulled=false; m.renderOrder=5; s.scene.add(m);
   return {mesh:m, U:U};
+}
+function buildSea(s){
+  var b=s.biome, top=lin(b.seaCol||b.cloudCol), D=buildDeck(s), U=D.U;
+  U.topCol.value.copy(top); U.botCol.value.copy(top).multiplyScalar(.35); U.solid.value=1; U.alphaK.value=1; U.cover.value=.7; U.scale.value=.0024; U.seed.value+=.31;
+  U.fogNear.value=250; U.fogFar.value=2200;
+  D.mesh.position.y=SEA_Y; D.mesh.renderOrder=4; D.mesh.visible=true;
+  return D;
+}
+function updateSea(s){
+  if(!s.sea) s.sea=buildSea(s);
+  var U=s.sea.U; s.sea.mesh.position.set(camera.position.x,SEA_Y,camera.position.z);
+  U.sunDir.value.copy(s.sunDir); U.sunCol.value.copy(FOGU.fogSunCol.value); if(s.scene.fog) U.fogCol.value.copy(s.scene.fog.color);
+  U.topCol.value.copy(lin(s.biome.seaCol)).multiplyScalar(.25+.75*s.dayF);   // the sea darkens with the day
+}
+/* a platform deck: plated, railed, lit at the rim; gas giants hang skimmer intakes into the sea and ride on lift
+   thrusters, cloud worlds hang their towns from gas envelopes round the rim */
+function buildPlatform(scene, b, site, ter){
+  var g=new THREE.Group(), T=stationTextures(), hs=site.hs, R=site.pr, rr=rng(ihash(b.seed,4321+site.j)), gas=b.gas===1;
+  g.position.set(site.x,0,site.z); scene.add(g);
+  var deckM=new THREE.MeshStandardMaterial({color:lin('#77776f'), map:texRep(T.plate,R/9,R/9), metalness:.4, roughness:.72});
+  var dark=new THREE.MeshStandardMaterial({color:lin('#2b2c2e'), metalness:.6, roughness:.55});
+  var rust=new THREE.MeshStandardMaterial({color:lin(gas?'#7a5236':'#8c8576'), metalness:.35, roughness:.7});
+  var lampM=new THREE.MeshBasicMaterial({color:new THREE.Color(2.2,.5,.2)});
+  function mesh(geo,mat,x,y,z,par){ var m=new THREE.Mesh(geo,mat); m.position.set(x,y,z); m.castShadow=true; m.receiveShadow=true; (par||g).add(m); return m; }
+  function disc(par,r,y){
+    mesh(new THREE.CylinderGeometry(r,r*.97,4,Math.max(24,Math.round(r/3))),deckM,0,y-2.03,0,par);
+    mesh(new THREE.CylinderGeometry(r*.9,r*.3,r*.28,24),dark,0,y-4-r*.14,0,par);
+    var rim=mesh(new THREE.CylinderGeometry(r+.25,r+.25,1.1,Math.max(32,Math.round(r/2)),1,true),dark,0,y+.5,0,par); rim.material=rim.material.clone(); rim.material.side=THREE.DoubleSide;
+    var nl=Math.max(8,Math.round(r/6));
+    for(var i=0;i<nl;i++){ var a=i/nl*TAU, l=new THREE.Mesh(new THREE.SphereGeometry(.3,6,4),lampM); l.position.set(Math.cos(a)*(r+.3),y+1.2,Math.sin(a)*(r+.3)); par.add(l); }
+  }
+  disc(g,R,hs);
+  var hm=homeOnTer(ter), mine=hm && ter.sites[(state.home&&state.home.site)||0]===site;
+  if(mine){ var ag=new THREE.Group(); ag.position.set(hm.x-site.x,0,hm.z-site.z); g.add(ag); disc(ag,60,hs);
+    var L=Math.hypot(hm.x-site.x,hm.z-site.z), br=mesh(new THREE.BoxGeometry(12,1.2,L),deckM,(hm.x-site.x)/2,hs-.62,(hm.z-site.z)/2); br.rotation.y=Math.atan2(hm.x-site.x,hm.z-site.z); }
+  var homeAng=mine?Math.atan2(hm.z-site.z,hm.x-site.x):99;
+  function clearOfHome(a){ return Math.abs(wrapA(a-homeAng))>.45; }
+  // the open deck between the settlement and the rim: a painted boundary, sheds and container stacks, lit masts
+  var r0=(site.cr||46)+12, r1=R-(gas?20:10);
+  var line=new THREE.Mesh(new THREE.RingGeometry(r0-6,r0-5.4,96),new THREE.MeshBasicMaterial({color:lin('#8a6a2a')})); line.rotation.x=-Math.PI/2; line.position.y=hs+.03; g.add(line);
+  if(r1-r0>10){ var NS=Math.round((r1-r0)/7)+(site.outpost?3:8);
+    for(var q=0;q<NS;q++){ var aq=rr()*TAU; if(!clearOfHome(aq)) continue; var rq=r0+rr()*(r1-r0), qx=Math.cos(aq)*rq, qz=Math.sin(aq)*rq;
+      if(rr()<.7){ var w=6+rr()*8, hh=3+rr()*4, dd=5+rr()*6, sh=mesh(new THREE.BoxGeometry(w,hh,dd),rr()<.5?rust:dark,qx,hs+hh/2,qz); sh.rotation.y=-aq; }
+      else { var mh=14+rr()*14; mesh(new THREE.CylinderGeometry(.25,.4,mh,6),dark,qx,hs+mh/2,qz); var ml=new THREE.Mesh(new THREE.SphereGeometry(.45,6,4),lampM); ml.position.set(qx,hs+mh+.3,qz); g.add(ml); } } }
+  if(gas){
+    // skimmer intakes into the sea, lift thrusters round the keel, ammonia tanks at the rim
+    var NI=site.outpost?2:4;
+    for(var i=0;i<NI;i++){ var a=i/NI*TAU+rr(), rx=Math.cos(a)*R*.28, rz=Math.sin(a)*R*.28, top=hs-6, bot=SEA_Y-40, len=top-bot;
+      mesh(new THREE.CylinderGeometry(2.2,2.6,len,12),rust,rx,bot+len/2,rz);
+      var sc=mesh(new THREE.CylinderGeometry(3,8,10,14,1,true),dark,rx,bot-3,rz); sc.material=dark.clone(); sc.material.side=THREE.DoubleSide; }
+    var NT=site.outpost?6:12, glow=new THREE.MeshBasicMaterial({color:new THREE.Color(.6,1.2,3.2), map:glowTex, transparent:true, blending:THREE.AdditiveBlending, depthWrite:false});
+    for(var t=0;t<NT;t++){ var a2=t/NT*TAU, px=Math.cos(a2)*R*.95, pz=Math.sin(a2)*R*.95;
+      mesh(new THREE.CylinderGeometry(2.6,1.8,5,12),dark,px,hs-6.5,pz);
+      var fl=new THREE.Mesh(new THREE.PlaneGeometry(9,9),glow); fl.rotation.x=Math.PI/2; fl.position.set(px,hs-9.2,pz); g.add(fl); }
+    var NK=site.outpost?4:9;
+    for(var k=0;k<NK;k++){ var a3=k/NK*TAU+.3; if(!clearOfHome(a3)) continue; var tr=R-11, tx=Math.cos(a3)*tr, tz=Math.sin(a3)*tr, rad=4.5+rr()*2.5;
+      mesh(new THREE.SphereGeometry(rad,20,14),rust,tx,hs+rad+1.4,tz);
+      mesh(new THREE.CylinderGeometry(rad*.8,rad*.9,1.4,16),dark,tx,hs+.7,tz); }
+  } else {
+    // gas envelopes round the rim, tethered down to the deck, with gondolas slung under the keel
+    var NB=site.outpost?3:6, env=new THREE.MeshStandardMaterial({color:lin('#d6ccb0'), map:texRep(T.plate,3,1), roughness:.85, metalness:.05});
+    for(var e=0;e<NB;e++){ var a4=e/NB*TAU+rr()*.4; if(!clearOfHome(a4)) a4+=.9; var rb=site.outpost?16:24, d0=R+rb*.55, bx=Math.cos(a4)*d0, bz=Math.sin(a4)*d0, by=hs+rb*1.9;
+      var bal=mesh(new THREE.SphereGeometry(1,28,18),env,bx,by,bz); bal.scale.set(rb*1.7,rb*.85,rb); bal.rotation.y=-a4+Math.PI/2;
+      for(var tq=-1;tq<=1;tq+=2){ var ex=Math.cos(a4+tq*.12)*(R-1), ez=Math.sin(a4+tq*.12)*(R-1), cy=hs+(by-rb*.7-hs)/2, cl=Math.hypot(bx-ex,by-rb*.7-hs,bz-ez);
+        var cab=mesh(new THREE.CylinderGeometry(.12,.12,cl,4),dark,(bx+ex)/2,cy,(bz+ez)/2); cab.lookAt(g.position.x+bx,by-rb*.7,g.position.z+bz); cab.rotateX(Math.PI/2); } }
+    for(var gd=0;gd<(site.outpost?2:5);gd++){ var a5=rr()*TAU, gr=R*(.3+rr()*.4);
+      mesh(new THREE.BoxGeometry(10,5,7),rust,Math.cos(a5)*gr,hs-R*.12-6,Math.sin(a5)*gr); }
+  }
+  return g;
 }
 function updateDeck(s, camY){
   if(!s.deck) s.deck=buildDeck(s);
@@ -7293,6 +7411,15 @@ function updateDeck(s, camY){
   var inK=1-sstep(8,55,Math.abs(camY-DECK_Y));
   if(inK>0) addRumble(inK*.35, inK*.6);
   return inK;
+}
+/* sink into a floating world's cloud sea and the pressure climbs: the hull starts to go past 25 m down, and past
+   90 m the rig fights its way back up on its own */
+function seaPressure(dt, sh){
+  var dep=SEA_Y-sh.position.y; if(dep<=0) return;
+  if(dep>25){ state.seaWear=(state.seaWear||0)+dt*(dep-25)*.012; if(state.seaWear>=.5){ wearHull(state.seaWear); state.seaWear=0; } }
+  if(dep>90){ state.vel.y=Math.max(state.vel.y,(dep-90)*.5); addRumble(.4,.7); }
+  else if(dep>25) addRumble(.15*(dep-25)/65,.3);
+  if(!state.seaWarn || state.t-state.seaWarn>6){ state.seaWarn=state.t; toast(dep>60?'PRESSURE CRITICAL · HULL BUCKLING · CLIMB':'UNDER THE CLOUD SEA · PRESSURE RISING · CLIMB'); }
 }
 function updateAtmo(dt){
   var sh=S.ship, f;
@@ -7322,7 +7449,7 @@ function updateAtmo(dt){
     camera.lookAt(f.aim); camera.rotateZ(f.roll);
   }
   updateWorld(dt, sh.position);
-  var alt=sh.position.y-Math.max(S.heightAt(sh.position.x,sh.position.z),S.waterLevel);
+  var alt=sh.position.y-Math.max(S.heightAt(sh.position.x,sh.position.z),S.waterLevel,S.biome.float?SEA_Y:-1e9);
   var eh=clamp(1-(state.t-(state.entryT||-99))/8,0,1); setPlasma(sh, eh*eh*.9);
   if(eh>0){ addRumble(eh*.7, eh*1.2); if(Q.heat) finalPass.uniforms.heatK.value=Math.max(finalPass.uniforms.heatK.value,eh*.8); }
   var wxk=S.wx?S.wx.k*S.wx.cfg.turb:0, spd0=state.vel.length();
@@ -7335,7 +7462,10 @@ function updateAtmo(dt){
 
   veilHold=Math.max(0,veilHold-dt*.7);
   var deckIn=updateDeck(S, camera.position.y), altVeil=sstep(EXIT_Y-90,EXIT_Y,sh.position.y), climb=clamp(state.vel.y/30,0,1);
-  if(deckIn>altVeil && deckIn>veilHold) setVeil(deckIn*.9, S.biome.cloudCol||S.biome.horizon, 0);
+  var seaIn=S.biome.float?sstep(SEA_Y+2,SEA_Y-30,camera.position.y):0;
+  if(S.biome.float) seaPressure(dt, sh);
+  if(seaIn>.01 && seaIn>=deckIn) setVeil(Math.min(.96,seaIn), S.biome.seaCol, 0);
+  else if(deckIn>altVeil && deckIn>veilHold) setVeil(deckIn*.9, S.biome.cloudCol||S.biome.horizon, 0);
   else setVeil(Math.max(altVeil,veilHold), S.biome.horizon, altVeil*(1-altVeil)*4*climb);
   if(!state.landing && sh.position.y>EXIT_Y){ exitAtmosphere(); return; }
 
@@ -7345,7 +7475,7 @@ function updateAtmo(dt){
   else if(state.launch) setPrompt(null);
   else if(!state.landing){
     if(nt && padD<34 && alt<45 && spd<24) setPrompt('LAND ON PAD',nt.T.name,function(){ land(true); });
-    else if(alt<14 && spd<18 && S.slopeAt(sh.position.x,sh.position.z)<.6 && S.heightAt(sh.position.x,sh.position.z)>S.waterLevel+.4) setPrompt('LAND','SET DOWN HERE',function(){ land(false); });
+    else if(alt<14 && spd<18 && S.slopeAt(sh.position.x,sh.position.z)<.6 && S.heightAt(sh.position.x,sh.position.z)>(S.biome.float?SEA_Y:S.waterLevel+.4)) setPrompt('LAND','SET DOWN HERE',function(){ land(false); });
     else setPrompt(null);
     if(alt>=14 && alt<60 && !state.landHint){ state.landHint=true; toast((S.biome.town?'TOWN':'OUTPOST')+' PADS ON RADAR · TAP RADAR FOR THE MAP AND AUTOPILOT'); }
   }
@@ -7488,6 +7618,10 @@ function updateSurface(dt){
   var mx=(-inp.y*fx + inp.x*rx)*speed, mz=(-inp.y*fz + inp.x*rz)*speed;
   var p=state.pos;
   p.x+=mx*dt; p.z+=mz*dt;
+  if(S.biome.float){
+    if(floatHeight(S.ter,p.x,p.z,4)<SEA_Y){ p.x-=mx*dt; p.z-=mz*dt; }   // the rail at the deck edge
+    if(p.y<SEA_Y+5){ var ns=S.ter.sites.slice().sort(function(a,c){ return Math.hypot(a.x-p.x,a.z-p.z)-Math.hypot(c.x-p.x,c.z-p.z); })[0]; p.set(ns.x+14,ns.hs+1.7,ns.z); state.vy=0; toast('CAUGHT BY THE SAFETY NET · BACK ON THE DECK'); }
+  }
   p.x=clamp(p.x,-WORLD_E,WORLD_E); p.z=clamp(p.z,-WORLD_E,WORLD_E);
   var gh=Math.max(S.heightAt(p.x,p.z), S.waterLevel-.6), nt=nearestTown(p.x,p.z);
   if(nt && nt.d<10.2) gh=Math.max(gh,nt.T.pad.y);
@@ -8327,7 +8461,7 @@ async function boot(){
   frame();
   setTimeout(streamShipModels,1500);
 }
-window.__nh={droid:{DR:DR, groups:function(){ return jobGroups(); }, open:openDroid, close:closeNav, sites:function(){ return SYS?sysSiteLocs(SYS):[]; }, project:function(loc){ setProject(loc); renderInv(); }, deliver:function(loc){ var r=deliverHere(loc); renderInv(); return r; }}, town:{grow:function(loc,p){ return growTown(loc,p); }, rec:townRec, kit:function(){ return TOWN_KIT; }, prompt:kitPrompt, invest:investIn, world:{profile:sysProfile, base:townBaseLvl, sysInfo:sysInfo, sites:sysSiteLocs, spawnPirates:spawnPirates, lawActors:function(){ return lawActors; }}, road:{fire:function(i){ ROAD_EVENTS[i].run(); }, ok:function(){ return ROAD_EVENTS.map(function(e){ return e.ok(); }); }, R:ROAD}, fleetVisit:function(tier,j){ var T=S&&S.towns[j||0]; return fleetVisit({tier:tier||2, name:'TF-09', pilot:{name:'WREN TEST', grade:'veteran'}},T); }, fleetVis:function(){ return fleetVis; }, home:{pt:function(){ return homeT(); }, loc:function(){ return homeLoc(); }, land:function(){ var H=homeT(); if(!H) return false; S.ship.position.set(H.x,H.pad.y+hullGear(S.ship),H.z); state.landing={t:1, pad:true, town:H, y0:H.pad.y+10, y1:H.pad.y}; disembark(); state.camFrom=null; return true; }}, shares:function(mins,eff){ return simShares(mins,eff==null?1:eff); }, terminal:openTerminal}, stationLoc:function(){ return stationLoc(); }, lineup:function(){ var sc=new THREE.Scene(); sc.background=new THREE.Color(.16,.165,.17); sc.environment=spaceScene.environment;
+window.__nh={genSystem:genSystem, droid:{DR:DR, groups:function(){ return jobGroups(); }, open:openDroid, close:closeNav, sites:function(){ return SYS?sysSiteLocs(SYS):[]; }, project:function(loc){ setProject(loc); renderInv(); }, deliver:function(loc){ var r=deliverHere(loc); renderInv(); return r; }}, town:{grow:function(loc,p){ return growTown(loc,p); }, rec:townRec, kit:function(){ return TOWN_KIT; }, prompt:kitPrompt, invest:investIn, world:{profile:sysProfile, base:townBaseLvl, sysInfo:sysInfo, sites:sysSiteLocs, spawnPirates:spawnPirates, lawActors:function(){ return lawActors; }}, road:{fire:function(i){ ROAD_EVENTS[i].run(); }, ok:function(){ return ROAD_EVENTS.map(function(e){ return e.ok(); }); }, R:ROAD}, fleetVisit:function(tier,j){ var T=S&&S.towns[j||0]; return fleetVisit({tier:tier||2, name:'TF-09', pilot:{name:'WREN TEST', grade:'veteran'}},T); }, fleetVis:function(){ return fleetVis; }, home:{pt:function(){ return homeT(); }, loc:function(){ return homeLoc(); }, land:function(){ var H=homeT(); if(!H) return false; S.ship.position.set(H.x,H.pad.y+hullGear(S.ship),H.z); state.landing={t:1, pad:true, town:H, y0:H.pad.y+10, y1:H.pad.y}; disembark(); state.camFrom=null; return true; }}, shares:function(mins,eff){ return simShares(mins,eff==null?1:eff); }, terminal:openTerminal}, stationLoc:function(){ return stationLoc(); }, lineup:function(){ var sc=new THREE.Scene(); sc.background=new THREE.Color(.16,.165,.17); sc.environment=spaceScene.environment;
     sc.add(new THREE.HemisphereLight(0xdfe6ee,0x30302c,.8)); var dl=new THREE.DirectionalLight(0xffffff,2.2); dl.position.set(-30,50,40); sc.add(dl);
     var x=0; [0,1,4,2,3].forEach(function(t){ var h=buildHull(t,true,{value:.4}); var bb=new THREE.Box3().setFromObject(h); h.position.set(x-bb.min.x,-h.userData.gear,0); x+=bb.max.x-bb.min.x+3; sc.add(h); });
     var cam=new THREE.PerspectiveCamera(30,innerWidth/innerHeight,.1,1000); cam.position.set(x/2,22,x*.95); cam.lookAt(x/2,0,0); SHOWCASE={scene:sc, cam:cam, ground:new THREE.Object3D()}; },
