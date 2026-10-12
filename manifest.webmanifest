@@ -2,7 +2,7 @@
   "name": "Nomad Horizon",
   "short_name": "Nomad Horizon",
   "description": "Haul freight between space stations and frontier towns across an endless procedural galaxy.",
-  "id": "./",
+  "id": "/nomad-horizon/",
   "start_url": "./",
   "scope": "./",
   "display": "fullscreen",

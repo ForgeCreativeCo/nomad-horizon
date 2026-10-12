@@ -1,6 +1,6 @@
 /* Nomad Horizon service worker: offline play + fast reloads.
    Bump VERSION on every release so installed copies pick up the new game. */
-const VERSION = 'nh-2026-10-11-floating';
+const VERSION = 'nh-2026-10-12-app-id';
 const MUSIC_CACHE = 'nh-music-1';   // kept across releases so music downloads once
 const THREE_BASE = 'https://cdn.jsdelivr.net/npm/three@0.128.0/';
 const CORE = [
@@ -26,7 +26,8 @@ self.addEventListener('install', (e) => {
 self.addEventListener('activate', (e) => {
   e.waitUntil(
     caches.keys()
-      .then((keys) => Promise.all(keys.filter((k) => k !== VERSION && k !== MUSIC_CACHE).map((k) => caches.delete(k))))
+      /* only this game's old caches (all named nh-): other projects on forgecreativeco.github.io share this storage */
+      .then((keys) => Promise.all(keys.filter((k) => k.startsWith('nh-') && k !== VERSION && k !== MUSIC_CACHE).map((k) => caches.delete(k))))
       .then(() => self.clients.claim())
   );
 });
